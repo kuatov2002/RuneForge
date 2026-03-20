@@ -47,7 +47,7 @@ public class RunebreakerBoss : MonoBehaviour
 
     void OnHPChanged(int cur, int max)
     {
-        float ratio = cur / max;
+        float ratio = (float)cur / max;
         if (ratio < 0.33f && phase < 3)
         {
             phase = 3;

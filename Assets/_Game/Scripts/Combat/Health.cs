@@ -59,7 +59,14 @@ public class Health : MonoBehaviour
     public void TakeDamage(float amount)
     {
         if (isDead) return;
+
+        // Relic: modify incoming damage (Shield blocks first hit per room)
         int dmg = Mathf.Max(1, Mathf.CeilToInt(amount));
+        var relicMgr = GetComponent<RelicManager>();
+        if (relicMgr != null)
+            dmg = relicMgr.ModifyIncomingDamage(dmg);
+        if (dmg <= 0) return;
+
         currentHP -= dmg;
         if (currentHP < 0) currentHP = 0;
         OnHPChanged?.Invoke(currentHP, maxHP);

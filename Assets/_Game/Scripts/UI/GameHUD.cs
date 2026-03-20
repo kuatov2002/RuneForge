@@ -2,6 +2,7 @@ using UnityEngine;
 using UnityEngine.UIElements;
 using UnityEngine.TextCore.Text;
 using System;
+using System.Collections.Generic;
 
 public class GameHUD : MonoBehaviour
 {
@@ -20,6 +21,9 @@ public class GameHUD : MonoBehaviour
     VisualElement deathOverlay;
     Label deathWaveLabel;
     VisualElement victoryOverlay;
+
+    // Relics
+    VisualElement relicBar;
 
     // Boss HUD
     VisualElement bossHPContainer;
@@ -104,6 +108,14 @@ public class GameHUD : MonoBehaviour
 
         topBar.Add(rightCol);
         root.Add(topBar);
+
+        // ── Relic bar (under top bar, left side) ──
+        relicBar = new VisualElement();
+        relicBar.pickingMode = PickingMode.Ignore;
+        relicBar.style.flexDirection = FlexDirection.Row;
+        relicBar.style.paddingLeft = 20;
+        relicBar.style.paddingTop = 4;
+        root.Add(relicBar);
 
         // ── Boss HP bar ──
         bossHPContainer = new VisualElement();
@@ -498,6 +510,227 @@ public class GameHUD : MonoBehaviour
             mod = m.modifierType != ModifierType.None ? " + " + m.modifierName : "";
 
         return $"{elem}  {form}{mod}";
+    }
+
+    // ─── RELIC SELECTION ─────────────────────────────────────────
+
+    public void ShowRelicSelection(RelicSO[] options, Action<int> onSelect)
+    {
+        runeOverlay.style.display = DisplayStyle.Flex;
+        runePanel.Clear();
+        currentSpellPreview.Clear();
+        currentSpellPreview.Add(Lbl("Choose a Relic", 18, new Color(1f, 0.85f, 0.3f), FontStyle.Bold));
+        slotHintLabel.text = "Relics give passive bonuses for the rest of the run";
+
+        for (int i = 0; i < options.Length; i++)
+        {
+            int idx = i;
+            var relic = options[i];
+            var card = new VisualElement();
+            card.style.flexDirection = FlexDirection.Column;
+            card.style.width = 250;
+            card.style.marginLeft = 10;
+            card.style.marginRight = 10;
+            card.style.backgroundColor = CardBg;
+            Radius(card, 14);
+            Border(card, InactiveBorder, 2);
+            card.style.overflow = Overflow.Hidden;
+
+            card.RegisterCallback<ClickEvent>(_ =>
+            {
+                runeOverlay.style.display = DisplayStyle.None;
+                onSelect?.Invoke(idx);
+            });
+
+            // Header
+            var header = new VisualElement();
+            header.style.backgroundColor = relic.color;
+            Pad(header, 14, 18);
+            header.Add(Lbl(relic.relicName, 26, Color.white, FontStyle.Bold));
+            var typeLbl = Lbl("RELIC", 14, new Color(1, 1, 1, 0.75f), FontStyle.Bold);
+            typeLbl.style.marginTop = 2;
+            header.Add(typeLbl);
+            card.Add(header);
+
+            // Body
+            var body = new VisualElement();
+            Pad(body, 14, 18);
+            var descLbl = Lbl(relic.description, 18, new Color(0.85f, 0.85f, 0.9f));
+            descLbl.style.whiteSpace = WhiteSpace.Normal;
+            body.Add(descLbl);
+            card.Add(body);
+
+            // Hover
+            card.RegisterCallback<MouseEnterEvent>(_ =>
+            {
+                card.style.backgroundColor = CardBgHover;
+                Border(card, relic.color, 3);
+            });
+            card.RegisterCallback<MouseLeaveEvent>(_ =>
+            {
+                card.style.backgroundColor = CardBg;
+                Border(card, InactiveBorder, 2);
+            });
+
+            runePanel.Add(card);
+        }
+    }
+
+    public void ShowShopRoom(RelicSO[] allRelics, RelicManager mgr, Action<RelicSO> onDone)
+    {
+        runeOverlay.style.display = DisplayStyle.Flex;
+        runePanel.Clear();
+        currentSpellPreview.Clear();
+        currentSpellPreview.Add(Lbl("SHOP", 24, new Color(1f, 0.85f, 0.2f), FontStyle.Bold));
+        slotHintLabel.text = "Pick a relic or skip";
+
+        // Gather available relics
+        var available = new List<RelicSO>();
+        foreach (var r in allRelics)
+            if (!mgr.HasRelic(r.relicType)) available.Add(r);
+
+        int count = Mathf.Min(3, available.Count);
+        var options = new RelicSO[count];
+        for (int i = 0; i < count; i++)
+        {
+            int idx = UnityEngine.Random.Range(0, available.Count);
+            options[i] = available[idx];
+            available.RemoveAt(idx);
+        }
+
+        for (int i = 0; i < count; i++)
+        {
+            var relic = options[i];
+            var card = new VisualElement();
+            card.style.flexDirection = FlexDirection.Column;
+            card.style.width = 220;
+            card.style.marginLeft = 8;
+            card.style.marginRight = 8;
+            card.style.backgroundColor = CardBg;
+            Radius(card, 14);
+            Border(card, InactiveBorder, 2);
+            card.style.overflow = Overflow.Hidden;
+
+            card.RegisterCallback<ClickEvent>(_ =>
+            {
+                runeOverlay.style.display = DisplayStyle.None;
+                onDone?.Invoke(relic);
+            });
+
+            var header = new VisualElement();
+            header.style.backgroundColor = relic.color;
+            Pad(header, 12, 16);
+            header.Add(Lbl(relic.relicName, 22, Color.white, FontStyle.Bold));
+            card.Add(header);
+
+            var body = new VisualElement();
+            Pad(body, 12, 16);
+            var descLbl = Lbl(relic.description, 16, new Color(0.85f, 0.85f, 0.9f));
+            descLbl.style.whiteSpace = WhiteSpace.Normal;
+            body.Add(descLbl);
+            card.Add(body);
+
+            card.RegisterCallback<MouseEnterEvent>(_ =>
+            {
+                card.style.backgroundColor = CardBgHover;
+                Border(card, relic.color, 3);
+            });
+            card.RegisterCallback<MouseLeaveEvent>(_ =>
+            {
+                card.style.backgroundColor = CardBg;
+                Border(card, InactiveBorder, 2);
+            });
+
+            runePanel.Add(card);
+        }
+
+        // Skip button
+        var skipCard = new VisualElement();
+        skipCard.style.flexDirection = FlexDirection.Column;
+        skipCard.style.width = 120;
+        skipCard.style.marginLeft = 8;
+        skipCard.style.backgroundColor = CardBg;
+        Radius(skipCard, 14);
+        Border(skipCard, Dim, 2);
+        skipCard.style.alignItems = Align.Center;
+        skipCard.style.justifyContent = Justify.Center;
+        Pad(skipCard, 20, 16);
+        skipCard.Add(Lbl("SKIP", 20, Dim, FontStyle.Bold));
+        skipCard.RegisterCallback<ClickEvent>(_ =>
+        {
+            runeOverlay.style.display = DisplayStyle.None;
+            onDone?.Invoke(null);
+        });
+        skipCard.RegisterCallback<MouseEnterEvent>(_ =>
+        {
+            skipCard.style.backgroundColor = CardBgHover;
+            Border(skipCard, Color.white, 2);
+        });
+        skipCard.RegisterCallback<MouseLeaveEvent>(_ =>
+        {
+            skipCard.style.backgroundColor = CardBg;
+            Border(skipCard, Dim, 2);
+        });
+        runePanel.Add(skipCard);
+    }
+
+    public void ShowRestRoom(Action onContinue)
+    {
+        runeOverlay.style.display = DisplayStyle.Flex;
+        runePanel.Clear();
+        currentSpellPreview.Clear();
+        currentSpellPreview.Add(Lbl("REST ROOM", 24, new Color(0.3f, 0.9f, 0.5f), FontStyle.Bold));
+        slotHintLabel.text = "You feel refreshed. HP fully restored.";
+
+        var continueCard = new VisualElement();
+        continueCard.style.flexDirection = FlexDirection.Column;
+        continueCard.style.width = 200;
+        continueCard.style.backgroundColor = CardBg;
+        Radius(continueCard, 14);
+        Border(continueCard, new Color(0.3f, 0.8f, 0.5f), 2);
+        continueCard.style.alignItems = Align.Center;
+        continueCard.style.justifyContent = Justify.Center;
+        Pad(continueCard, 24, 20);
+        continueCard.Add(Lbl("CONTINUE", 24, new Color(0.3f, 0.9f, 0.5f), FontStyle.Bold));
+        continueCard.RegisterCallback<ClickEvent>(_ =>
+        {
+            runeOverlay.style.display = DisplayStyle.None;
+            onContinue?.Invoke();
+        });
+        continueCard.RegisterCallback<MouseEnterEvent>(_ =>
+        {
+            continueCard.style.backgroundColor = CardBgHover;
+            Border(continueCard, new Color(0.4f, 1f, 0.6f), 3);
+        });
+        continueCard.RegisterCallback<MouseLeaveEvent>(_ =>
+        {
+            continueCard.style.backgroundColor = CardBg;
+            Border(continueCard, new Color(0.3f, 0.8f, 0.5f), 2);
+        });
+        runePanel.Add(continueCard);
+    }
+
+    public void RefreshRelics(List<RelicSO> relics)
+    {
+        relicBar.Clear();
+        foreach (var r in relics)
+        {
+            var icon = new VisualElement();
+            icon.style.width = 28;
+            icon.style.height = 28;
+            icon.style.marginRight = 4;
+            Radius(icon, 6);
+            icon.style.backgroundColor = r.color;
+            Border(icon, new Color(r.color.r * 0.6f, r.color.g * 0.6f, r.color.b * 0.6f), 1);
+            icon.tooltip = $"{r.relicName}: {r.description}";
+
+            var initial = Lbl(r.relicName.Substring(0, 1), 14, Color.white, FontStyle.Bold);
+            initial.style.alignSelf = Align.Center;
+            initial.style.unityTextAlign = UnityEngine.TextAnchor.MiddleCenter;
+            icon.Add(initial);
+
+            relicBar.Add(icon);
+        }
     }
 
     // ─── PUBLIC API ───────────────────────────────────────────────

@@ -16,6 +16,10 @@ public class Bootstrap : MonoBehaviour
     ModifierSO noneMod, splitMod, pierceMod, bounceMod, leechMod, oversizeMod, volatileMod, homingMod;
     ModifierSO[] allModifiers;
 
+    // Relics
+    RelicSO[] allRelics;
+    RelicManager relicMgr;
+
     // Runtime
     GameObject player;
     PlayerController playerCtrl;
@@ -143,6 +147,28 @@ public class Bootstrap : MonoBehaviour
         homingMod.homingDetectRange = 10f; homingMod.homingSpeedMult = 0.7f;
 
         allModifiers = new[] { noneMod, splitMod, pierceMod, bounceMod, leechMod, oversizeMod, volatileMod, homingMod };
+
+        // Relics
+        allRelics = new RelicSO[]
+        {
+            CreateRelic("Swift Boots", RelicType.SpeedBoost, "+15% movement speed", new Color(0.3f, 0.8f, 1f)),
+            CreateRelic("Double Strike", RelicType.DoubleStrike, "Every 5th hit deals 2x damage", new Color(1f, 0.6f, 0.1f)),
+            CreateRelic("Blazing Trail", RelicType.DashFire, "Dash leaves a fire trail", new Color(1f, 0.3f, 0.1f)),
+            CreateRelic("Thorns", RelicType.Thorns, "Reflect 1 damage to melee attackers", new Color(0.5f, 0.8f, 0.2f)),
+            CreateRelic("Vampire Aura", RelicType.VampireAura, "Heal 1 HP per room cleared", new Color(0.8f, 0.1f, 0.2f)),
+            CreateRelic("Glass Cannon", RelicType.GlassCannon, "+50% damage, -1 max HP", new Color(0.9f, 0.9f, 0.3f)),
+            CreateRelic("Aegis", RelicType.Shield, "Block the first hit in each room", new Color(0.4f, 0.6f, 0.9f)),
+            CreateRelic("Lucky Charm", RelicType.Lucky, "+20% chance for 4th rune choice", new Color(0.2f, 0.9f, 0.4f)),
+            CreateRelic("Berserker Rage", RelicType.Berserker, "+25% damage when below 50% HP", new Color(0.9f, 0.2f, 0.1f)),
+            CreateRelic("Regeneration", RelicType.Regeneration, "Heal 1 HP every 30 seconds", new Color(0.3f, 0.9f, 0.5f)),
+        };
+    }
+
+    static RelicSO CreateRelic(string name, RelicType type, string desc, Color col)
+    {
+        var r = ScriptableObject.CreateInstance<RelicSO>();
+        r.relicName = name; r.relicType = type; r.description = desc; r.color = col;
+        return r;
     }
 
     static ElementSO CreateElement(string name, int dmg, StatusEffectType effect, float dps, float dur, Color col)
@@ -221,6 +247,7 @@ public class Bootstrap : MonoBehaviour
 
         wave++;
         hud.SetFloorRoom(currentFloor, currentRoom);
+        if (relicMgr != null) relicMgr.OnRoomEnter();
         SpawnWave();
     }
 
@@ -313,6 +340,9 @@ public class Bootstrap : MonoBehaviour
         spellCaster.spellSlots[0] = new SpellData { element = fireElem, form = boltForm, modifier = noneMod };
         spellCaster.spellSlots[1] = new SpellData { element = iceElem, form = coneForm, modifier = splitMod };
 
+        relicMgr = player.AddComponent<RelicManager>();
+        relicMgr.Init(playerHealth, playerCtrl);
+
         playerHealth.OnDeath += OnPlayerDeath;
 
         // Update staff tip color when spell changes
@@ -395,6 +425,20 @@ public class Bootstrap : MonoBehaviour
             return;
         }
 
+        // Shop room: room 5
+        if (currentRoom == 5)
+        {
+            StartShopRoom();
+            return;
+        }
+
+        // Rest room: room 8
+        if (currentRoom == 8)
+        {
+            StartRestRoom();
+            return;
+        }
+
         // Threat budget scales with floor: Floor 1=10, 2=18, 3=28, 4=40, 5=55
         int baseBudget = currentFloor switch { 1 => 10, 2 => 18, 3 => 28, 4 => 40, _ => 55 };
         int budget = baseBudget + (currentRoom - 1) * 2;
@@ -416,6 +460,28 @@ public class Bootstrap : MonoBehaviour
             else { SpawnEnemy(type); enemiesAlive++; }
         }
         if (enemiesAlive == 0) { SpawnEnemy(0); enemiesAlive = 1; }
+    }
+
+    void StartShopRoom()
+    {
+        // Shop: show 3 relics to buy (auto-offer, no combat)
+        hud.ShowShopRoom(allRelics, relicMgr, relic =>
+        {
+            if (relic != null)
+            {
+                relicMgr.AddRelic(relic);
+                hud.RefreshRelics(relicMgr.OwnedRelics);
+            }
+            TransitionToNextRoom();
+        });
+    }
+
+    void StartRestRoom()
+    {
+        // Rest: heal to full, then advance
+        if (playerHealth != null)
+            playerHealth.Heal(playerHealth.maxHP);
+        hud.ShowRestRoom(() => TransitionToNextRoom());
     }
 
     int PickEnemyType(int budget)
@@ -797,18 +863,27 @@ public class Bootstrap : MonoBehaviour
     void ShowRuneSelection()
     {
         roomCleared = true;
-        var options = new ScriptableObject[3];
+
+        // Every 3rd room: offer relic choice instead of rune
+        if (currentRoom % 3 == 0 && !bossActive)
+        {
+            ShowRelicSelection();
+            return;
+        }
+
+        int count = 3;
+        // Lucky relic: 20% chance for 4th choice
+        if (relicMgr != null && relicMgr.HasLucky) count = 4;
+
+        var options = new ScriptableObject[count];
 
         // Weighted rune pools by floor
-        // Floor 1-2: 60% element, 30% form, 10% modifier
-        // Floor 2-3: 30% element, 50% form, 20% modifier
-        // Floor 3-5: 10% element, 30% form, 60% modifier
         float elemW, formW;
         if (currentFloor <= 2) { elemW = 0.6f; formW = 0.3f; }
         else if (currentFloor <= 3) { elemW = 0.3f; formW = 0.5f; }
         else { elemW = 0.1f; formW = 0.3f; }
 
-        for (int i = 0; i < 3; i++)
+        for (int i = 0; i < count; i++)
         {
             float r = Random.value;
             if (r < elemW)
@@ -822,20 +897,59 @@ public class Bootstrap : MonoBehaviour
         hud.ShowRuneSelection(options, idx =>
         {
             ApplyRune(options[idx]);
-            // After boss kill, advance floor
             if (bossActive)
-            {
                 bossActive = false;
-                TransitionToNextRoom();
-                return;
-            }
-            // Normal room: doors are now unlocked (roomCleared = true)
-            // If no doors, just advance directly
-            if (currentRoom >= roomsPerFloor)
-            {
-                TransitionToNextRoom();
-            }
-            // Otherwise player walks through door to proceed
+            TransitionToNextRoom();
+        });
+    }
+
+    void ShowRelicSelection()
+    {
+        // Pick 3 random relics the player doesn't have yet
+        var available = new List<RelicSO>();
+        foreach (var r in allRelics)
+            if (!relicMgr.HasRelic(r.relicType)) available.Add(r);
+
+        if (available.Count == 0)
+        {
+            // All relics owned, show normal rune selection instead
+            ShowRuneSelectionForce();
+            return;
+        }
+
+        int count = Mathf.Min(3, available.Count);
+        var options = new RelicSO[count];
+        for (int i = 0; i < count; i++)
+        {
+            int idx = Random.Range(0, available.Count);
+            options[i] = available[idx];
+            available.RemoveAt(idx);
+        }
+
+        hud.ShowRelicSelection(options, idx =>
+        {
+            relicMgr.AddRelic(options[idx]);
+            hud.RefreshRelics(relicMgr.OwnedRelics);
+            TransitionToNextRoom();
+        });
+    }
+
+    // Fallback when all relics are owned
+    void ShowRuneSelectionForce()
+    {
+        var options = new ScriptableObject[3];
+        float elemW = 0.3f, formW = 0.3f;
+        for (int i = 0; i < 3; i++)
+        {
+            float r = Random.value;
+            if (r < elemW) options[i] = allElements[Random.Range(0, allElements.Length)];
+            else if (r < elemW + formW) options[i] = allForms[Random.Range(0, allForms.Length)];
+            else options[i] = allModifiers[Random.Range(0, allModifiers.Length)];
+        }
+        hud.ShowRuneSelection(options, idx =>
+        {
+            ApplyRune(options[idx]);
+            TransitionToNextRoom();
         });
     }
 

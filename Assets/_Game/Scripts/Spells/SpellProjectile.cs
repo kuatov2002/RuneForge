@@ -154,7 +154,13 @@ public class SpellProjectile : MonoBehaviour
                 return;
             }
 
-            health.TakeDamage(damage);
+            float finalDmg = damage;
+            if (playerHealth != null)
+            {
+                var relicMgr = playerHealth.GetComponent<RelicManager>();
+                if (relicMgr != null) finalDmg = relicMgr.ModifyDamage(finalDmg);
+            }
+            health.TakeDamage(finalDmg);
             health.ApplyStatusEffect(element);
 
             // Leech

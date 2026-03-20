@@ -65,12 +65,18 @@ public class PlayerController : MonoBehaviour
         dashCDTimer -= Time.deltaTime;
         if (mouse != null && mouse.rightButton.wasPressedThisFrame && dashCDTimer <= 0)
         {
+            Vector3 dashFrom = transform.position;
             isDashing = true;
             isInvulnerable = true;
             dashTimer = DashDuration;
             dashCDTimer = dashCooldown;
             rb.linearVelocity = transform.forward * (dashDistance / DashDuration);
             Invoke(nameof(EndIFrames), IFrameDuration);
+
+            // Dash fire relic
+            var relicMgr = GetComponent<RelicManager>();
+            if (relicMgr != null)
+                relicMgr.OnDash(dashFrom, dashFrom + transform.forward * dashDistance);
         }
     }
 
