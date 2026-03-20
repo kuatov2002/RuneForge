@@ -24,6 +24,16 @@ public class RelicManager : MonoBehaviour
         LoadRelics();
     }
 
+    public void ClearRelics()
+    {
+        ownedRelics.Clear();
+        hitCounter = 0;
+        regenTimer = 0;
+        roomShieldActive = false;
+        PlayerPrefs.DeleteKey("owned_relics");
+        PlayerPrefs.Save();
+    }
+
     public void AddRelic(RelicSO relic)
     {
         ownedRelics.Add(relic);

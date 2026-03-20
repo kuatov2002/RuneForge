@@ -1059,6 +1059,16 @@ public class Bootstrap : MonoBehaviour
         playerCtrl.enabled = true;
         spellCaster.enabled = true;
 
+        // Clear relics on death — roguelite reset
+        if (relicMgr != null) relicMgr.ClearRelics();
+        hud.RefreshRelics(relicMgr.OwnedRelics);
+
+        // Reset base stats that relics may have modified
+        playerCtrl.moveSpeed = 6f;
+        int baseHP = 5 + MetaProgression.MaxHPBonus;
+        playerHealth.maxHP = baseHP;
+        playerHealth.currentHP = baseHP;
+
         wave = 1;
         currentFloor = 1;
         currentRoom = 1;
