@@ -1,21 +1,31 @@
 using UnityEngine;
 using UnityEngine.UIElements;
+using UnityEngine.TextCore.Text;
 using System;
 
 public class GameHUD : MonoBehaviour
 {
-    UIDocument uiDoc;
-    Label hpLabel;
-    Label spell1Label;
-    Label spell2Label;
-    VisualElement spell1Slot;
-    VisualElement spell2Slot;
-    Label waveLabel;
-    VisualElement runePanel;
-    Label deathLabel;
-
     SpellCaster caster;
     Health playerHealth;
+    UIDocument uiDoc;
+
+    VisualElement hpBar;
+    Label waveLabel;
+    VisualElement spell1Card, spell2Card;
+    VisualElement runeOverlay;
+    VisualElement runePanel;
+    VisualElement currentSpellPreview;
+    Label slotHintLabel;
+    VisualElement deathOverlay;
+    Label deathWaveLabel;
+
+    static readonly Color CardBg = new(0.06f, 0.06f, 0.1f, 0.92f);
+    static readonly Color CardBgHover = new(0.12f, 0.12f, 0.18f, 0.95f);
+    static readonly Color ActiveBorder = new(1f, 0.85f, 0.2f);
+    static readonly Color InactiveBorder = new(0.3f, 0.3f, 0.35f);
+    static readonly Color FormColor = new(0.4f, 0.55f, 0.75f);
+    static readonly Color ModColor = new(0.25f, 0.7f, 0.6f);
+    static readonly Color Dim = new(0.5f, 0.5f, 0.55f);
 
     public void Init(SpellCaster sc, Health hp)
     {
@@ -23,220 +33,473 @@ public class GameHUD : MonoBehaviour
         playerHealth = hp;
 
         uiDoc = gameObject.AddComponent<UIDocument>();
-        uiDoc.panelSettings = CreatePanelSettings();
-
-        var root = uiDoc.rootVisualElement;
-        root.style.flexGrow = 1;
-        root.style.flexDirection = FlexDirection.Column;
-        root.style.justifyContent = Justify.SpaceBetween;
-
-        // Top bar
-        var topBar = new VisualElement();
-        topBar.style.flexDirection = FlexDirection.Row;
-        topBar.style.paddingTop = 10;
-        topBar.style.paddingLeft = 10;
-
-        hpLabel = new Label($"HP: {hp.currentHP}/{hp.maxHP}");
-        hpLabel.style.fontSize = 24;
-        hpLabel.style.color = Color.white;
-        hpLabel.style.unityFontStyleAndWeight = FontStyle.Bold;
-        topBar.Add(hpLabel);
-
-        waveLabel = new Label("Wave 1");
-        waveLabel.style.fontSize = 20;
-        waveLabel.style.color = new Color(1f, 0.9f, 0.3f);
-        waveLabel.style.marginLeft = 30;
-        topBar.Add(waveLabel);
-
-        root.Add(topBar);
-
-        // Death label (hidden)
-        deathLabel = new Label("YOU DIED - Press R to restart");
-        deathLabel.style.fontSize = 36;
-        deathLabel.style.color = new Color(1f, 0.2f, 0.2f);
-        deathLabel.style.unityFontStyleAndWeight = FontStyle.Bold;
-        deathLabel.style.unityTextAlign = TextAnchor.MiddleCenter;
-        deathLabel.style.position = Position.Absolute;
-        deathLabel.style.top = new Length(40, LengthUnit.Percent);
-        deathLabel.style.left = 0;
-        deathLabel.style.right = 0;
-        deathLabel.style.display = DisplayStyle.None;
-        root.Add(deathLabel);
-
-        // Rune selection (hidden)
-        runePanel = new VisualElement();
-        runePanel.style.flexGrow = 1;
-        runePanel.style.alignItems = Align.Center;
-        runePanel.style.justifyContent = Justify.Center;
-        runePanel.style.display = DisplayStyle.None;
-        root.Add(runePanel);
-
-        // Bottom bar
-        var bottomBar = new VisualElement();
-        bottomBar.style.flexDirection = FlexDirection.Row;
-        bottomBar.style.justifyContent = Justify.Center;
-        bottomBar.style.paddingBottom = 20;
-        bottomBar.style.alignItems = Align.Center;
-
-        spell1Slot = CreateSpellSlot(out spell1Label);
-        spell2Slot = CreateSpellSlot(out spell2Label);
-
-        bottomBar.Add(spell1Slot);
-
-        var swapLabel = new Label("  [Q]  ");
-        swapLabel.style.color = Color.gray;
-        swapLabel.style.fontSize = 16;
-        bottomBar.Add(swapLabel);
-
-        bottomBar.Add(spell2Slot);
-        root.Add(bottomBar);
-
-        // Controls hint
-        var controls = new Label("WASD - Move | LMB - Cast | RMB - Dash | Q - Swap spell");
-        controls.style.fontSize = 12;
-        controls.style.color = new Color(0.5f, 0.5f, 0.5f);
-        controls.style.unityTextAlign = TextAnchor.MiddleCenter;
-        controls.style.paddingBottom = 5;
-        root.Add(controls);
-
-        playerHealth.OnHPChanged += (cur, max) => hpLabel.text = $"HP: {cur}/{max}";
-        caster.OnSpellChanged += UpdateSpellDisplay;
-
-        UpdateSpellDisplay();
-    }
-
-    VisualElement CreateSpellSlot(out Label label)
-    {
-        var slot = new VisualElement();
-        slot.style.backgroundColor = new Color(0, 0, 0, 0.7f);
-        slot.style.paddingTop = 8;
-        slot.style.paddingBottom = 8;
-        slot.style.paddingLeft = 12;
-        slot.style.paddingRight = 12;
-        slot.style.borderTopLeftRadius = 8;
-        slot.style.borderTopRightRadius = 8;
-        slot.style.borderBottomLeftRadius = 8;
-        slot.style.borderBottomRightRadius = 8;
-        SetBorder(slot, Color.gray, 2);
-        slot.style.width = 200;
-
-        label = new Label("Empty");
-        label.style.fontSize = 14;
-        label.style.color = Color.white;
-        label.style.unityTextAlign = TextAnchor.MiddleCenter;
-        slot.Add(label);
-
-        return slot;
-    }
-
-    static void SetBorder(VisualElement el, Color color, int width)
-    {
-        el.style.borderTopColor = color;
-        el.style.borderBottomColor = color;
-        el.style.borderLeftColor = color;
-        el.style.borderRightColor = color;
-        el.style.borderTopWidth = width;
-        el.style.borderBottomWidth = width;
-        el.style.borderLeftWidth = width;
-        el.style.borderRightWidth = width;
-    }
-
-    void UpdateSpellDisplay()
-    {
-        UpdateSlotVisual(0, spell1Slot, spell1Label);
-        UpdateSlotVisual(1, spell2Slot, spell2Label);
-    }
-
-    void UpdateSlotVisual(int index, VisualElement slot, Label label)
-    {
-        var spell = caster.spellSlots[index];
-        bool isActive = caster.activeSlot == index;
-
-        var borderColor = isActive ? Color.yellow : Color.gray;
-        SetBorder(slot, borderColor, isActive ? 3 : 2);
-
-        if (spell != null && spell.element != null)
-        {
-            string elem = spell.element.elementName;
-            string form = spell.form != null ? spell.form.formName : "???";
-            string mod = spell.modifier != null && spell.modifier.modifierType != ModifierType.None
-                ? $" + {spell.modifier.modifierName}" : "";
-            label.text = $"{elem} {form}{mod}";
-            label.style.color = spell.element.color;
-        }
-        else
-        {
-            label.text = "Empty";
-            label.style.color = Color.gray;
-        }
-    }
-
-    public void SetWave(int wave)
-    {
-        waveLabel.text = $"Wave {wave}";
-    }
-
-    public void ShowRuneSelection(string[] runeNames, Action<int> onSelect)
-    {
-        runePanel.style.display = DisplayStyle.Flex;
-        runePanel.Clear();
-
-        var title = new Label("Choose a Rune");
-        title.style.fontSize = 28;
-        title.style.color = Color.white;
-        title.style.marginBottom = 20;
-        title.style.unityFontStyleAndWeight = FontStyle.Bold;
-        runePanel.Add(title);
-
-        var row = new VisualElement();
-        row.style.flexDirection = FlexDirection.Row;
-
-        for (int i = 0; i < runeNames.Length; i++)
-        {
-            int idx = i;
-            var btn = new Button(() =>
-            {
-                runePanel.style.display = DisplayStyle.None;
-                onSelect?.Invoke(idx);
-            });
-            btn.text = runeNames[i];
-            btn.style.fontSize = 16;
-            btn.style.paddingTop = 15;
-            btn.style.paddingBottom = 15;
-            btn.style.paddingLeft = 25;
-            btn.style.paddingRight = 25;
-            btn.style.marginLeft = 10;
-            btn.style.marginRight = 10;
-            btn.style.backgroundColor = new Color(0.15f, 0.15f, 0.2f, 0.9f);
-            btn.style.color = Color.white;
-            btn.style.borderTopLeftRadius = 8;
-            btn.style.borderTopRightRadius = 8;
-            btn.style.borderBottomLeftRadius = 8;
-            btn.style.borderBottomRightRadius = 8;
-            SetBorder(btn, new Color(0.4f, 0.4f, 0.5f), 1);
-            row.Add(btn);
-        }
-
-        runePanel.Add(row);
-    }
-
-    public void ShowDeath(bool show)
-    {
-        deathLabel.style.display = show ? DisplayStyle.Flex : DisplayStyle.None;
-    }
-
-    public void Refresh()
-    {
-        UpdateSpellDisplay();
-        if (playerHealth != null)
-            hpLabel.text = $"HP: {playerHealth.currentHP}/{playerHealth.maxHP}";
-    }
-
-    PanelSettings CreatePanelSettings()
-    {
         var ps = ScriptableObject.CreateInstance<PanelSettings>();
         ps.scaleMode = PanelScaleMode.ScaleWithScreenSize;
         ps.referenceResolution = new Vector2Int(1920, 1080);
-        return ps;
+        ps.themeStyleSheet = UnityEngine.UIElements.ThemeStyleSheet.CreateInstance<ThemeStyleSheet>();
+        uiDoc.panelSettings = ps;
+
+        BuildUI();
+
+        // Set a system font on root so all labels render text
+        var font = Font.CreateDynamicFontFromOSFont("Arial", 14);
+        uiDoc.rootVisualElement.style.unityFontDefinition = FontDefinition.FromFont(font);
+
+        playerHealth.OnHPChanged += (_, _) => RefreshHP();
+        caster.OnSpellChanged += RefreshSpells;
+        RefreshHP();
+        RefreshSpells();
+    }
+
+    void BuildUI()
+    {
+        var root = uiDoc.rootVisualElement;
+        root.style.flexGrow = 1;
+        root.pickingMode = PickingMode.Ignore;
+
+        // ── Top bar ──
+        var topBar = new VisualElement();
+        topBar.pickingMode = PickingMode.Ignore;
+        topBar.style.flexDirection = FlexDirection.Row;
+        topBar.style.alignItems = Align.Center;
+        topBar.style.paddingTop = 16;
+        topBar.style.paddingLeft = 20;
+        topBar.style.paddingRight = 20;
+
+        var hpRow = new VisualElement();
+        hpRow.pickingMode = PickingMode.Ignore;
+        hpRow.style.flexDirection = FlexDirection.Row;
+        hpRow.style.alignItems = Align.Center;
+        var hpLabel = Lbl("HP", 20, new Color(0.95f, 0.2f, 0.2f), FontStyle.Bold);
+        hpLabel.style.marginRight = 10;
+        hpRow.Add(hpLabel);
+        hpBar = new VisualElement();
+        hpBar.pickingMode = PickingMode.Ignore;
+        hpBar.style.flexDirection = FlexDirection.Row;
+        hpRow.Add(hpBar);
+        topBar.Add(hpRow);
+
+        var spacer = new VisualElement();
+        spacer.style.flexGrow = 1;
+        topBar.Add(spacer);
+
+        waveLabel = Lbl("Wave 1", 28, new Color(1f, 0.9f, 0.3f), FontStyle.Bold);
+        topBar.Add(waveLabel);
+        root.Add(topBar);
+
+        // ── Death overlay ──
+        deathOverlay = MakeOverlay(new Color(0, 0, 0, 0.75f));
+        var deathTitle = Lbl("YOU DIED", 64, new Color(0.9f, 0.1f, 0.1f), FontStyle.Bold);
+        deathOverlay.Add(deathTitle);
+        deathWaveLabel = Lbl("Reached wave 1", 26, Dim);
+        deathWaveLabel.style.marginTop = 12;
+        deathOverlay.Add(deathWaveLabel);
+        var restartHint = Lbl("Press  R  to restart", 22, new Color(0.7f, 0.7f, 0.7f));
+        restartHint.style.marginTop = 24;
+        deathOverlay.Add(restartHint);
+        root.Add(deathOverlay);
+
+        // ── Rune selection overlay ──
+        runeOverlay = MakeOverlay(new Color(0, 0, 0, 0.65f));
+
+        var runeContainer = new VisualElement();
+        runeContainer.style.alignItems = Align.Center;
+
+        var runeTitle = Lbl("CHOOSE A RUNE", 36, Color.white, FontStyle.Bold);
+        runeTitle.style.marginBottom = 12;
+        runeContainer.Add(runeTitle);
+
+        currentSpellPreview = new VisualElement();
+        currentSpellPreview.style.flexDirection = FlexDirection.Row;
+        currentSpellPreview.style.alignItems = Align.Center;
+        currentSpellPreview.style.marginBottom = 8;
+        runeContainer.Add(currentSpellPreview);
+
+        slotHintLabel = Lbl("Press Q to switch target slot", 16, Dim);
+        slotHintLabel.style.marginBottom = 24;
+        runeContainer.Add(slotHintLabel);
+
+        runePanel = new VisualElement();
+        runePanel.style.flexDirection = FlexDirection.Row;
+        runePanel.style.justifyContent = Justify.Center;
+        runeContainer.Add(runePanel);
+
+        runeOverlay.Add(runeContainer);
+        root.Add(runeOverlay);
+
+        // ── Bottom bar ──
+        var bottomArea = new VisualElement();
+        bottomArea.pickingMode = PickingMode.Ignore;
+        bottomArea.style.position = Position.Absolute;
+        bottomArea.style.bottom = 0;
+        bottomArea.style.left = 0;
+        bottomArea.style.right = 0;
+        bottomArea.style.alignItems = Align.Center;
+        bottomArea.style.paddingBottom = 16;
+
+        var slotRow = new VisualElement();
+        slotRow.pickingMode = PickingMode.Ignore;
+        slotRow.style.flexDirection = FlexDirection.Row;
+        slotRow.style.alignItems = Align.FlexEnd;
+
+        spell1Card = BuildSpellCard(0);
+        spell2Card = BuildSpellCard(1);
+
+        var qHint = Lbl("[Q]", 18, Dim, FontStyle.Bold);
+        qHint.style.marginLeft = 16;
+        qHint.style.marginRight = 16;
+        qHint.style.marginBottom = 18;
+
+        slotRow.Add(spell1Card);
+        slotRow.Add(qHint);
+        slotRow.Add(spell2Card);
+        bottomArea.Add(slotRow);
+
+        var controls = Lbl("WASD Move   LMB Cast   RMB Dash   Q Swap", 14, new Color(0.35f, 0.35f, 0.4f));
+        controls.style.marginTop = 8;
+        bottomArea.Add(controls);
+
+        root.Add(bottomArea);
+    }
+
+    // ─── SPELL CARDS (bottom) ─────────────────────────────────────
+
+    VisualElement BuildSpellCard(int index)
+    {
+        var card = new VisualElement();
+        card.name = $"spell-card-{index}";
+        card.pickingMode = PickingMode.Ignore;
+        card.style.backgroundColor = CardBg;
+        Pad(card, 12, 16);
+        Radius(card, 12);
+        Border(card, InactiveBorder, 2);
+        card.style.minWidth = 260;
+
+        var header = new VisualElement();
+        header.style.flexDirection = FlexDirection.Row;
+        header.style.alignItems = Align.Center;
+        header.style.marginBottom = 8;
+
+        var slotLbl = Lbl($"Slot {index + 1}", 14, Dim, FontStyle.Bold);
+        header.Add(slotLbl);
+
+        var activeTag = Lbl("ACTIVE", 11, ActiveBorder, FontStyle.Bold);
+        activeTag.name = "active-tag";
+        activeTag.style.marginLeft = 10;
+        activeTag.style.backgroundColor = new Color(1f, 0.85f, 0.2f, 0.15f);
+        Pad(activeTag, 2, 8);
+        Radius(activeTag, 4);
+        header.Add(activeTag);
+        card.Add(header);
+
+        var pills = new VisualElement();
+        pills.name = "pills";
+        pills.style.flexDirection = FlexDirection.Row;
+        pills.style.flexWrap = Wrap.Wrap;
+        card.Add(pills);
+
+        return card;
+    }
+
+    void RefreshSpellCard(int index, VisualElement card)
+    {
+        var spell = caster.spellSlots[index];
+        bool active = caster.activeSlot == index;
+
+        Border(card, active ? ActiveBorder : InactiveBorder, active ? 3 : 2);
+        card.Q("active-tag").style.display = active ? DisplayStyle.Flex : DisplayStyle.None;
+
+        var pills = card.Q("pills");
+        pills.Clear();
+
+        if (spell == null || spell.element == null)
+        {
+            pills.Add(Pill("Empty", Color.gray, Color.gray));
+            return;
+        }
+
+        pills.Add(Pill(spell.element.elementName, spell.element.color, Color.white));
+        pills.Add(Pill(spell.form != null ? spell.form.formName : "???", FormColor, Color.white));
+        if (spell.modifier != null && spell.modifier.modifierType != ModifierType.None)
+            pills.Add(Pill(spell.modifier.modifierName, ModColor, Color.white));
+    }
+
+    // ─── HP ───────────────────────────────────────────────────────
+
+    void RefreshHP()
+    {
+        hpBar.Clear();
+        for (int i = 0; i < playerHealth.maxHP; i++)
+        {
+            var block = new VisualElement();
+            block.style.width = 36;
+            block.style.height = 36;
+            block.style.marginRight = 5;
+            Radius(block, 6);
+            bool full = i < playerHealth.currentHP;
+            block.style.backgroundColor = full ? new Color(0.9f, 0.12f, 0.12f) : new Color(0.2f, 0.06f, 0.06f);
+            if (full) Border(block, new Color(1f, 0.35f, 0.35f), 2);
+            hpBar.Add(block);
+        }
+        var hpText = Lbl($"{playerHealth.currentHP}/{playerHealth.maxHP}", 22, new Color(0.95f, 0.3f, 0.3f), FontStyle.Bold);
+        hpText.style.marginLeft = 10;
+        hpBar.Add(hpText);
+    }
+
+    // ─── RUNE SELECTION ───────────────────────────────────────────
+
+    public void ShowRuneSelection(ScriptableObject[] options, Action<int> onSelect)
+    {
+        runeOverlay.style.display = DisplayStyle.Flex;
+        runePanel.Clear();
+        RefreshCurrentSpellPreview();
+
+        for (int i = 0; i < options.Length; i++)
+        {
+            int idx = i;
+            var card = BuildRuneCard(options[i], () =>
+            {
+                runeOverlay.style.display = DisplayStyle.None;
+                onSelect?.Invoke(idx);
+            });
+            runePanel.Add(card);
+        }
+    }
+
+    void RefreshCurrentSpellPreview()
+    {
+        currentSpellPreview.Clear();
+        var spell = caster.spellSlots[caster.activeSlot];
+
+        currentSpellPreview.Add(Lbl($"Slot {caster.activeSlot + 1}: ", 18, Dim, FontStyle.Bold));
+
+        if (spell != null && spell.element != null)
+        {
+            currentSpellPreview.Add(Pill(spell.element.elementName, spell.element.color, Color.white));
+            if (spell.form != null) currentSpellPreview.Add(Pill(spell.form.formName, FormColor, Color.white));
+            if (spell.modifier != null && spell.modifier.modifierType != ModifierType.None)
+                currentSpellPreview.Add(Pill(spell.modifier.modifierName, ModColor, Color.white));
+        }
+        else
+        {
+            currentSpellPreview.Add(Pill("Empty", Color.gray, Color.gray));
+        }
+    }
+
+    VisualElement BuildRuneCard(ScriptableObject rune, Action onClick)
+    {
+        GetRuneInfo(rune, out string runeName, out string typeName, out Color runeColor, out string description);
+        string preview = ComputePreview(rune);
+
+        // Use VisualElement instead of Button to avoid child-rendering issues
+        var card = new VisualElement();
+        card.style.flexDirection = FlexDirection.Column;
+        card.style.width = 250;
+        card.style.marginLeft = 10;
+        card.style.marginRight = 10;
+        card.style.backgroundColor = CardBg;
+        Radius(card, 14);
+        Border(card, InactiveBorder, 2);
+        card.style.overflow = Overflow.Hidden;
+        card.style.cursor = StyleKeyword.Auto;
+
+        // Click handler
+        card.RegisterCallback<ClickEvent>(_ => onClick?.Invoke());
+
+        // ── Header (colored bar) ──
+        var header = new VisualElement();
+        header.style.backgroundColor = runeColor;
+        Pad(header, 14, 18);
+
+        header.Add(Lbl(runeName, 26, Color.white, FontStyle.Bold));
+        var typeLbl = Lbl(typeName, 14, new Color(1, 1, 1, 0.75f), FontStyle.Bold);
+        typeLbl.style.marginTop = 2;
+        header.Add(typeLbl);
+        card.Add(header);
+
+        // ── Body ──
+        var body = new VisualElement();
+        Pad(body, 14, 18);
+        body.style.flexGrow = 1;
+
+        var descLbl = Lbl(description, 16, new Color(0.8f, 0.8f, 0.85f));
+        descLbl.style.whiteSpace = WhiteSpace.Normal;
+        descLbl.style.marginBottom = 14;
+        body.Add(descLbl);
+
+        // Separator
+        var sep = new VisualElement();
+        sep.style.height = 1;
+        sep.style.backgroundColor = new Color(0.3f, 0.3f, 0.35f);
+        sep.style.marginBottom = 10;
+        body.Add(sep);
+
+        body.Add(Lbl("RESULT", 12, Dim, FontStyle.Bold));
+        var previewLbl = Lbl(preview, 18, Color.white, FontStyle.Bold);
+        previewLbl.style.whiteSpace = WhiteSpace.Normal;
+        previewLbl.style.marginTop = 4;
+        body.Add(previewLbl);
+
+        card.Add(body);
+
+        // Hover
+        card.RegisterCallback<MouseEnterEvent>(_ =>
+        {
+            card.style.backgroundColor = CardBgHover;
+            Border(card, runeColor, 3);
+        });
+        card.RegisterCallback<MouseLeaveEvent>(_ =>
+        {
+            card.style.backgroundColor = CardBg;
+            Border(card, InactiveBorder, 2);
+        });
+
+        return card;
+    }
+
+    // ─── RUNE INFO ────────────────────────────────────────────────
+
+    void GetRuneInfo(ScriptableObject rune, out string name, out string type, out Color color, out string desc)
+    {
+        name = "?"; type = "?"; color = Color.gray; desc = "";
+
+        if (rune is ElementSO e)
+        {
+            name = e.elementName; type = "ELEMENT"; color = e.color;
+            desc = e.statusEffect switch
+            {
+                StatusEffectType.Burn   => $"Base damage: {e.baseDamage}\nBurn: {e.statusDPS} DMG/s for {e.statusDuration}s",
+                StatusEffectType.Slow   => $"Base damage: {e.baseDamage}\nSlow 40% for {e.statusDuration}s\nRepeat hit = Freeze",
+                StatusEffectType.Chain  => $"Base damage: {e.baseDamage}\nChains to {e.chainCount} nearby enemies\nStun {e.statusDuration}s",
+                StatusEffectType.Poison => $"Base damage: {e.baseDamage}\nPoison stacks up to 5\n2 DMG/s per stack",
+                StatusEffectType.VoidMark => $"Base damage: {e.baseDamage}\nOn kill: pulls nearby enemies",
+                _ => $"Base damage: {e.baseDamage}"
+            };
+        }
+        else if (rune is FormSO f)
+        {
+            name = f.formName; type = "FORM"; color = FormColor;
+            desc = f.formType switch
+            {
+                FormType.Bolt  => $"Aimed projectile\nMedium speed, long range\nCD: {f.cooldown}s",
+                FormType.Cone  => $"45 deg frontal arc\nClose range AoE\nCD: {f.cooldown}s",
+                FormType.Beam  => $"Instant hitscan line\nHits all enemies in path\nCD: {f.cooldown}s",
+                FormType.Aura  => $"360 deg pulse around you\nPassive, auto-casts\nCD: {f.cooldown}s",
+                FormType.Orbit => $"Orbiting projectiles\nNo aiming needed\nCD: {f.cooldown}s",
+                FormType.Trap  => $"Mine at cursor position\nTriggers on proximity\nCD: {f.cooldown}s",
+                _ => ""
+            };
+        }
+        else if (rune is ModifierSO m)
+        {
+            name = m.modifierName; type = "MODIFIER"; color = ModColor;
+            desc = m.modifierType switch
+            {
+                ModifierType.Split => $"x{m.splitCount} copies\n-{(int)((1 - m.damageMultiplier) * 100)}% damage each\n{m.splitSpreadAngle} deg spread",
+                _ => "No modification\nPure base spell"
+            };
+        }
+    }
+
+    string ComputePreview(ScriptableObject rune)
+    {
+        var spell = caster.spellSlots[caster.activeSlot];
+        string elem = spell?.element?.elementName ?? "???";
+        string form = spell?.form?.formName ?? "???";
+        string mod = "";
+        if (spell?.modifier != null && spell.modifier.modifierType != ModifierType.None)
+            mod = " + " + spell.modifier.modifierName;
+
+        if (rune is ElementSO e) elem = e.elementName;
+        else if (rune is FormSO f) form = f.formName;
+        else if (rune is ModifierSO m)
+            mod = m.modifierType != ModifierType.None ? " + " + m.modifierName : "";
+
+        return $"{elem}  {form}{mod}";
+    }
+
+    // ─── PUBLIC API ───────────────────────────────────────────────
+
+    public void SetWave(int w) => waveLabel.text = $"Wave {w}";
+
+    public void ShowDeath(bool show)
+    {
+        deathOverlay.style.display = show ? DisplayStyle.Flex : DisplayStyle.None;
+        if (show) deathWaveLabel.text = $"Reached wave {waveLabel.text.Replace("Wave ", "")}";
+    }
+
+    public void Refresh() { RefreshSpells(); RefreshHP(); }
+
+    void RefreshSpells()
+    {
+        RefreshSpellCard(0, spell1Card);
+        RefreshSpellCard(1, spell2Card);
+    }
+
+    // ─── HELPERS ──────────────────────────────────────────────────
+
+    static Label Lbl(string text, int size, Color color, FontStyle style = FontStyle.Normal)
+    {
+        var l = new Label(text);
+        l.style.fontSize = size;
+        l.style.color = color;
+        l.style.unityFontStyleAndWeight = style;
+        return l;
+    }
+
+    static VisualElement Pill(string text, Color bg, Color fg)
+    {
+        var pill = new VisualElement();
+        pill.style.flexDirection = FlexDirection.Row;
+        pill.style.alignItems = Align.Center;
+        Color bgA = bg; bgA.a = 0.3f;
+        pill.style.backgroundColor = bgA;
+        Pad(pill, 4, 10);
+        pill.style.marginRight = 6;
+        pill.style.marginTop = 2;
+        Radius(pill, 8);
+
+        var dot = new VisualElement();
+        dot.style.width = 10;
+        dot.style.height = 10;
+        Radius(dot, 5);
+        dot.style.backgroundColor = bg;
+        dot.style.marginRight = 6;
+        pill.Add(dot);
+
+        pill.Add(Lbl(text, 15, fg, FontStyle.Bold));
+        return pill;
+    }
+
+    static VisualElement MakeOverlay(Color bg)
+    {
+        var o = new VisualElement();
+        o.style.position = Position.Absolute;
+        o.style.top = 0; o.style.bottom = 0; o.style.left = 0; o.style.right = 0;
+        o.style.backgroundColor = bg;
+        o.style.alignItems = Align.Center;
+        o.style.justifyContent = Justify.Center;
+        o.style.display = DisplayStyle.None;
+        return o;
+    }
+
+    static void Border(VisualElement el, Color c, int w)
+    {
+        el.style.borderTopColor = c; el.style.borderBottomColor = c;
+        el.style.borderLeftColor = c; el.style.borderRightColor = c;
+        el.style.borderTopWidth = w; el.style.borderBottomWidth = w;
+        el.style.borderLeftWidth = w; el.style.borderRightWidth = w;
+    }
+
+    static void Radius(VisualElement el, int r)
+    {
+        el.style.borderTopLeftRadius = r; el.style.borderTopRightRadius = r;
+        el.style.borderBottomLeftRadius = r; el.style.borderBottomRightRadius = r;
+    }
+
+    static void Pad(VisualElement el, int v, int h)
+    {
+        el.style.paddingTop = v; el.style.paddingBottom = v;
+        el.style.paddingLeft = h; el.style.paddingRight = h;
     }
 }

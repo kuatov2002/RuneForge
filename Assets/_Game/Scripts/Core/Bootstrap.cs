@@ -346,6 +346,7 @@ public class Bootstrap : MonoBehaviour
         health.currentHP = health.maxHP;
 
         // AI - use the body renderer for status color changes
+        enemy.AddComponent<EnemyHealthBar>();
         var ai = enemy.AddComponent<ShamblerAI>();
         ai.moveSpeed = 2.5f + wave * 0.2f;
         ai.baseColor = enemyColor;
@@ -412,41 +413,28 @@ public class Bootstrap : MonoBehaviour
 
     void ShowRuneSelection()
     {
-        string[] options = new string[3];
-        object[] runeData = new object[3];
+        var options = new ScriptableObject[3];
 
         for (int i = 0; i < 3; i++)
         {
             int type = Random.Range(0, 3);
-            switch (type)
+            options[i] = type switch
             {
-                case 0: // Element
-                    var elem = allElements[Random.Range(0, allElements.Length)];
-                    options[i] = $"{elem.elementName} [Element]";
-                    runeData[i] = elem;
-                    break;
-                case 1: // Form
-                    var form = allForms[Random.Range(0, allForms.Length)];
-                    options[i] = $"{form.formName} [Form]";
-                    runeData[i] = form;
-                    break;
-                case 2: // Modifier
-                    var mod = allModifiers[Random.Range(0, allModifiers.Length)];
-                    options[i] = $"{mod.modifierName} [Mod]";
-                    runeData[i] = mod;
-                    break;
-            }
+                0 => allElements[Random.Range(0, allElements.Length)],
+                1 => allForms[Random.Range(0, allForms.Length)],
+                _ => allModifiers[Random.Range(0, allModifiers.Length)]
+            };
         }
 
         hud.ShowRuneSelection(options, idx =>
         {
-            ApplyRune(runeData[idx]);
+            ApplyRune(options[idx]);
             wave++;
             SpawnWave();
         });
     }
 
-    void ApplyRune(object rune)
+    void ApplyRune(ScriptableObject rune)
     {
         var spell = spellCaster.spellSlots[spellCaster.activeSlot];
         if (spell == null)
