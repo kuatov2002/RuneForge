@@ -139,10 +139,7 @@ public class RunebreakerBoss : MonoBehaviour
         Destroy(vfx.GetComponent<CapsuleCollider>());
         vfx.transform.position = transform.position + Vector3.up * 0.05f;
         vfx.transform.localScale = new Vector3(meleeRange * 2, 0.05f, meleeRange * 2);
-        var mat = new Material(Shader.Find("Universal Render Pipeline/Lit"));
-        mat.color = new Color(0.8f, 0.1f, 0.1f);
-        mat.EnableKeyword("_EMISSION");
-        mat.SetColor("_EmissionColor", new Color(0.8f, 0.1f, 0.1f) * 2f);
+        var mat = ShaderCache.NewEmissive(new Color(0.8f, 0.1f, 0.1f), 2f);
         vfx.GetComponent<Renderer>().material = mat;
         Destroy(vfx, 0.2f);
     }
@@ -173,9 +170,7 @@ public class RunebreakerBoss : MonoBehaviour
         Destroy(vfx.GetComponent<SphereCollider>());
         vfx.transform.position = transform.position + Vector3.up * 1f;
         vfx.transform.localScale = Vector3.one * 3f;
-        var mat = new Material(Shader.Find("Universal Render Pipeline/Lit"));
-        mat.color = new Color(0.9f, 0.1f, 0.1f, 0.5f);
-        mat.EnableKeyword("_EMISSION");
+        var mat = ShaderCache.NewEmissive(new Color(0.9f, 0.1f, 0.1f, 0.5f), 4f);
         mat.SetColor("_EmissionColor", new Color(1f, 0f, 0f) * 4f);
         vfx.GetComponent<Renderer>().material = mat;
         Destroy(vfx, 0.4f);

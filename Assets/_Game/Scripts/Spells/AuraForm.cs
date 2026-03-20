@@ -70,10 +70,7 @@ public class AuraForm : MonoBehaviour
         var mf = go.AddComponent<MeshFilter>();
         mf.mesh = GenerateRingMesh(radius, 0.15f);
         var mr = go.AddComponent<MeshRenderer>();
-        var mat = new Material(Shader.Find("Universal Render Pipeline/Lit"));
-        mat.color = color;
-        mat.EnableKeyword("_EMISSION");
-        mat.SetColor("_EmissionColor", color * 4f);
+        var mat = ShaderCache.NewEmissive(color, 4f);
         mr.material = mat;
         mr.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
         Destroy(go, 0.3f);

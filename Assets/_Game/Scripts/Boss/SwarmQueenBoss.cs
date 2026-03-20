@@ -83,8 +83,7 @@ public class SwarmQueenBoss : MonoBehaviour
             body.transform.parent = minion.transform;
             body.transform.localPosition = new Vector3(0, 0.2f, 0);
             body.transform.localScale = Vector3.one * 0.2f;
-            var litShader = Shader.Find("Universal Render Pipeline/Lit");
-            var mat = new Material(litShader) { color = baseColor };
+            var mat = ShaderCache.NewLit(baseColor);
             body.GetComponent<Renderer>().material = mat;
 
             Vector3 offset = Random.insideUnitSphere * 2f; offset.y = 0;

@@ -39,8 +39,7 @@ public class SpellProjectile : MonoBehaviour
         trail.startWidth = 0.2f;
         trail.endWidth = 0f;
         trail.time = 0.25f;
-        var tMat = new Material(Shader.Find("Universal Render Pipeline/Unlit"));
-        tMat.color = elem.color;
+        var tMat = ShaderCache.NewLit(elem.color);
         trail.material = tMat;
         trail.startColor = elem.color;
         Color endCol = elem.color;
@@ -263,8 +262,7 @@ public class SpellProjectile : MonoBehaviour
         lr.positionCount = 4;
         lr.startWidth = 0.08f;
         lr.endWidth = 0.08f;
-        var mat = new Material(Shader.Find("Universal Render Pipeline/Unlit"));
-        mat.color = new Color(1f, 1f, 0.3f);
+        var mat = ShaderCache.NewLit(new Color(1f, 1f, 0.3f));
         lr.material = mat;
         lr.startColor = new Color(1f, 1f, 0.3f);
         lr.endColor = new Color(0.5f, 0.5f, 1f);

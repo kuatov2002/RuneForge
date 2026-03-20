@@ -64,18 +64,14 @@ public class EnemyProjectile : MonoBehaviour
         rb.useGravity = false;
         rb.isKinematic = true;
 
-        var mat = new Material(Shader.Find("Universal Render Pipeline/Lit"));
-        mat.color = color;
-        mat.EnableKeyword("_EMISSION");
-        mat.SetColor("_EmissionColor", color * 2f);
+        var mat = ShaderCache.NewEmissive(color, 2f);
         go.GetComponent<Renderer>().material = mat;
 
         var trail = go.AddComponent<TrailRenderer>();
         trail.startWidth = 0.15f;
         trail.endWidth = 0f;
         trail.time = 0.2f;
-        var tMat = new Material(Shader.Find("Universal Render Pipeline/Unlit"));
-        tMat.color = color;
+        var tMat = ShaderCache.NewLit(color);
         trail.material = tMat;
         trail.startColor = color;
         Color endC = color; endC.a = 0;

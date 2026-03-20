@@ -12,13 +12,11 @@ public static class RoomBuilder
         int floorIndex = 0)
     {
         var room = new GameObject("Room");
-        var litShader = Shader.Find("Universal Render Pipeline/Lit");
-
         var (wallCol, floorCol, floorAltCol, pillarCol) = FloorGenerator.GetFloorTheme(floorIndex);
-        floorMat = new Material(litShader) { color = floorCol };
-        floorTileMat = new Material(litShader) { color = floorAltCol };
-        wallMat = new Material(litShader) { color = wallCol };
-        pillarMat = new Material(litShader) { color = pillarCol };
+        floorMat = ShaderCache.NewLit(floorCol);
+        floorTileMat = ShaderCache.NewLit(floorAltCol);
+        wallMat = ShaderCache.NewLit(wallCol);
+        pillarMat = ShaderCache.NewLit(pillarCol);
 
         // Floor - checkerboard tiles
         for (int x = 0; x < width; x++)
@@ -199,10 +197,7 @@ public static class RoomBuilder
         sphere.transform.parent = torchGO.transform;
         sphere.transform.localPosition = Vector3.zero;
         sphere.transform.localScale = Vector3.one * 0.15f;
-        var mat = new Material(Shader.Find("Universal Render Pipeline/Lit"));
-        mat.color = color;
-        mat.EnableKeyword("_EMISSION");
-        mat.SetColor("_EmissionColor", color * 5f);
+        var mat = ShaderCache.NewEmissive(color, 5f);
         sphere.GetComponent<Renderer>().material = mat;
     }
 

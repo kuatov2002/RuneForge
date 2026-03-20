@@ -859,11 +859,8 @@ public class Bootstrap : MonoBehaviour
         beam.transform.parent = rewardPickup.transform;
         beam.transform.localPosition = new Vector3(0, 2f, 0);
         beam.transform.localScale = new Vector3(0.15f, 2f, 0.15f);
-        var beamMat = new Material(Shader.Find("Universal Render Pipeline/Lit"));
         Color beamCol = orbColor; beamCol.a = 0.4f;
-        beamMat.color = beamCol;
-        beamMat.EnableKeyword("_EMISSION");
-        beamMat.SetColor("_EmissionColor", orbColor * 2f);
+        var beamMat = ShaderCache.NewEmissive(beamCol, 2f);
         beam.GetComponent<Renderer>().material = beamMat;
 
         // Trigger collider for pickup
@@ -1078,17 +1075,11 @@ public class Bootstrap : MonoBehaviour
 
     static Material MakeLit(Color color)
     {
-        var mat = new Material(Shader.Find("Universal Render Pipeline/Lit"));
-        mat.color = color;
-        return mat;
+        return ShaderCache.NewLit(color);
     }
 
     static Material MakeEmissive(Color color)
     {
-        var mat = new Material(Shader.Find("Universal Render Pipeline/Lit"));
-        mat.color = color;
-        mat.EnableKeyword("_EMISSION");
-        mat.SetColor("_EmissionColor", color * 3f);
-        return mat;
+        return ShaderCache.NewEmissive(color);
     }
 }

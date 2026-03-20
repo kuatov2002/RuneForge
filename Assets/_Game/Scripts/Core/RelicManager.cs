@@ -180,9 +180,7 @@ public class RelicManager : MonoBehaviour
         col.radius = 0.6f;
         fire.transform.position = pos + Vector3.up * 0.05f;
         fire.transform.localScale = new Vector3(0.8f, 0.05f, 0.8f);
-        var mat = new Material(Shader.Find("Universal Render Pipeline/Lit"));
-        mat.color = new Color(1f, 0.4f, 0.1f, 0.6f);
-        mat.EnableKeyword("_EMISSION");
+        var mat = ShaderCache.NewEmissive(new Color(1f, 0.4f, 0.1f, 0.6f));
         mat.SetColor("_EmissionColor", new Color(1f, 0.3f, 0f) * 3f);
         fire.GetComponent<Renderer>().material = mat;
         fire.AddComponent<DashFireZone>();

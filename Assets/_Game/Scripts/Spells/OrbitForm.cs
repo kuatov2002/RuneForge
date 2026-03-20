@@ -40,10 +40,7 @@ public class OrbitForm : MonoBehaviour
             rb.useGravity = false;
             rb.isKinematic = true;
 
-            var mat = new Material(Shader.Find("Universal Render Pipeline/Lit"));
-            mat.color = elem.color;
-            mat.EnableKeyword("_EMISSION");
-            mat.SetColor("_EmissionColor", elem.color * 3f);
+            var mat = ShaderCache.NewEmissive(elem.color);
             orb.GetComponent<Renderer>().material = mat;
 
             var dmgComp = orb.AddComponent<OrbitDamager>();
@@ -58,8 +55,7 @@ public class OrbitForm : MonoBehaviour
             trail.startWidth = 0.15f * sizeScale;
             trail.endWidth = 0f;
             trail.time = 0.2f;
-            var tMat = new Material(Shader.Find("Universal Render Pipeline/Unlit"));
-            tMat.color = elem.color;
+            var tMat = ShaderCache.NewLit(elem.color);
             trail.material = tMat;
             trail.startColor = elem.color;
             Color endC = elem.color;

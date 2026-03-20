@@ -103,10 +103,7 @@ public class BruteAI : MonoBehaviour
         Destroy(vfx.GetComponent<CapsuleCollider>());
         vfx.transform.position = transform.position + Vector3.up * 0.05f;
         vfx.transform.localScale = new Vector3(slamRadius * 2, 0.05f, slamRadius * 2);
-        var mat = new Material(Shader.Find("Universal Render Pipeline/Lit"));
-        mat.color = new Color(0.6f, 0.3f, 0.1f);
-        mat.EnableKeyword("_EMISSION");
-        mat.SetColor("_EmissionColor", new Color(0.6f, 0.3f, 0.1f) * 2f);
+        var mat = ShaderCache.NewEmissive(new Color(0.6f, 0.3f, 0.1f), 2f);
         vfx.GetComponent<Renderer>().material = mat;
         Destroy(vfx, 0.2f);
     }

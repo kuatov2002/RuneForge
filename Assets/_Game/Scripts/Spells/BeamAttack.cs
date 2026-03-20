@@ -65,10 +65,7 @@ public class BeamAttack : MonoBehaviour
         beam.transform.rotation = Quaternion.LookRotation(direction);
         beam.transform.localScale = new Vector3(0.15f, 0.15f, length);
 
-        var mat = new Material(Shader.Find("Universal Render Pipeline/Lit"));
-        mat.color = color;
-        mat.EnableKeyword("_EMISSION");
-        mat.SetColor("_EmissionColor", color * 5f);
+        var mat = ShaderCache.NewEmissive(color, 5f);
         beam.GetComponent<Renderer>().material = mat;
         beam.GetComponent<Renderer>().shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
 
@@ -78,10 +75,9 @@ public class BeamAttack : MonoBehaviour
         glow.transform.position = beam.transform.position;
         glow.transform.rotation = beam.transform.rotation;
         glow.transform.localScale = new Vector3(0.4f, 0.4f, length);
-        var glowMat = new Material(Shader.Find("Universal Render Pipeline/Unlit"));
         Color glowCol = color;
         glowCol.a = 0.3f;
-        glowMat.color = glowCol;
+        var glowMat = ShaderCache.NewLit(glowCol);
         glow.GetComponent<Renderer>().material = glowMat;
         glow.GetComponent<Renderer>().shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
 

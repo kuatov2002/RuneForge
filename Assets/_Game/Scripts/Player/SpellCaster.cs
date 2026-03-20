@@ -228,10 +228,7 @@ public class SpellCaster : MonoBehaviour
         rb.useGravity = false;
         rb.isKinematic = true;
 
-        var mat = new Material(Shader.Find("Universal Render Pipeline/Lit"));
-        mat.color = spell.element.color;
-        mat.EnableKeyword("_EMISSION");
-        mat.SetColor("_EmissionColor", spell.element.color * 3f);
+        var mat = ShaderCache.NewEmissive(spell.element.color);
         go.GetComponent<Renderer>().material = mat;
 
         var proj = go.AddComponent<SpellProjectile>();

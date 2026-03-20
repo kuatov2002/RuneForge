@@ -43,10 +43,7 @@ public class ConeAttack : MonoBehaviour
         mf.mesh = GenerateConeMesh(angle, range);
 
         var mr = go.AddComponent<MeshRenderer>();
-        var mat = new Material(Shader.Find("Universal Render Pipeline/Lit"));
-        mat.color = color;
-        mat.EnableKeyword("_EMISSION");
-        mat.SetColor("_EmissionColor", color * 3f);
+        var mat = ShaderCache.NewEmissive(color);
         mr.material = mat;
         mr.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
 

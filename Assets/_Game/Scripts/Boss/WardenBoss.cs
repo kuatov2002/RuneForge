@@ -85,10 +85,7 @@ public class WardenBoss : MonoBehaviour
         Destroy(vfx.GetComponent<CapsuleCollider>());
         vfx.transform.position = transform.position + Vector3.up * 0.05f;
         vfx.transform.localScale = new Vector3(slamRange * 2, 0.05f, slamRange * 2);
-        var mat = new Material(Shader.Find("Universal Render Pipeline/Lit"));
-        mat.color = new Color(0.5f, 0.4f, 0.2f);
-        mat.EnableKeyword("_EMISSION");
-        mat.SetColor("_EmissionColor", new Color(0.5f, 0.4f, 0.2f) * 2f);
+        var mat = ShaderCache.NewEmissive(new Color(0.5f, 0.4f, 0.2f), 2f);
         vfx.GetComponent<Renderer>().material = mat;
         Destroy(vfx, 0.2f);
     }
@@ -105,8 +102,7 @@ public class WardenBoss : MonoBehaviour
         wall.transform.localScale = new Vector3(3f, 1.5f, 0.4f);
         wall.transform.rotation = Quaternion.LookRotation(perp);
         wall.isStatic = false;
-        var mat = new Material(Shader.Find("Universal Render Pipeline/Lit"));
-        mat.color = new Color(0.4f, 0.35f, 0.25f);
+        var mat = ShaderCache.NewLit(new Color(0.4f, 0.35f, 0.25f));
         wall.GetComponent<Renderer>().material = mat;
         walls.Add(wall);
         Destroy(wall, 5f);

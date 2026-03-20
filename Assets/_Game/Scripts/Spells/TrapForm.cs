@@ -68,10 +68,7 @@ public class TrapForm : MonoBehaviour
         Destroy(explosion.GetComponent<SphereCollider>());
         explosion.transform.position = transform.position + Vector3.up * 0.2f;
         explosion.transform.localScale = Vector3.one * radius * 2f;
-        var mat = new Material(Shader.Find("Universal Render Pipeline/Lit"));
-        mat.color = element.color;
-        mat.EnableKeyword("_EMISSION");
-        mat.SetColor("_EmissionColor", element.color * 5f);
+        var mat = ShaderCache.NewEmissive(element.color, 5f);
         explosion.GetComponent<Renderer>().material = mat;
         explosion.GetComponent<Renderer>().shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
         Destroy(explosion, 0.15f);
@@ -97,9 +94,7 @@ public class TrapForm : MonoBehaviour
         rb.useGravity = false;
         rb.isKinematic = true;
 
-        var mat = new Material(Shader.Find("Universal Render Pipeline/Lit"));
-        mat.color = element.color * 0.7f;
-        mat.EnableKeyword("_EMISSION");
+        var mat = ShaderCache.NewEmissive(element.color * 0.7f, 2f);
         mat.SetColor("_EmissionColor", element.color * 2f);
         go.GetComponent<Renderer>().material = mat;
 

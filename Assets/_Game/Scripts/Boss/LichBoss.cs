@@ -115,10 +115,7 @@ public class LichBoss : MonoBehaviour
         body.transform.parent = orb.transform;
         body.transform.localPosition = Vector3.zero;
         body.transform.localScale = Vector3.one * 0.35f;
-        var litShader = Shader.Find("Universal Render Pipeline/Lit");
-        var mat = new Material(litShader);
-        mat.color = new Color(0.4f, 0f, 0.6f);
-        mat.EnableKeyword("_EMISSION");
+        var mat = ShaderCache.NewEmissive(new Color(0.4f, 0f, 0.6f));
         mat.SetColor("_EmissionColor", new Color(0.6f, 0f, 1f) * 3f);
         body.GetComponent<Renderer>().material = mat;
 
@@ -131,8 +128,7 @@ public class LichBoss : MonoBehaviour
         trail.startWidth = 0.15f;
         trail.endWidth = 0f;
         trail.time = 0.3f;
-        var tMat = new Material(Shader.Find("Universal Render Pipeline/Unlit"));
-        tMat.color = new Color(0.5f, 0f, 0.8f);
+        var tMat = ShaderCache.NewLit(new Color(0.5f, 0f, 0.8f));
         trail.material = tMat;
         trail.startColor = new Color(0.5f, 0f, 0.8f);
         Color endCol = new Color(0.5f, 0f, 0.8f, 0f);
@@ -147,9 +143,7 @@ public class LichBoss : MonoBehaviour
         Destroy(vfx.GetComponent<SphereCollider>());
         vfx.transform.position = pos + Vector3.up * 0.5f;
         vfx.transform.localScale = Vector3.one * 1.5f;
-        var mat = new Material(Shader.Find("Universal Render Pipeline/Lit"));
-        mat.color = new Color(0.3f, 0f, 0.5f, 0.5f);
-        mat.EnableKeyword("_EMISSION");
+        var mat = ShaderCache.NewEmissive(new Color(0.3f, 0f, 0.5f, 0.5f), 2f);
         mat.SetColor("_EmissionColor", new Color(0.5f, 0f, 1f) * 2f);
         vfx.GetComponent<Renderer>().material = mat;
         Destroy(vfx, 0.3f);
@@ -162,9 +156,7 @@ public class LichBoss : MonoBehaviour
         zone.name = "PoisonZone";
         zone.transform.position = pos + Vector3.up * 0.05f;
         zone.transform.localScale = new Vector3(poisonZoneRadius * 2, 0.05f, poisonZoneRadius * 2);
-        var mat = new Material(Shader.Find("Universal Render Pipeline/Lit"));
-        mat.color = new Color(0.1f, 0.6f, 0.1f, 0.6f);
-        mat.EnableKeyword("_EMISSION");
+        var mat = ShaderCache.NewEmissive(new Color(0.1f, 0.6f, 0.1f, 0.6f), 1.5f);
         mat.SetColor("_EmissionColor", new Color(0.1f, 0.8f, 0.1f) * 1.5f);
         zone.GetComponent<Renderer>().material = mat;
 
