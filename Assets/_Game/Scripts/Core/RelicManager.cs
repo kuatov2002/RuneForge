@@ -14,16 +14,53 @@ public class RelicManager : MonoBehaviour
 
     public List<RelicSO> OwnedRelics => ownedRelics;
 
-    public void Init(Health hp, PlayerController ctrl)
+    RelicSO[] allRelicsRef; // reference to all relics for loading
+
+    public void Init(Health hp, PlayerController ctrl, RelicSO[] allRelics)
     {
         playerHealth = hp;
         playerCtrl = ctrl;
+        allRelicsRef = allRelics;
+        LoadRelics();
     }
 
     public void AddRelic(RelicSO relic)
     {
         ownedRelics.Add(relic);
         ApplyPassive(relic);
+        SaveRelics();
+    }
+
+    void SaveRelics()
+    {
+        var types = new List<string>();
+        foreach (var r in ownedRelics)
+            types.Add(r.relicType.ToString());
+        PlayerPrefs.SetString("owned_relics", string.Join(",", types));
+        PlayerPrefs.Save();
+    }
+
+    void LoadRelics()
+    {
+        string saved = PlayerPrefs.GetString("owned_relics", "");
+        if (string.IsNullOrEmpty(saved) || allRelicsRef == null) return;
+
+        string[] types = saved.Split(',');
+        foreach (string t in types)
+        {
+            if (string.IsNullOrEmpty(t)) continue;
+            if (!System.Enum.TryParse<RelicType>(t, out var relicType)) continue;
+            // Find matching relic SO
+            foreach (var r in allRelicsRef)
+            {
+                if (r.relicType == relicType && !HasRelic(relicType))
+                {
+                    ownedRelics.Add(r);
+                    ApplyPassive(r);
+                    break;
+                }
+            }
+        }
     }
 
     public bool HasRelic(RelicType type)

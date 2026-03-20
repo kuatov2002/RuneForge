@@ -34,6 +34,7 @@ public class Bootstrap : MonoBehaviour
     bool isPlayerDead;
     bool bossActive;
     GameObject currentBoss;
+    GameObject rewardPickup;
 
     // Floor/Room system
     int currentFloor = 1; // 1-5
@@ -63,6 +64,7 @@ public class Bootstrap : MonoBehaviour
         CreateCamera();
         CreateLighting();
         CreateHUD();
+        hud.RefreshRelics(relicMgr.OwnedRelics);
         DoorTrigger.OnDoorEntered += OnDoorEntered;
         SpawnWave();
     }
@@ -212,7 +214,8 @@ public class Bootstrap : MonoBehaviour
 
     void TransitionToNextRoom()
     {
-        // Clean up enemies
+        // Clean up
+        if (rewardPickup != null) { Destroy(rewardPickup); rewardPickup = null; }
         foreach (var e in enemies) if (e != null) Destroy(e);
         enemies.Clear();
         enemiesAlive = 0;
@@ -341,7 +344,7 @@ public class Bootstrap : MonoBehaviour
         spellCaster.spellSlots[1] = new SpellData { element = iceElem, form = coneForm, modifier = splitMod };
 
         relicMgr = player.AddComponent<RelicManager>();
-        relicMgr.Init(playerHealth, playerCtrl);
+        relicMgr.Init(playerHealth, playerCtrl, allRelics);
 
         playerHealth.OnDeath += OnPlayerDeath;
 
@@ -806,7 +809,7 @@ public class Bootstrap : MonoBehaviour
         enemiesAlive = 0;
         MetaProgression.AwardBossCurrency(currentFloor);
         // bossActive stays true so ShowRuneSelection knows to advance floor
-        ShowRuneSelection();
+        SpawnRewardPickup();
     }
 
     // Called by SwarmQueenBoss for minion tracking
@@ -816,7 +819,74 @@ public class Bootstrap : MonoBehaviour
         if (bossActive) return;
         enemies.Remove(minion);
         enemiesAlive--;
-        if (enemiesAlive <= 0) ShowRuneSelection();
+        if (enemiesAlive <= 0) SpawnRewardPickup();
+    }
+
+    // ─── REWARD PICKUP ──────────────────────────────────────────
+
+    void SpawnRewardPickup()
+    {
+        roomCleared = true;
+
+        // Spawn glowing pickup in center of room
+        rewardPickup = new GameObject("RewardPickup");
+        var center = new Vector3(6, 0, 6);
+        if (currentRoomGO != null)
+            center = currentRoomGO.transform.position + new Vector3(6, 0, 6);
+        rewardPickup.transform.position = center;
+
+        // Visual: glowing orb floating above ground
+        var orb = GameObject.CreatePrimitive(PrimitiveType.Sphere);
+        Destroy(orb.GetComponent<SphereCollider>());
+        orb.name = "RewardOrb";
+        orb.transform.parent = rewardPickup.transform;
+        orb.transform.localPosition = new Vector3(0, 0.8f, 0);
+        orb.transform.localScale = Vector3.one * 0.4f;
+
+        // Color based on what type of reward
+        Color orbColor;
+        if (currentRoom % 3 == 0 && !bossActive)
+            orbColor = new Color(1f, 0.85f, 0.2f); // relic = gold
+        else
+            orbColor = new Color(0.3f, 0.6f, 1f); // rune = blue
+
+        orb.GetComponent<Renderer>().material = MakeEmissive(orbColor);
+
+        // Pillar of light
+        var beam = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
+        Destroy(beam.GetComponent<CapsuleCollider>());
+        beam.name = "RewardBeam";
+        beam.transform.parent = rewardPickup.transform;
+        beam.transform.localPosition = new Vector3(0, 2f, 0);
+        beam.transform.localScale = new Vector3(0.15f, 2f, 0.15f);
+        var beamMat = new Material(Shader.Find("Universal Render Pipeline/Lit"));
+        Color beamCol = orbColor; beamCol.a = 0.4f;
+        beamMat.color = beamCol;
+        beamMat.EnableKeyword("_EMISSION");
+        beamMat.SetColor("_EmissionColor", orbColor * 2f);
+        beam.GetComponent<Renderer>().material = beamMat;
+
+        // Trigger collider for pickup
+        var col = rewardPickup.AddComponent<SphereCollider>();
+        col.isTrigger = true;
+        col.radius = 1.2f;
+        col.center = new Vector3(0, 0.5f, 0);
+
+        var pickup = rewardPickup.AddComponent<RewardPickup>();
+        pickup.onPickedUp = OnRewardPickedUp;
+
+        // Float animation
+        rewardPickup.AddComponent<FloatBob>();
+    }
+
+    void OnRewardPickedUp()
+    {
+        if (rewardPickup != null)
+        {
+            Destroy(rewardPickup);
+            rewardPickup = null;
+        }
+        ShowRuneSelection();
     }
 
     // ─── GAME EVENTS ──────────────────────────────────────────────
@@ -855,9 +925,7 @@ public class Bootstrap : MonoBehaviour
         enemiesAlive--;
 
         if (enemiesAlive <= 0)
-        {
-            ShowRuneSelection();
-        }
+            SpawnRewardPickup();
     }
 
     void ShowRuneSelection()
@@ -984,6 +1052,7 @@ public class Bootstrap : MonoBehaviour
         hud.HideBossHP();
         bossActive = false;
         if (currentBoss != null) { Destroy(currentBoss); currentBoss = null; }
+        if (rewardPickup != null) { Destroy(rewardPickup); rewardPickup = null; }
 
         foreach (var e in enemies)
             if (e != null) Destroy(e);
