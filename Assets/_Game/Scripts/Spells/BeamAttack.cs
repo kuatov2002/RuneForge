@@ -4,7 +4,8 @@ public class BeamAttack : MonoBehaviour
 {
     float lifetime = 0.12f;
 
-    public static void Fire(Vector3 origin, Vector3 direction, float range, float width, float damage, ElementSO element)
+    public static void Fire(Vector3 origin, Vector3 direction, float range, float width, float damage, ElementSO element,
+        float leechPercent = 0f, Health playerHealth = null, bool isVolatile = false, float volatileMiss = 0f)
     {
         origin += Vector3.up * 0.5f;
         direction.y = 0;
@@ -12,14 +13,12 @@ public class BeamAttack : MonoBehaviour
 
         float hitRange = range;
 
-        // Raycast for walls to limit beam length
         if (Physics.Raycast(origin, direction, out RaycastHit wallHit, range))
         {
             if (wallHit.collider.GetComponent<Health>() == null)
                 hitRange = wallHit.distance;
         }
 
-        // SphereCast to hit enemies along the beam path
         RaycastHit[] hits = Physics.SphereCastAll(origin, width, direction, hitRange);
         foreach (var hit in hits)
         {
@@ -27,10 +26,14 @@ public class BeamAttack : MonoBehaviour
             var health = hit.collider.GetComponent<Health>();
             if (health == null || health.IsDead) continue;
 
+            if (isVolatile && Random.value < volatileMiss) continue;
+
             health.TakeDamage(damage);
             health.ApplyStatusEffect(element);
 
-            // Chain for lightning
+            if (leechPercent > 0 && playerHealth != null)
+                playerHealth.Heal(Mathf.Max(1, Mathf.CeilToInt(damage * leechPercent)));
+
             if (element.statusEffect == StatusEffectType.Chain)
             {
                 Collider[] nearby = Physics.OverlapSphere(hit.collider.transform.position, element.chainRadius);
@@ -49,7 +52,6 @@ public class BeamAttack : MonoBehaviour
             }
         }
 
-        // Visual beam
         CreateBeamVisual(origin, direction, hitRange, element.color);
     }
 
@@ -70,7 +72,6 @@ public class BeamAttack : MonoBehaviour
         beam.GetComponent<Renderer>().material = mat;
         beam.GetComponent<Renderer>().shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
 
-        // Wider glow beam
         var glow = GameObject.CreatePrimitive(PrimitiveType.Cube);
         Object.Destroy(glow.GetComponent<BoxCollider>());
         glow.transform.parent = go.transform;

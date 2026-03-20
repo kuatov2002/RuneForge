@@ -12,7 +12,9 @@ public class OrbitForm : MonoBehaviour
     GameObject[] orbs;
     bool active;
 
-    public void Init(float radius, float speed, int count, float dmg, ElementSO elem, float dur)
+    public void Init(float radius, float speed, int count, float dmg, ElementSO elem, float dur,
+        float sizeScale = 1f, int bounceCount = 0, bool homing = false,
+        float leech = 0f, Health playerHp = null, bool volatile_ = false, float missCh = 0f)
     {
         orbitRadius = radius;
         orbitSpeed = speed;
@@ -28,7 +30,7 @@ public class OrbitForm : MonoBehaviour
         {
             var orb = GameObject.CreatePrimitive(PrimitiveType.Sphere);
             orb.name = "OrbitOrb";
-            orb.transform.localScale = Vector3.one * 0.35f;
+            orb.transform.localScale = Vector3.one * 0.35f * sizeScale;
 
             var col = orb.GetComponent<SphereCollider>();
             col.isTrigger = true;
@@ -47,10 +49,13 @@ public class OrbitForm : MonoBehaviour
             var dmgComp = orb.AddComponent<OrbitDamager>();
             dmgComp.damage = dmg;
             dmgComp.element = elem;
+            dmgComp.leechPercent = leech;
+            dmgComp.playerHealth = playerHp;
+            dmgComp.isVolatile = volatile_;
+            dmgComp.volatileMiss = missCh;
 
-            // Trail
             var trail = orb.AddComponent<TrailRenderer>();
-            trail.startWidth = 0.15f;
+            trail.startWidth = 0.15f * sizeScale;
             trail.endWidth = 0f;
             trail.time = 0.2f;
             var tMat = new Material(Shader.Find("Universal Render Pipeline/Unlit"));
@@ -77,7 +82,6 @@ public class OrbitForm : MonoBehaviour
     void Update()
     {
         if (!active) return;
-
         timer -= Time.deltaTime;
         if (timer <= 0) { Cleanup(); return; }
 
@@ -103,6 +107,10 @@ public class OrbitDamager : MonoBehaviour
 {
     public float damage;
     public ElementSO element;
+    public float leechPercent;
+    public Health playerHealth;
+    public bool isVolatile;
+    public float volatileMiss;
     float hitCooldown;
 
     void Update()
@@ -120,8 +128,12 @@ public class OrbitDamager : MonoBehaviour
         var health = other.GetComponent<Health>();
         if (health == null || health.IsDead) return;
 
+        if (isVolatile && Random.value < volatileMiss) return;
+
         health.TakeDamage(damage);
         health.ApplyStatusEffect(element);
+        if (leechPercent > 0 && playerHealth != null)
+            playerHealth.Heal(Mathf.Max(1, Mathf.CeilToInt(damage * leechPercent)));
         hitCooldown = 0.5f;
     }
 }

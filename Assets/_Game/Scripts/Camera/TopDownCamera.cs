@@ -9,6 +9,21 @@ public class TopDownCamera : MonoBehaviour
     public float cursorOffsetMax = 2f;
     public float smoothSpeed = 8f;
 
+    // Screen shake (trauma-based)
+    float trauma;
+    float shakeDecay = 2f;
+    float shakeMaxOffset = 0.4f;
+    float shakeFrequency = 25f;
+
+    public static TopDownCamera Instance { get; private set; }
+
+    void Awake() { Instance = this; }
+
+    public void AddTrauma(float amount)
+    {
+        trauma = Mathf.Clamp01(trauma + amount);
+    }
+
     void LateUpdate()
     {
         if (target == null) return;
@@ -38,5 +53,16 @@ public class TopDownCamera : MonoBehaviour
 
         transform.position = Vector3.Lerp(transform.position, desiredPos, smoothSpeed * Time.deltaTime);
         transform.LookAt(targetPos);
+
+        // Apply screen shake
+        if (trauma > 0)
+        {
+            float shake = trauma * trauma; // Quadratic for smooth feel
+            float t = Time.time * shakeFrequency;
+            float offsetX = shakeMaxOffset * shake * (Mathf.PerlinNoise(t, 0) * 2f - 1f);
+            float offsetY = shakeMaxOffset * shake * (Mathf.PerlinNoise(0, t) * 2f - 1f);
+            transform.position += transform.right * offsetX + transform.up * offsetY;
+            trauma = Mathf.Max(0, trauma - shakeDecay * Time.deltaTime);
+        }
     }
 }

@@ -8,10 +8,21 @@ public class SpellCaster : MonoBehaviour
     public int activeSlot;
 
     public event Action OnSpellChanged;
+    public event Action<ElementSO> OnSpellFired; // For Mirror enemy
 
     float cooldownTimer;
     AuraForm activeAura;
     OrbitForm activeOrbit;
+    bool[] slotDisabled = new bool[2];
+
+    public void SetSlotDisabled(int slot, bool disabled)
+    {
+        if (slot < 0 || slot >= 2) return;
+        slotDisabled[slot] = disabled;
+        OnSpellChanged?.Invoke();
+    }
+
+    public bool IsSlotDisabled(int slot) => slot >= 0 && slot < 2 && slotDisabled[slot];
 
     public SpellData ActiveSpell => spellSlots[activeSlot];
 
@@ -33,12 +44,12 @@ public class SpellCaster : MonoBehaviour
 
         var spell = ActiveSpell;
         if (spell == null || !spell.IsComplete) return;
+        if (slotDisabled[activeSlot]) return;
 
-        // Aura is passive - auto-activates
+        // Aura is passive
         if (spell.form.formType == FormType.Aura && activeAura == null)
             ActivatePassiveForms();
 
-        // Non-passive forms: cast on LMB
         if (spell.form.formType != FormType.Aura)
         {
             if (mouse.leftButton.wasPressedThisFrame && cooldownTimer <= 0)
@@ -57,8 +68,15 @@ public class SpellCaster : MonoBehaviour
         if (spell.form.formType == FormType.Aura && activeAura == null)
         {
             float dmg = CalculateDamage(spell);
+            float rad = spell.form.auraRadius;
+            var mod = GetActiveModifier(spell);
+
+            if (mod != null && mod.modifierType == ModifierType.Oversize)
+                rad *= mod.sizeMultiplier;
+
             activeAura = gameObject.AddComponent<AuraForm>();
-            activeAura.Init(spell.form.auraRadius, dmg, spell.element, spell.form.cooldown);
+            activeAura.Init(rad, dmg, spell.element, spell.form.cooldown,
+                GetLeechPercent(spell), GetComponent<Health>(), IsVolatile(spell), GetVolatileMiss(spell));
         }
     }
 
@@ -70,64 +88,104 @@ public class SpellCaster : MonoBehaviour
 
     void Cast(SpellData spell)
     {
+        OnSpellFired?.Invoke(spell.element);
+
+        var mod = GetActiveModifier(spell);
+        ModifierType modType = mod != null ? mod.modifierType : ModifierType.None;
+
         int count = 1;
         float spreadAngle = 0;
-        float damageMult = 1f;
+        float damageMult = spell.modifier != null ? spell.modifier.damageMultiplier : 1f;
+        float damage = spell.element.baseDamage * damageMult;
 
-        bool useSplit = spell.modifier != null && spell.modifier.modifierType == ModifierType.Split;
-        if (useSplit)
+        // Volatile: 1.5x damage
+        if (modType == ModifierType.Volatile)
+            damage *= 1.5f;
+
+        // Split: multiple projectiles
+        if (modType == ModifierType.Split)
         {
-            damageMult = spell.modifier.damageMultiplier;
-            // Split compatibility check
-            bool compatible = spell.form.formType switch
-            {
-                FormType.Aura => false,
-                _ => true
-            };
-            if (compatible)
-            {
-                count = spell.modifier.splitCount;
-                spreadAngle = spell.modifier.splitSpreadAngle;
-            }
+            count = mod.splitCount;
+            spreadAngle = mod.splitSpreadAngle;
         }
 
-        float damage = spell.element.baseDamage * damageMult;
+        // Form-specific oversize params
+        float sizeScale = (modType == ModifierType.Oversize) ? mod.sizeMultiplier : 1f;
 
         switch (spell.form.formType)
         {
             case FormType.Bolt:
                 FireDirectional(spell, count, spreadAngle, damage, (dir, dmg) =>
                 {
-                    CreateBolt(dir, spell, dmg);
+                    CreateBolt(dir, spell, dmg, mod);
                 });
                 break;
 
             case FormType.Cone:
                 FireDirectional(spell, count, spreadAngle, damage, (dir, dmg) =>
                 {
-                    ConeAttack.Fire(transform.position, dir, spell.form.coneAngle, spell.form.coneRange, dmg, spell.element);
+                    float coneAngle = spell.form.coneAngle * sizeScale;
+                    float coneRange = spell.form.coneRange * sizeScale;
+                    ConeAttack.Fire(transform.position, dir, coneAngle, coneRange, dmg, spell.element,
+                        GetLeechPercent(spell), GetComponent<Health>(), IsVolatile(spell), GetVolatileMiss(spell));
                 });
                 break;
 
             case FormType.Beam:
                 FireDirectional(spell, count, spreadAngle, damage, (dir, dmg) =>
                 {
-                    BeamAttack.Fire(transform.position, dir, spell.form.beamRange, spell.form.beamWidth, dmg, spell.element);
+                    float beamWidth = spell.form.beamWidth * sizeScale;
+                    float beamRange = spell.form.beamRange;
+                    int pierce = (modType == ModifierType.Pierce) ? mod.pierceCount : 0;
+                    BeamAttack.Fire(transform.position, dir, beamRange, beamWidth, dmg, spell.element,
+                        GetLeechPercent(spell), GetComponent<Health>(), IsVolatile(spell), GetVolatileMiss(spell));
                 });
                 break;
 
             case FormType.Orbit:
-                if (activeOrbit != null) break; // Already active
+                if (activeOrbit != null) break;
                 int orbCount = spell.form.orbitCount;
-                if (useSplit) orbCount += spell.modifier.splitCount;
+                if (modType == ModifierType.Split) orbCount += mod.splitCount;
+                float orbRadius = spell.form.orbitRadius * sizeScale;
+                float orbSize = sizeScale;
                 activeOrbit = gameObject.AddComponent<OrbitForm>();
-                activeOrbit.Init(spell.form.orbitRadius, spell.form.orbitSpeed, orbCount, damage, spell.element, spell.form.orbitDuration);
+                activeOrbit.Init(orbRadius, spell.form.orbitSpeed, orbCount, damage, spell.element,
+                    spell.form.orbitDuration, orbSize, modType == ModifierType.Bounce ? mod.bounceCount : 0,
+                    modType == ModifierType.Homing, GetLeechPercent(spell), GetComponent<Health>(),
+                    IsVolatile(spell), GetVolatileMiss(spell));
                 break;
 
             case FormType.Trap:
-                PlaceTraps(spell, count, damage);
+                float trapRadius = spell.form.trapRadius * sizeScale;
+                PlaceTraps(spell, count, damage, trapRadius,
+                    GetLeechPercent(spell), GetComponent<Health>(), IsVolatile(spell), GetVolatileMiss(spell));
                 break;
         }
+    }
+
+    ModifierSO GetActiveModifier(SpellData spell)
+    {
+        if (spell.modifier == null || spell.modifier.modifierType == ModifierType.None) return null;
+        if (!ModifierSO.IsCompatible(spell.modifier.modifierType, spell.form.formType)) return null;
+        return spell.modifier;
+    }
+
+    float GetLeechPercent(SpellData spell)
+    {
+        var mod = GetActiveModifier(spell);
+        return (mod != null && mod.modifierType == ModifierType.Leech) ? mod.leechPercent : 0f;
+    }
+
+    bool IsVolatile(SpellData spell)
+    {
+        var mod = GetActiveModifier(spell);
+        return mod != null && mod.modifierType == ModifierType.Volatile;
+    }
+
+    float GetVolatileMiss(SpellData spell)
+    {
+        var mod = GetActiveModifier(spell);
+        return (mod != null && mod.modifierType == ModifierType.Volatile) ? mod.volatileMissChance : 0f;
     }
 
     void FireDirectional(SpellData spell, int count, float spreadAngle, float damage, Action<Vector3, float> fireAction)
@@ -143,12 +201,24 @@ public class SpellCaster : MonoBehaviour
         }
     }
 
-    void CreateBolt(Vector3 dir, SpellData spell, float damage)
+    void CreateBolt(Vector3 dir, SpellData spell, float damage, ModifierSO mod)
     {
         var go = GameObject.CreatePrimitive(PrimitiveType.Sphere);
         go.name = "Bolt";
         go.transform.position = transform.position + dir * 0.6f + Vector3.up * 0.5f;
-        go.transform.localScale = Vector3.one * 0.25f;
+
+        float scale = 0.25f;
+        float spd = spell.form.projectileSpeed;
+
+        if (mod != null && mod.modifierType == ModifierType.Oversize)
+        {
+            scale *= mod.sizeMultiplier;
+            spd *= mod.speedPenalty;
+        }
+        if (mod != null && mod.modifierType == ModifierType.Homing)
+            spd *= mod.homingSpeedMult;
+
+        go.transform.localScale = Vector3.one * scale;
 
         var col = go.GetComponent<SphereCollider>();
         col.isTrigger = true;
@@ -165,10 +235,12 @@ public class SpellCaster : MonoBehaviour
         go.GetComponent<Renderer>().material = mat;
 
         var proj = go.AddComponent<SpellProjectile>();
-        proj.Setup(dir, spell.form.projectileSpeed, damage, spell.element, spell.form.range);
+        proj.Setup(dir, spd, damage, spell.element, spell.form.range);
+        proj.ApplyModifier(mod, GetComponent<Health>());
     }
 
-    void PlaceTraps(SpellData spell, int count, float damage)
+    void PlaceTraps(SpellData spell, int count, float damage, float radius,
+        float leech, Health playerHp, bool isVolatile, float missCh)
     {
         var mouse = Mouse.current;
         if (mouse == null || Camera.main == null) return;
@@ -183,7 +255,8 @@ public class SpellCaster : MonoBehaviour
         {
             Vector3 offset = count > 1 ? UnityEngine.Random.insideUnitSphere * 1.5f : Vector3.zero;
             offset.y = 0;
-            TrapForm.Create(basePos + offset, damage, spell.element, spell.form.trapRadius, spell.form.trapArmTime);
+            TrapForm.Create(basePos + offset, damage, spell.element, radius, spell.form.trapArmTime,
+                leech, playerHp, isVolatile, missCh);
         }
     }
 
@@ -191,6 +264,9 @@ public class SpellCaster : MonoBehaviour
     {
         float dmg = spell.element.baseDamage;
         if (spell.modifier != null) dmg *= spell.modifier.damageMultiplier;
+        var mod = GetActiveModifier(spell);
+        if (mod != null && mod.modifierType == ModifierType.Volatile)
+            dmg *= 1.5f;
         return dmg;
     }
 

@@ -8,24 +8,31 @@ public class TrapForm : MonoBehaviour
     float armTimer;
     bool armed;
     bool triggered;
+    float leechPercent;
+    Health playerHealth;
+    bool isVolatile;
+    float volatileMiss;
 
-    public void Init(float dmg, ElementSO elem, float rad, float armTime)
+    public void Init(float dmg, ElementSO elem, float rad, float armTime,
+        float leech = 0f, Health playerHp = null, bool volatile_ = false, float missCh = 0f)
     {
         damage = dmg;
         element = elem;
         radius = rad;
         armTimer = armTime;
+        leechPercent = leech;
+        playerHealth = playerHp;
+        isVolatile = volatile_;
+        volatileMiss = missCh;
     }
 
     void Update()
     {
         if (triggered) return;
-
         if (!armed)
         {
             armTimer -= Time.deltaTime;
-            if (armTimer <= 0)
-                armed = true;
+            if (armTimer <= 0) armed = true;
         }
     }
 
@@ -50,11 +57,13 @@ public class TrapForm : MonoBehaviour
             if (hit.GetComponent<PlayerController>() != null) continue;
             var health = hit.GetComponent<Health>();
             if (health == null || health.IsDead) continue;
+            if (isVolatile && Random.value < volatileMiss) continue;
             health.TakeDamage(damage);
             health.ApplyStatusEffect(element);
+            if (leechPercent > 0 && playerHealth != null)
+                playerHealth.Heal(Mathf.Max(1, Mathf.CeilToInt(damage * leechPercent)));
         }
 
-        // Explosion visual
         var explosion = GameObject.CreatePrimitive(PrimitiveType.Sphere);
         Destroy(explosion.GetComponent<SphereCollider>());
         explosion.transform.position = transform.position + Vector3.up * 0.2f;
@@ -70,7 +79,8 @@ public class TrapForm : MonoBehaviour
         Destroy(gameObject, 0.05f);
     }
 
-    public static GameObject Create(Vector3 position, float damage, ElementSO element, float radius, float armTime)
+    public static GameObject Create(Vector3 position, float damage, ElementSO element, float radius, float armTime,
+        float leech = 0f, Health playerHp = null, bool volatile_ = false, float missCh = 0f)
     {
         var go = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
         go.name = "Trap";
@@ -94,10 +104,9 @@ public class TrapForm : MonoBehaviour
         go.GetComponent<Renderer>().material = mat;
 
         var trap = go.AddComponent<TrapForm>();
-        trap.Init(damage, element, radius, armTime);
+        trap.Init(damage, element, radius, armTime, leech, playerHp, volatile_, missCh);
 
-        Destroy(go, 15f); // Auto-destroy after 15s if not triggered
-
+        Destroy(go, 15f);
         return go;
     }
 }

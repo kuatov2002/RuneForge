@@ -1,4 +1,5 @@
 using UnityEngine;
+using System.Collections.Generic;
 
 public class SpellProjectile : MonoBehaviour
 {
@@ -9,6 +10,19 @@ public class SpellProjectile : MonoBehaviour
     float maxDistance;
     Vector3 startPos;
     bool initialized;
+
+    // Modifier state
+    int pierceLeft;
+    int bounceLeft;
+    float leechPercent;
+    bool isHoming;
+    float homingTurnSpeed;
+    float homingDetectRange;
+    bool isVolatile;
+    float volatileMissChance;
+    Health playerHealth;
+
+    HashSet<Collider> hitTargets = new();
 
     public void Setup(Vector3 dir, float spd, float dmg, ElementSO elem, float range)
     {
@@ -34,12 +48,73 @@ public class SpellProjectile : MonoBehaviour
         trail.endColor = endCol;
     }
 
+    public void ApplyModifier(ModifierSO mod, Health playerHp)
+    {
+        if (mod == null) return;
+        playerHealth = playerHp;
+
+        switch (mod.modifierType)
+        {
+            case ModifierType.Pierce:
+                pierceLeft = mod.pierceCount;
+                break;
+            case ModifierType.Bounce:
+                bounceLeft = mod.bounceCount;
+                break;
+            case ModifierType.Leech:
+                leechPercent = mod.leechPercent;
+                break;
+            case ModifierType.Oversize:
+                transform.localScale *= mod.sizeMultiplier;
+                speed *= mod.speedPenalty;
+                break;
+            case ModifierType.Volatile:
+                isVolatile = true;
+                volatileMissChance = mod.volatileMissChance;
+                break;
+            case ModifierType.Homing:
+                isHoming = true;
+                homingTurnSpeed = mod.homingTurnSpeed;
+                homingDetectRange = mod.homingDetectRange;
+                speed *= mod.homingSpeedMult;
+                break;
+        }
+    }
+
     void Update()
     {
         if (!initialized) return;
+
+        // Homing: steer toward nearest enemy
+        if (isHoming)
+        {
+            var target = FindClosestEnemy();
+            if (target != null)
+            {
+                Vector3 toTarget = (target.transform.position + Vector3.up * 0.5f - transform.position).normalized;
+                direction = Vector3.RotateTowards(direction, toTarget, homingTurnSpeed * Mathf.Deg2Rad * Time.deltaTime, 0f).normalized;
+            }
+        }
+
         transform.position += direction * speed * Time.deltaTime;
         if (Vector3.Distance(startPos, transform.position) > maxDistance)
             Destroy(gameObject);
+    }
+
+    Transform FindClosestEnemy()
+    {
+        Collider[] nearby = Physics.OverlapSphere(transform.position, homingDetectRange);
+        Transform best = null;
+        float bestDist = float.MaxValue;
+        foreach (var col in nearby)
+        {
+            if (col.GetComponent<PlayerController>() != null) continue;
+            var h = col.GetComponent<Health>();
+            if (h == null || h.IsDead) continue;
+            float d = Vector3.Distance(transform.position, col.transform.position);
+            if (d < bestDist) { bestDist = d; best = col.transform; }
+        }
+        return best;
     }
 
     void OnTriggerEnter(Collider other)
@@ -49,19 +124,110 @@ public class SpellProjectile : MonoBehaviour
         if (other.GetComponent<SpellProjectile>() != null) return;
         if (other.GetComponent<OrbitForm>() != null) return;
         if (other.GetComponent<TrapForm>() != null) return;
+        if (other.GetComponent<OrbitDamager>() != null) return;
+
+        // Skip already-pierced targets
+        if (hitTargets.Contains(other)) return;
 
         var health = other.GetComponent<Health>();
         if (health != null && !health.IsDead)
         {
+            // Shield Bearer block check
+            var shield = other.GetComponent<ShieldBearerAI>();
+            if (shield != null && shield.IsBlockedFromDirection(startPos))
+                return; // Blocked by shield
+
+            // Mirror Knight shield check
+            var mirrorKnight = other.GetComponent<MirrorKnightBoss>();
+            if (mirrorKnight != null && mirrorKnight.ShouldBlockDamage())
+                return;
+
+            // Lich teleport immunity
+            var lich = other.GetComponent<LichBoss>();
+            if (lich != null && lich.IsImmune)
+                return;
+
+            // Volatile miss check
+            if (isVolatile && Random.value < volatileMissChance)
+            {
+                // Miss — continue without hitting
+                return;
+            }
+
             health.TakeDamage(damage);
             health.ApplyStatusEffect(element);
+
+            // Leech
+            if (leechPercent > 0 && playerHealth != null)
+            {
+                int healAmt = Mathf.Max(1, Mathf.CeilToInt(damage * leechPercent));
+                playerHealth.Heal(healAmt);
+            }
 
             // Chain lightning
             if (element.statusEffect == StatusEffectType.Chain)
                 ChainToNearby(other.transform.position, other, element.chainCount, damage * 0.5f);
+
+            hitTargets.Add(other);
+
+            // Pierce: don't destroy, keep going
+            if (pierceLeft > 0)
+            {
+                pierceLeft--;
+                return;
+            }
+
+            // Bounce: redirect toward nearest other enemy
+            if (bounceLeft > 0)
+            {
+                bounceLeft--;
+                var next = FindBounceTarget(other);
+                if (next != null)
+                {
+                    direction = (next.transform.position - transform.position).normalized;
+                    direction.y = 0;
+                    direction.Normalize();
+                    return;
+                }
+            }
+        }
+        else if (health == null)
+        {
+            // Hit a wall/obstacle
+            if (bounceLeft > 0)
+            {
+                bounceLeft--;
+                // Reflect off wall
+                if (Physics.Raycast(transform.position - direction * 0.5f, direction, out RaycastHit wallHit, 1.5f))
+                {
+                    direction = Vector3.Reflect(direction, wallHit.normal);
+                    direction.y = 0;
+                    direction.Normalize();
+                    startPos = transform.position; // reset distance
+                }
+                return;
+            }
         }
 
         Destroy(gameObject);
+    }
+
+    Transform FindBounceTarget(Collider exclude)
+    {
+        Collider[] nearby = Physics.OverlapSphere(transform.position, 8f);
+        Transform best = null;
+        float bestDist = float.MaxValue;
+        foreach (var col in nearby)
+        {
+            if (col == exclude) continue;
+            if (hitTargets.Contains(col)) continue;
+            if (col.GetComponent<PlayerController>() != null) continue;
+            var h = col.GetComponent<Health>();
+            if (h == null || h.IsDead) continue;
+            float d = Vector3.Distance(transform.position, col.transform.position);
+            if (d < bestDist) { bestDist = d; best = col.transform; }
+        }
+        return best;
     }
 
     void ChainToNearby(Vector3 hitPos, Collider originalTarget, int chainCount, float chainDamage)
@@ -97,7 +263,6 @@ public class SpellProjectile : MonoBehaviour
         lr.startColor = new Color(1f, 1f, 0.3f);
         lr.endColor = new Color(0.5f, 0.5f, 1f);
 
-        // Jagged lightning shape
         Vector3 mid = (from + to) * 0.5f;
         Vector3 perp = Vector3.Cross(to - from, Vector3.up).normalized;
         lr.SetPosition(0, from + Vector3.up * 0.5f);

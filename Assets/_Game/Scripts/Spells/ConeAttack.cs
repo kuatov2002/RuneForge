@@ -4,7 +4,8 @@ public class ConeAttack : MonoBehaviour
 {
     float lifetime = 0.15f;
 
-    public static void Fire(Vector3 origin, Vector3 direction, float angle, float range, float damage, ElementSO element)
+    public static void Fire(Vector3 origin, Vector3 direction, float angle, float range, float damage, ElementSO element,
+        float leechPercent = 0f, Health playerHealth = null, bool isVolatile = false, float volatileMiss = 0f)
     {
         Collider[] hits = Physics.OverlapSphere(origin, range);
         foreach (var hit in hits)
@@ -21,8 +22,11 @@ public class ConeAttack : MonoBehaviour
 
             if (Vector3.Angle(direction, toTarget) <= angle * 0.5f)
             {
+                if (isVolatile && Random.value < volatileMiss) continue;
                 health.TakeDamage(damage);
                 health.ApplyStatusEffect(element);
+                if (leechPercent > 0 && playerHealth != null)
+                    playerHealth.Heal(Mathf.Max(1, Mathf.CeilToInt(damage * leechPercent)));
             }
         }
 

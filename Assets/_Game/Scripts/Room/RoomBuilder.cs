@@ -4,18 +4,21 @@ public static class RoomBuilder
 {
     static Material wallMat;
     static Material floorMat;
-    static Material pillarMat;
     static Material floorTileMat;
+    static Material pillarMat;
 
-    public static GameObject Build(int width = 12, int height = 12)
+    public static GameObject Build(int width = 12, int height = 12,
+        bool doorN = false, bool doorS = false, bool doorE = false, bool doorW = false,
+        int floorIndex = 0)
     {
         var room = new GameObject("Room");
         var litShader = Shader.Find("Universal Render Pipeline/Lit");
 
-        floorMat = new Material(litShader) { color = new Color(0.18f, 0.18f, 0.22f) };
-        floorTileMat = new Material(litShader) { color = new Color(0.22f, 0.22f, 0.28f) };
-        wallMat = new Material(litShader) { color = new Color(0.35f, 0.28f, 0.22f) };
-        pillarMat = new Material(litShader) { color = new Color(0.4f, 0.35f, 0.3f) };
+        var (wallCol, floorCol, floorAltCol, pillarCol) = FloorGenerator.GetFloorTheme(floorIndex);
+        floorMat = new Material(litShader) { color = floorCol };
+        floorTileMat = new Material(litShader) { color = floorAltCol };
+        wallMat = new Material(litShader) { color = wallCol };
+        pillarMat = new Material(litShader) { color = pillarCol };
 
         // Floor - checkerboard tiles
         for (int x = 0; x < width; x++)
@@ -33,35 +36,106 @@ public static class RoomBuilder
         }
 
         float wh = 2f;
+        float doorWidth = 2f;
+        float halfW = width * 0.5f;
+        float halfH = height * 0.5f;
 
-        // Walls - thicker, taller
-        CreateWall(room.transform, new Vector3(width * 0.5f, wh * 0.5f, height + 0.25f),
-            new Vector3(width + 1, wh, 0.5f));
-        CreateWall(room.transform, new Vector3(width * 0.5f, wh * 0.5f, -0.25f),
-            new Vector3(width + 1, wh, 0.5f));
-        CreateWall(room.transform, new Vector3(width + 0.25f, wh * 0.5f, height * 0.5f),
-            new Vector3(0.5f, wh, height));
-        CreateWall(room.transform, new Vector3(-0.25f, wh * 0.5f, height * 0.5f),
-            new Vector3(0.5f, wh, height));
+        // North wall (z = height)
+        if (doorN)
+        {
+            float leftW = halfW - doorWidth * 0.5f;
+            float rightW = halfW - doorWidth * 0.5f;
+            CreateWall(room.transform, new Vector3(leftW * 0.5f, wh * 0.5f, height + 0.25f),
+                new Vector3(leftW + 0.5f, wh, 0.5f));
+            CreateWall(room.transform, new Vector3(width - rightW * 0.5f, wh * 0.5f, height + 0.25f),
+                new Vector3(rightW + 0.5f, wh, 0.5f));
+        }
+        else
+        {
+            CreateWall(room.transform, new Vector3(halfW, wh * 0.5f, height + 0.25f),
+                new Vector3(width + 1, wh, 0.5f));
+        }
 
-        // Corner pillars (decorative, taller)
+        // South wall (z = 0)
+        if (doorS)
+        {
+            float leftW = halfW - doorWidth * 0.5f;
+            float rightW = halfW - doorWidth * 0.5f;
+            CreateWall(room.transform, new Vector3(leftW * 0.5f, wh * 0.5f, -0.25f),
+                new Vector3(leftW + 0.5f, wh, 0.5f));
+            CreateWall(room.transform, new Vector3(width - rightW * 0.5f, wh * 0.5f, -0.25f),
+                new Vector3(rightW + 0.5f, wh, 0.5f));
+        }
+        else
+        {
+            CreateWall(room.transform, new Vector3(halfW, wh * 0.5f, -0.25f),
+                new Vector3(width + 1, wh, 0.5f));
+        }
+
+        // East wall (x = width)
+        if (doorE)
+        {
+            float botH = halfH - doorWidth * 0.5f;
+            float topH = halfH - doorWidth * 0.5f;
+            CreateWall(room.transform, new Vector3(width + 0.25f, wh * 0.5f, botH * 0.5f),
+                new Vector3(0.5f, wh, botH));
+            CreateWall(room.transform, new Vector3(width + 0.25f, wh * 0.5f, height - topH * 0.5f),
+                new Vector3(0.5f, wh, topH));
+        }
+        else
+        {
+            CreateWall(room.transform, new Vector3(width + 0.25f, wh * 0.5f, halfH),
+                new Vector3(0.5f, wh, height));
+        }
+
+        // West wall (x = 0)
+        if (doorW)
+        {
+            float botH = halfH - doorWidth * 0.5f;
+            float topH = halfH - doorWidth * 0.5f;
+            CreateWall(room.transform, new Vector3(-0.25f, wh * 0.5f, botH * 0.5f),
+                new Vector3(0.5f, wh, botH));
+            CreateWall(room.transform, new Vector3(-0.25f, wh * 0.5f, height - topH * 0.5f),
+                new Vector3(0.5f, wh, topH));
+        }
+        else
+        {
+            CreateWall(room.transform, new Vector3(-0.25f, wh * 0.5f, halfH),
+                new Vector3(0.5f, wh, height));
+        }
+
+        // Corner pillars
         CreateDecoPillar(room.transform, new Vector3(-0.25f, 0, -0.25f), 3f);
         CreateDecoPillar(room.transform, new Vector3(width + 0.25f, 0, -0.25f), 3f);
         CreateDecoPillar(room.transform, new Vector3(-0.25f, 0, height + 0.25f), 3f);
         CreateDecoPillar(room.transform, new Vector3(width + 0.25f, 0, height + 0.25f), 3f);
 
-        // Gameplay pillars (cover)
-        CreatePillar(room.transform, new Vector3(3, 0, 3));
-        CreatePillar(room.transform, new Vector3(9, 0, 3));
-        CreatePillar(room.transform, new Vector3(3, 0, 9));
-        CreatePillar(room.transform, new Vector3(9, 0, 9));
-        CreatePillar(room.transform, new Vector3(6, 0, 6));
+        // Gameplay pillars - vary based on room size
+        if (width >= 10 && height >= 10)
+        {
+            float px1 = width * 0.25f;
+            float px2 = width * 0.75f;
+            float pz1 = height * 0.25f;
+            float pz2 = height * 0.75f;
+            CreatePillar(room.transform, new Vector3(px1, 0, pz1));
+            CreatePillar(room.transform, new Vector3(px2, 0, pz1));
+            CreatePillar(room.transform, new Vector3(px1, 0, pz2));
+            CreatePillar(room.transform, new Vector3(px2, 0, pz2));
+            if (width >= 12 && height >= 12)
+                CreatePillar(room.transform, new Vector3(halfW, 0, halfH));
+        }
 
-        // Ambient point lights (torch-like)
+        // Torches
         CreateTorch(room.transform, new Vector3(0.3f, 1.5f, 0.3f), new Color(1f, 0.6f, 0.2f));
         CreateTorch(room.transform, new Vector3(width - 0.3f, 1.5f, 0.3f), new Color(1f, 0.6f, 0.2f));
         CreateTorch(room.transform, new Vector3(0.3f, 1.5f, height - 0.3f), new Color(0.2f, 0.5f, 1f));
         CreateTorch(room.transform, new Vector3(width - 0.3f, 1.5f, height - 0.3f), new Color(0.2f, 0.5f, 1f));
+
+        // Door trigger zones
+        if (doorN) CreateDoorTrigger(room.transform, new Vector3(halfW, 0.5f, height + 0.5f), "DoorN");
+        if (doorS) CreateDoorTrigger(room.transform, new Vector3(halfW, 0.5f, -0.5f), "DoorS");
+        if (doorE) CreateDoorTrigger(room.transform, new Vector3(width + 0.5f, 0.5f, halfH), "DoorE");
+        if (doorW) CreateDoorTrigger(room.transform, new Vector3(-0.5f, 0.5f, halfH), "DoorW");
 
         return room;
     }
@@ -87,7 +161,6 @@ public static class RoomBuilder
         pillar.GetComponent<Renderer>().material = pillarMat;
         pillar.isStatic = true;
 
-        // Pillar top cap
         var cap = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
         cap.name = "PillarCap";
         cap.transform.parent = pillar.transform;
@@ -121,7 +194,6 @@ public static class RoomBuilder
         light.range = 6f;
         light.shadows = LightShadows.Soft;
 
-        // Small emissive sphere as visual
         var sphere = GameObject.CreatePrimitive(PrimitiveType.Sphere);
         Object.Destroy(sphere.GetComponent<SphereCollider>());
         sphere.transform.parent = torchGO.transform;
@@ -132,5 +204,16 @@ public static class RoomBuilder
         mat.EnableKeyword("_EMISSION");
         mat.SetColor("_EmissionColor", color * 5f);
         sphere.GetComponent<Renderer>().material = mat;
+    }
+
+    static void CreateDoorTrigger(Transform parent, Vector3 pos, string name)
+    {
+        var trigger = new GameObject(name);
+        trigger.transform.parent = parent;
+        trigger.transform.position = pos;
+        var col = trigger.AddComponent<BoxCollider>();
+        col.isTrigger = true;
+        col.size = new Vector3(2f, 2f, 1f);
+        trigger.AddComponent<DoorTrigger>().doorName = name;
     }
 }

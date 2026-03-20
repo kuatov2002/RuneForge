@@ -63,11 +63,22 @@ public class Health : MonoBehaviour
         currentHP -= dmg;
         if (currentHP < 0) currentHP = 0;
         OnHPChanged?.Invoke(currentHP, maxHP);
+
+        // Screen shake when player takes damage
+        if (GetComponent<PlayerController>() != null && TopDownCamera.Instance != null)
+            TopDownCamera.Instance.AddTrauma(0.4f);
         if (currentHP <= 0)
         {
             isDead = true;
             OnDeath?.Invoke();
         }
+    }
+
+    public void Heal(int amount)
+    {
+        if (isDead || amount <= 0) return;
+        currentHP = Mathf.Min(currentHP + amount, maxHP);
+        OnHPChanged?.Invoke(currentHP, maxHP);
     }
 
     public void ApplyStatusEffect(ElementSO element)

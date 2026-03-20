@@ -11,6 +11,7 @@ public class GameHUD : MonoBehaviour
 
     VisualElement hpBar;
     Label waveLabel;
+    Label floorRoomLabel;
     VisualElement spell1Card, spell2Card;
     VisualElement runeOverlay;
     VisualElement runePanel;
@@ -18,6 +19,13 @@ public class GameHUD : MonoBehaviour
     Label slotHintLabel;
     VisualElement deathOverlay;
     Label deathWaveLabel;
+    VisualElement victoryOverlay;
+
+    // Boss HUD
+    VisualElement bossHPContainer;
+    VisualElement bossHPFill;
+    Label bossNameLabel;
+    Health trackedBossHP;
 
     static readonly Color CardBg = new(0.06f, 0.06f, 0.1f, 0.92f);
     static readonly Color CardBgHover = new(0.12f, 0.12f, 0.18f, 0.95f);
@@ -83,9 +91,48 @@ public class GameHUD : MonoBehaviour
         spacer.style.flexGrow = 1;
         topBar.Add(spacer);
 
+        var rightCol = new VisualElement();
+        rightCol.pickingMode = PickingMode.Ignore;
+        rightCol.style.alignItems = Align.FlexEnd;
+
         waveLabel = Lbl("Wave 1", 28, new Color(1f, 0.9f, 0.3f), FontStyle.Bold);
-        topBar.Add(waveLabel);
+        rightCol.Add(waveLabel);
+
+        floorRoomLabel = Lbl("Floor 1 — Room 1/10", 16, new Color(0.6f, 0.6f, 0.65f));
+        floorRoomLabel.style.marginTop = 2;
+        rightCol.Add(floorRoomLabel);
+
+        topBar.Add(rightCol);
         root.Add(topBar);
+
+        // ── Boss HP bar ──
+        bossHPContainer = new VisualElement();
+        bossHPContainer.pickingMode = PickingMode.Ignore;
+        bossHPContainer.style.alignItems = Align.Center;
+        bossHPContainer.style.marginTop = 8;
+        bossHPContainer.style.display = DisplayStyle.None;
+
+        bossNameLabel = Lbl("BOSS", 22, new Color(1f, 0.3f, 0.3f), FontStyle.Bold);
+        bossNameLabel.style.marginBottom = 4;
+        bossHPContainer.Add(bossNameLabel);
+
+        var bossBarBg = new VisualElement();
+        bossBarBg.pickingMode = PickingMode.Ignore;
+        bossBarBg.style.width = 500;
+        bossBarBg.style.height = 20;
+        bossBarBg.style.backgroundColor = new Color(0.15f, 0.05f, 0.05f);
+        Radius(bossBarBg, 6);
+        Border(bossBarBg, new Color(0.6f, 0.15f, 0.15f), 2);
+
+        bossHPFill = new VisualElement();
+        bossHPFill.pickingMode = PickingMode.Ignore;
+        bossHPFill.style.height = new StyleLength(Length.Percent(100));
+        bossHPFill.style.width = new StyleLength(Length.Percent(100));
+        bossHPFill.style.backgroundColor = new Color(0.85f, 0.15f, 0.15f);
+        Radius(bossHPFill, 4);
+        bossBarBg.Add(bossHPFill);
+        bossHPContainer.Add(bossBarBg);
+        root.Add(bossHPContainer);
 
         // ── Death overlay ──
         deathOverlay = MakeOverlay(new Color(0, 0, 0, 0.75f));
@@ -98,6 +145,18 @@ public class GameHUD : MonoBehaviour
         restartHint.style.marginTop = 24;
         deathOverlay.Add(restartHint);
         root.Add(deathOverlay);
+
+        // ── Victory overlay ──
+        victoryOverlay = MakeOverlay(new Color(0, 0, 0, 0.8f));
+        var vicTitle = Lbl("VICTORY!", 64, new Color(1f, 0.85f, 0.2f), FontStyle.Bold);
+        victoryOverlay.Add(vicTitle);
+        var vicSub = Lbl("You have conquered the dungeon!", 24, new Color(0.8f, 0.8f, 0.85f));
+        vicSub.style.marginTop = 12;
+        victoryOverlay.Add(vicSub);
+        var vicHint = Lbl("Press  R  to start a new run", 22, new Color(0.7f, 0.7f, 0.7f));
+        vicHint.style.marginTop = 24;
+        victoryOverlay.Add(vicHint);
+        root.Add(victoryOverlay);
 
         // ── Rune selection overlay ──
         runeOverlay = MakeOverlay(new Color(0, 0, 0, 0.65f));
@@ -291,7 +350,15 @@ public class GameHUD : MonoBehaviour
         GetRuneInfo(rune, out string runeName, out string typeName, out Color runeColor, out string description);
         string preview = ComputePreview(rune);
 
-        // Use VisualElement instead of Button to avoid child-rendering issues
+        // Check modifier compatibility
+        bool incompatible = false;
+        if (rune is ModifierSO modSO && modSO.modifierType != ModifierType.None)
+        {
+            var spell = caster.spellSlots[caster.activeSlot];
+            if (spell?.form != null && !ModifierSO.IsCompatible(modSO.modifierType, spell.form.formType))
+                incompatible = true;
+        }
+
         var card = new VisualElement();
         card.style.flexDirection = FlexDirection.Column;
         card.style.width = 250;
@@ -299,11 +366,12 @@ public class GameHUD : MonoBehaviour
         card.style.marginRight = 10;
         card.style.backgroundColor = CardBg;
         Radius(card, 14);
-        Border(card, InactiveBorder, 2);
+        Border(card, incompatible ? new Color(0.4f, 0.4f, 0.4f) : InactiveBorder, 2);
         card.style.overflow = Overflow.Hidden;
         card.style.cursor = StyleKeyword.Auto;
+        if (incompatible) card.style.opacity = 0.45f;
 
-        // Click handler
+        // Click handler (still allow click — rune replaces the slot even if incompatible)
         card.RegisterCallback<ClickEvent>(_ => onClick?.Invoke());
 
         // ── Header (colored bar) ──
@@ -333,6 +401,14 @@ public class GameHUD : MonoBehaviour
         sep.style.backgroundColor = new Color(0.3f, 0.3f, 0.35f);
         sep.style.marginBottom = 10;
         body.Add(sep);
+
+        if (incompatible)
+        {
+            var warn = Lbl("INCOMPATIBLE WITH CURRENT FORM", 12, new Color(1f, 0.4f, 0.3f), FontStyle.Bold);
+            warn.style.whiteSpace = WhiteSpace.Normal;
+            warn.style.marginBottom = 6;
+            body.Add(warn);
+        }
 
         body.Add(Lbl("RESULT", 12, Dim, FontStyle.Bold));
         var previewLbl = Lbl(preview, 18, Color.white, FontStyle.Bold);
@@ -396,6 +472,12 @@ public class GameHUD : MonoBehaviour
             desc = m.modifierType switch
             {
                 ModifierType.Split => $"x{m.splitCount} copies\n-{(int)((1 - m.damageMultiplier) * 100)}% damage each\n{m.splitSpreadAngle} deg spread",
+                ModifierType.Pierce => $"Passes through {m.pierceCount} enemies\nFull damage to each",
+                ModifierType.Bounce => $"Bounces {m.bounceCount} times\nOff walls or between enemies",
+                ModifierType.Leech => $"{(int)(m.leechPercent * 100)}% damage heals you\nSustain in combat",
+                ModifierType.Oversize => $"x{m.sizeMultiplier} size\n-{(int)((1 - m.speedPenalty) * 100)}% projectile speed",
+                ModifierType.Volatile => $"x{m.damageMultiplier} damage\n{(int)(m.volatileMissChance * 100)}% chance to miss",
+                ModifierType.Homing => $"Seeks nearest enemy\n-{(int)((1 - m.homingSpeedMult) * 100)}% projectile speed",
                 _ => "No modification\nPure base spell"
             };
         }
@@ -422,9 +504,41 @@ public class GameHUD : MonoBehaviour
 
     public void SetWave(int w) => waveLabel.text = $"Wave {w}";
 
+    public void SetFloorRoom(int floor, int room) =>
+        floorRoomLabel.text = $"Floor {floor} — Room {room}/10";
+
+    public void ShowVictory(int waves, int floors)
+    {
+        victoryOverlay.style.display = DisplayStyle.Flex;
+    }
+
+    public void ShowBossHP(Health bossHP, string bossName)
+    {
+        trackedBossHP = bossHP;
+        bossNameLabel.text = bossName;
+        bossHPContainer.style.display = DisplayStyle.Flex;
+        RefreshBossHP(bossHP.currentHP, bossHP.maxHP);
+        bossHP.OnHPChanged += RefreshBossHP;
+    }
+
+    public void HideBossHP()
+    {
+        if (trackedBossHP != null)
+            trackedBossHP.OnHPChanged -= RefreshBossHP;
+        trackedBossHP = null;
+        bossHPContainer.style.display = DisplayStyle.None;
+    }
+
+    void RefreshBossHP(int cur, int max)
+    {
+        float pct = max > 0 ? (float)cur / max : 0;
+        bossHPFill.style.width = new StyleLength(Length.Percent(pct * 100f));
+    }
+
     public void ShowDeath(bool show)
     {
         deathOverlay.style.display = show ? DisplayStyle.Flex : DisplayStyle.None;
+        victoryOverlay.style.display = DisplayStyle.None;
         if (show) deathWaveLabel.text = $"Reached wave {waveLabel.text.Replace("Wave ", "")}";
     }
 
