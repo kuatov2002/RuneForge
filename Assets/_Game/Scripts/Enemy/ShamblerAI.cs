@@ -19,6 +19,11 @@ public class ShamblerAI : MonoBehaviour
     Vector3 pullTarget;
     float pullTimer;
 
+    // Attack telegraph
+    bool isWindingUp;
+    float windupTimer;
+    const float WindupDuration = 0.35f;
+
     void Start()
     {
         var player = FindAnyObjectByType<PlayerController>();
@@ -68,6 +73,30 @@ public class ShamblerAI : MonoBehaviour
         toPlayer.y = 0;
         float dist = toPlayer.magnitude;
 
+        // Wind-up phase
+        if (isWindingUp)
+        {
+            windupTimer -= Time.deltaTime;
+            float flash = Mathf.PingPong(Time.time * 10f, 1f);
+            foreach (var r in renderers)
+                if (r != null && r.gameObject.name != "Eye")
+                    r.material.color = Color.Lerp(baseColor, Color.white, flash);
+
+            if (windupTimer <= 0)
+            {
+                isWindingUp = false;
+                var playerHealth = target.GetComponent<Health>();
+                var playerCtrl = target.GetComponent<PlayerController>();
+                if (playerHealth != null && !playerHealth.IsDead
+                    && (playerCtrl == null || !playerCtrl.isInvulnerable)
+                    && Vector3.Distance(transform.position, target.position) < attackRange + 0.5f)
+                {
+                    playerHealth.TakeDamage(attackDamage);
+                }
+            }
+            return;
+        }
+
         if (dist > attackRange)
         {
             Vector3 moveDir = toPlayer.normalized;
@@ -81,13 +110,8 @@ public class ShamblerAI : MonoBehaviour
             if (attackTimer <= 0)
             {
                 attackTimer = attackCooldown;
-                var playerHealth = target.GetComponent<Health>();
-                var playerCtrl = target.GetComponent<PlayerController>();
-                if (playerHealth != null && !playerHealth.IsDead
-                    && (playerCtrl == null || !playerCtrl.isInvulnerable))
-                {
-                    playerHealth.TakeDamage(attackDamage);
-                }
+                isWindingUp = true;
+                windupTimer = WindupDuration;
             }
         }
     }

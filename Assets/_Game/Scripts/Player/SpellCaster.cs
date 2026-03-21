@@ -67,6 +67,12 @@ public class SpellCaster : MonoBehaviour
             {
                 Cast(spell);
                 cooldownTimer = spell.form.cooldown;
+
+                // Dual-cast tracking
+                var dualCast = GetComponent<DualCast>();
+                if (dualCast != null) dualCast.OnCast(activeSlot);
+
+                SFXSystem.Play(SFXSystem.SFXType.Cast, transform.position);
             }
         }
     }
@@ -108,6 +114,10 @@ public class SpellCaster : MonoBehaviour
         float spreadAngle = 0;
         float damageMult = spell.modifier != null ? spell.modifier.damageMultiplier : 1f;
         float damage = spell.element.baseDamage * damageMult * MetaProgression.DamageMultiplier;
+
+        // Dual-cast bonus
+        var dualCast = GetComponent<DualCast>();
+        if (dualCast != null) damage *= dualCast.BonusMultiplier;
 
         // Crit chance from meta-progression
         if (UnityEngine.Random.value < MetaProgression.CritChance)

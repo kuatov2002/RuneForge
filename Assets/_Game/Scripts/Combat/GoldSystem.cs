@@ -140,6 +140,7 @@ public class GoldPickup : MonoBehaviour
             // Collect
             if (GoldSystem.Instance != null)
                 GoldSystem.Instance.AddGold(amount);
+            SFXSystem.Play(SFXSystem.SFXType.GoldPickup, transform.position);
             Destroy(gameObject);
             return;
         }

@@ -123,6 +123,11 @@ public class PlayerController : MonoBehaviour
                 chargeRechargeTimer = dashCooldown;
             rb.linearVelocity = transform.forward * (dashDistance / DashDuration);
             Invoke(nameof(EndIFrames), IFrameDuration);
+            SFXSystem.Play(SFXSystem.SFXType.Dash, transform.position);
+
+            // Reactive dual-cast on dash
+            var dualCast = GetComponent<DualCast>();
+            if (dualCast != null) dualCast.OnDash(transform.forward);
 
             // Dash fire relic
             var relicMgr = GetComponent<RelicManager>();

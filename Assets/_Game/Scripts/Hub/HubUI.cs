@@ -519,6 +519,62 @@ public class HubUI : MonoBehaviour
 
         panelContent.Add(bonusList);
 
+        // Heat/Ascension selector
+        if (AscensionSystem.MaxHeatUnlocked > 0)
+        {
+            var heatRow = new VisualElement();
+            heatRow.style.flexDirection = FlexDirection.Row;
+            heatRow.style.alignItems = Align.Center;
+            heatRow.style.justifyContent = Justify.Center;
+            heatRow.style.marginBottom = 16;
+
+            var heatLabel = Lbl($"Heat: {AscensionSystem.CurrentHeat}", 20, new Color(1f, 0.4f, 0.2f), FontStyle.Bold);
+            heatLabel.style.marginRight = 16;
+            heatRow.Add(heatLabel);
+
+            var minusBtn = new VisualElement();
+            minusBtn.style.width = 32; minusBtn.style.height = 32;
+            minusBtn.style.backgroundColor = new Color(0.2f, 0.2f, 0.25f);
+            Radius(minusBtn, 6);
+            minusBtn.style.alignItems = Align.Center;
+            minusBtn.style.justifyContent = Justify.Center;
+            minusBtn.Add(Lbl("-", 20, Color.white, FontStyle.Bold));
+            minusBtn.RegisterCallback<ClickEvent>(_ =>
+            {
+                AscensionSystem.CurrentHeat = Mathf.Max(0, AscensionSystem.CurrentHeat - 1);
+                panelContent.Clear();
+                BuildPortalPanel();
+            });
+            heatRow.Add(minusBtn);
+
+            var plusBtn = new VisualElement();
+            plusBtn.style.width = 32; plusBtn.style.height = 32;
+            plusBtn.style.backgroundColor = new Color(0.2f, 0.2f, 0.25f);
+            plusBtn.style.marginLeft = 8;
+            Radius(plusBtn, 6);
+            plusBtn.style.alignItems = Align.Center;
+            plusBtn.style.justifyContent = Justify.Center;
+            plusBtn.Add(Lbl("+", 20, Color.white, FontStyle.Bold));
+            plusBtn.RegisterCallback<ClickEvent>(_ =>
+            {
+                AscensionSystem.CurrentHeat = Mathf.Min(AscensionSystem.MaxHeatUnlocked, AscensionSystem.CurrentHeat + 1);
+                panelContent.Clear();
+                BuildPortalPanel();
+            });
+            heatRow.Add(plusBtn);
+
+            panelContent.Add(heatRow);
+
+            if (AscensionSystem.CurrentHeat > 0)
+            {
+                var heatDesc = Lbl(AscensionSystem.GetHeatDescription(), 14, new Color(1f, 0.5f, 0.3f));
+                heatDesc.style.whiteSpace = WhiteSpace.Normal;
+                heatDesc.style.unityTextAlign = TextAnchor.MiddleCenter;
+                heatDesc.style.marginBottom = 16;
+                panelContent.Add(heatDesc);
+            }
+        }
+
         // Start button
         var startBtn = new VisualElement();
         startBtn.style.alignSelf = Align.Center;

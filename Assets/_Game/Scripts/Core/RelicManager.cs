@@ -1,5 +1,7 @@
 using UnityEngine;
+using System;
 using System.Collections.Generic;
+using Random = UnityEngine.Random;
 
 public class RelicManager : MonoBehaviour
 {
@@ -95,6 +97,15 @@ public class RelicManager : MonoBehaviour
                         playerHealth.currentHP = playerHealth.maxHP;
                 }
                 break;
+            case RelicType.CursedSpeed:
+                if (playerCtrl != null) playerCtrl.moveSpeed *= 1.4f;
+                if (playerHealth != null)
+                {
+                    playerHealth.maxHP = Mathf.Max(1, playerHealth.maxHP - 2);
+                    if (playerHealth.currentHP > playerHealth.maxHP)
+                        playerHealth.currentHP = playerHealth.maxHP;
+                }
+                break;
         }
     }
 
@@ -135,6 +146,18 @@ public class RelicManager : MonoBehaviour
         if (HasRelic(RelicType.DoubleStrike) && hitCounter % 5 == 0)
             dmg *= 2f;
 
+        // Cursed Power: +75% damage
+        if (HasRelic(RelicType.CursedPower))
+            dmg *= 1.75f;
+
+        // Blood Pact: +100% damage
+        if (HasRelic(RelicType.BloodPact))
+            dmg *= 2f;
+
+        // Chaos: +30% damage
+        if (HasRelic(RelicType.Chaos))
+            dmg *= 1.3f;
+
         return dmg;
     }
 
@@ -149,6 +172,11 @@ public class RelicManager : MonoBehaviour
         }
 
         // Thorns: reflect 1 damage back (handled elsewhere via event)
+
+        // Cursed Power: take 1 extra damage per hit
+        if (HasRelic(RelicType.CursedPower))
+            damage += 1;
+
         return damage;
     }
 

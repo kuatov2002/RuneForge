@@ -243,6 +243,7 @@ public static class MetaProgression
         // Base: 10 per floor reached + 2 per room cleared + 1 per 3 enemies killed
         int reward = floor * 10 + room * 2 + enemiesKilled / 3;
         reward = Mathf.Max(reward, 5); // Minimum 5 even for early deaths
+        reward = Mathf.CeilToInt(reward * AscensionSystem.CurrencyMultiplier);
         Currency += reward;
         return reward;
     }

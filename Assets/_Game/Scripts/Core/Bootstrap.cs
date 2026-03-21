@@ -69,6 +69,7 @@ public class Bootstrap : MonoBehaviour
         CreateLighting();
         CreateGameFeel();
         CreateGoldSystem();
+        CreateSFXSystem();
         DoorTrigger.OnDoorEntered += OnDoorEntered;
         EnterHub();
     }
@@ -260,6 +261,13 @@ public class Bootstrap : MonoBehaviour
             CreateRelic("Lucky Charm", RelicType.Lucky, "+20% chance for 4th rune choice", new Color(0.2f, 0.9f, 0.4f)),
             CreateRelic("Berserker Rage", RelicType.Berserker, "+25% damage when below 50% HP", new Color(0.9f, 0.2f, 0.1f)),
             CreateRelic("Regeneration", RelicType.Regeneration, "Heal 1 HP every 30 seconds", new Color(0.3f, 0.9f, 0.5f)),
+
+            // Cursed relics
+            CreateCursedRelic("Cursed Power", RelicType.CursedPower, "CURSED: +75% damage, take 1 extra damage per hit", new Color(0.5f, 0.1f, 0.3f)),
+            CreateCursedRelic("Cursed Speed", RelicType.CursedSpeed, "CURSED: +40% move speed, -2 max HP", new Color(0.4f, 0.1f, 0.4f)),
+            CreateCursedRelic("Cursed Gold", RelicType.CursedGold, "CURSED: 3x gold drops, enemies +30% HP", new Color(0.6f, 0.5f, 0.1f)),
+            CreateCursedRelic("Blood Pact", RelicType.BloodPact, "CURSED: Spells cost 1 HP, +100% damage", new Color(0.6f, 0.05f, 0.05f)),
+            CreateCursedRelic("Chaos", RelicType.Chaos, "CURSED: Random element each cast, +30% damage", new Color(0.3f, 0.1f, 0.5f)),
         };
     }
 
@@ -267,6 +275,14 @@ public class Bootstrap : MonoBehaviour
     {
         var r = ScriptableObject.CreateInstance<RelicSO>();
         r.relicName = name; r.relicType = type; r.description = desc; r.color = col;
+        return r;
+    }
+
+    static RelicSO CreateCursedRelic(string name, RelicType type, string desc, Color col)
+    {
+        var r = ScriptableObject.CreateInstance<RelicSO>();
+        r.relicName = name; r.relicType = type; r.description = desc; r.color = col;
+        r.isCursed = true;
         return r;
     }
 
@@ -312,6 +328,10 @@ public class Bootstrap : MonoBehaviour
         bool isCombatRoom = !isStart && !isBossRoom && currentRoom != 5 && currentRoom != 8;
         if (isCombatRoom && w >= 10)
             RoomHazards.Populate(currentRoomGO.transform, w, h, currentFloor - 1);
+
+        // Floor-specific mechanics
+        if (isCombatRoom && currentFloor >= 2 && player != null)
+            FloorMechanics.Apply(currentRoomGO, currentFloor - 1, player.transform);
     }
 
     void TransitionToNextRoom()
@@ -333,6 +353,7 @@ public class Bootstrap : MonoBehaviour
             if (currentFloor > totalFloors)
             {
                 MetaProgression.CompleteRun();
+                AscensionSystem.OnRunComplete();
                 isPlayerDead = true; // Allow R to return to hub
                 hud.ShowVictory(wave, currentFloor - 1);
                 playerCtrl.enabled = false;
@@ -448,6 +469,9 @@ public class Bootstrap : MonoBehaviour
         relicMgr = player.AddComponent<RelicManager>();
         relicMgr.Init(playerHealth, playerCtrl, allRelics);
 
+        var dualCast = player.AddComponent<DualCast>();
+        dualCast.Init(spellCaster);
+
         if (!inHub)
         {
             // Starting spells: Fire Bolt, Ice Cone + Split
@@ -549,6 +573,13 @@ public class Bootstrap : MonoBehaviour
         go.AddComponent<GameFeel>();
     }
 
+    void CreateSFXSystem()
+    {
+        if (SFXSystem.Instance != null) return;
+        var go = new GameObject("SFXSystem");
+        go.AddComponent<SFXSystem>();
+    }
+
     void CreateGoldSystem()
     {
         if (GoldSystem.Instance != null) return;
@@ -572,10 +603,13 @@ public class Bootstrap : MonoBehaviour
             return;
         }
 
-        // Shop room: room 5
+        // Shop room: room 5 (Devil Deal on floor 3+, 50% chance)
         if (currentRoom == 5)
         {
-            StartShopRoom();
+            if (currentFloor >= 3 && Random.value < 0.5f)
+                StartDevilDealRoom();
+            else
+                StartShopRoom();
             return;
         }
 
@@ -628,6 +662,36 @@ public class Bootstrap : MonoBehaviour
         });
     }
 
+    void StartDevilDealRoom()
+    {
+        // Offer 2 cursed relics — powerful but with drawbacks, costs HP instead of gold
+        var cursedRelics = new List<RelicSO>();
+        foreach (var r in allRelics)
+            if (r.isCursed && !relicMgr.HasRelic(r.relicType)) cursedRelics.Add(r);
+
+        if (cursedRelics.Count == 0) { StartShopRoom(); return; }
+
+        runeOverlayActive = true;
+        hud.ShowDevilDeal(cursedRelics, relicMgr, playerHealth, relic =>
+        {
+            runeOverlayActive = false;
+            if (relic != null)
+            {
+                // Cost: 1 max HP
+                playerHealth.maxHP = Mathf.Max(1, playerHealth.maxHP - 1);
+                if (playerHealth.currentHP > playerHealth.maxHP)
+                    playerHealth.currentHP = playerHealth.maxHP;
+
+                relicMgr.AddRelic(relic);
+                hud.RefreshRelics(relicMgr.OwnedRelics);
+                hud.Refresh();
+            }
+            TransitionToNextRoom();
+        });
+    }
+
+    bool runeOverlayActive;
+
     void StartRestRoom()
     {
         // Rest: heal to full, then advance
@@ -673,11 +737,31 @@ public class Bootstrap : MonoBehaviour
     {
         enemy.transform.position = RandomSpawnPos();
         var rb = enemy.AddComponent<Rigidbody>(); rb.useGravity = false; rb.isKinematic = true;
-        var health = enemy.AddComponent<Health>(); health.maxHP = hp; health.currentHP = hp;
+
+        // Ascension scaling
+        int scaledHP = Mathf.CeilToInt(hp * AscensionSystem.EnemyHPMultiplier);
+
+        // Cursed Gold relic: enemies +30% HP
+        if (relicMgr != null && relicMgr.HasRelic(RelicType.CursedGold))
+            scaledHP = Mathf.CeilToInt(scaledHP * 1.3f);
+
+        var health = enemy.AddComponent<Health>(); health.maxHP = scaledHP; health.currentHP = scaledHP;
         enemy.AddComponent<EnemyHealthBar>();
         var enemyRef = enemy;
         health.OnDeath += () => OnEnemyDeath(enemyRef);
         enemies.Add(enemy);
+
+        // Elite affixes on floor 3+
+        float extraEliteChance = AscensionSystem.ExtraEliteChance;
+        AffixType affix = EnemyAffix.RollAffix(currentFloor);
+        if (affix == AffixType.None && extraEliteChance > 0 && Random.value < extraEliteChance)
+            affix = EnemyAffix.RollAffix(5); // Force a roll as if floor 5
+
+        if (affix != AffixType.None)
+        {
+            var affixComp = enemy.AddComponent<EnemyAffix>();
+            affixComp.Init(affix);
+        }
 
         // Track damage numbers
         if (hud != null) hud.TrackEnemyDamage(health);
@@ -1121,13 +1205,15 @@ public class Bootstrap : MonoBehaviour
 
         for (int i = 0; i < count; i++)
         {
-            float r = Random.value;
-            if (r < elemW && unlockedElements.Count > 0)
-                options[i] = unlockedElements[Random.Range(0, unlockedElements.Count)];
-            else if (r < elemW + formW)
-                options[i] = allForms[Random.Range(0, allForms.Length)];
-            else
-                options[i] = allModifiers[Random.Range(0, allModifiers.Length)];
+            options[i] = RollWeightedRune(elemW, formW, unlockedElements);
+        }
+
+        // Guarantee one option matches current build element (build direction)
+        if (count >= 3 && unlockedElements.Count > 0)
+        {
+            var currentElem = spellCaster.ActiveSpell?.element;
+            if (currentElem != null && Random.value < 0.4f)
+                options[0] = currentElem; // 40% chance to offer current element as first option
         }
 
         int rerolls = MetaProgression.Rerolls;
@@ -1139,17 +1225,9 @@ public class Bootstrap : MonoBehaviour
             TransitionToNextRoom();
         }, () =>
         {
-            // Reroll callback: regenerate options
+            // Reroll callback: regenerate options with weighting
             for (int i = 0; i < count; i++)
-            {
-                float r = Random.value;
-                if (r < elemW && unlockedElements.Count > 0)
-                    options[i] = unlockedElements[Random.Range(0, unlockedElements.Count)];
-                else if (r < elemW + formW)
-                    options[i] = allForms[Random.Range(0, allForms.Length)];
-                else
-                    options[i] = allModifiers[Random.Range(0, allModifiers.Length)];
-            }
+                options[i] = RollWeightedRune(elemW, formW, unlockedElements);
         });
     }
 
@@ -1205,6 +1283,22 @@ public class Bootstrap : MonoBehaviour
             ApplyRune(options[idx]);
             TransitionToNextRoom();
         }, null);
+    }
+
+    ScriptableObject RollWeightedRune(float elemW, float formW, List<ElementSO> unlockedElements)
+    {
+        float r = Random.value;
+        if (r < elemW && unlockedElements.Count > 0)
+        {
+            // Weight toward current build's element (2x chance)
+            var currentElem = spellCaster.ActiveSpell?.element;
+            if (currentElem != null && unlockedElements.Contains(currentElem) && Random.value < 0.35f)
+                return currentElem;
+            return unlockedElements[Random.Range(0, unlockedElements.Count)];
+        }
+        if (r < elemW + formW)
+            return allForms[Random.Range(0, allForms.Length)];
+        return allModifiers[Random.Range(0, allModifiers.Length)];
     }
 
     void ApplyRune(ScriptableObject rune)

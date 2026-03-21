@@ -878,6 +878,97 @@ public class GameHUD : MonoBehaviour
         runePanel.Add(skipCard);
     }
 
+    public void ShowDevilDeal(System.Collections.Generic.List<RelicSO> cursedRelics, RelicManager mgr, Health playerHP, Action<RelicSO> onDone)
+    {
+        runeOverlay.style.display = DisplayStyle.Flex;
+        runePanel.Clear();
+        currentSpellPreview.Clear();
+        currentSpellPreview.Add(Lbl("DEVIL DEAL", 24, new Color(0.8f, 0.15f, 0.15f), FontStyle.Bold));
+        slotHintLabel.text = "Cost: -1 Max HP per relic. Power demands sacrifice.";
+
+        int count = Mathf.Min(2, cursedRelics.Count);
+        for (int i = 0; i < count; i++)
+        {
+            var relic = cursedRelics[i];
+            var card = new VisualElement();
+            card.style.flexDirection = FlexDirection.Column;
+            card.style.width = 240;
+            card.style.marginLeft = 8;
+            card.style.marginRight = 8;
+            card.style.backgroundColor = new Color(0.12f, 0.04f, 0.06f, 0.95f);
+            Radius(card, 14);
+            Border(card, new Color(0.7f, 0.15f, 0.15f), 2);
+            card.style.overflow = Overflow.Hidden;
+
+            card.RegisterCallback<ClickEvent>(_ =>
+            {
+                runeOverlay.style.display = DisplayStyle.None;
+                onDone?.Invoke(relic);
+            });
+
+            var header = new VisualElement();
+            header.style.backgroundColor = relic.color;
+            Pad(header, 12, 16);
+            header.Add(Lbl(relic.relicName, 22, Color.white, FontStyle.Bold));
+            var cursedTag = Lbl("CURSED", 12, new Color(1f, 0.3f, 0.3f), FontStyle.Bold);
+            cursedTag.style.marginTop = 2;
+            header.Add(cursedTag);
+            card.Add(header);
+
+            var body = new VisualElement();
+            Pad(body, 12, 16);
+            var descLbl = Lbl(relic.description, 16, new Color(0.9f, 0.7f, 0.7f));
+            descLbl.style.whiteSpace = WhiteSpace.Normal;
+            body.Add(descLbl);
+
+            var costLbl = Lbl("-1 Max HP", 16, new Color(1f, 0.3f, 0.2f), FontStyle.Bold);
+            costLbl.style.marginTop = 8;
+            body.Add(costLbl);
+            card.Add(body);
+
+            card.RegisterCallback<MouseEnterEvent>(_ =>
+            {
+                card.style.backgroundColor = new Color(0.18f, 0.06f, 0.08f);
+                Border(card, new Color(1f, 0.2f, 0.2f), 3);
+            });
+            card.RegisterCallback<MouseLeaveEvent>(_ =>
+            {
+                card.style.backgroundColor = new Color(0.12f, 0.04f, 0.06f, 0.95f);
+                Border(card, new Color(0.7f, 0.15f, 0.15f), 2);
+            });
+
+            runePanel.Add(card);
+        }
+
+        // Skip button
+        var skipCard = new VisualElement();
+        skipCard.style.width = 120;
+        skipCard.style.marginLeft = 8;
+        skipCard.style.backgroundColor = CardBg;
+        Radius(skipCard, 14);
+        Border(skipCard, Dim, 2);
+        skipCard.style.alignItems = Align.Center;
+        skipCard.style.justifyContent = Justify.Center;
+        Pad(skipCard, 20, 16);
+        skipCard.Add(Lbl("RESIST", 18, new Color(0.5f, 0.8f, 0.5f), FontStyle.Bold));
+        skipCard.RegisterCallback<ClickEvent>(_ =>
+        {
+            runeOverlay.style.display = DisplayStyle.None;
+            onDone?.Invoke(null);
+        });
+        skipCard.RegisterCallback<MouseEnterEvent>(_ =>
+        {
+            skipCard.style.backgroundColor = CardBgHover;
+            Border(skipCard, new Color(0.5f, 0.8f, 0.5f), 2);
+        });
+        skipCard.RegisterCallback<MouseLeaveEvent>(_ =>
+        {
+            skipCard.style.backgroundColor = CardBg;
+            Border(skipCard, Dim, 2);
+        });
+        runePanel.Add(skipCard);
+    }
+
     public void ShowRestRoom(Action onContinue)
     {
         runeOverlay.style.display = DisplayStyle.Flex;

@@ -95,6 +95,12 @@ public class Health : MonoBehaviour
             GameFeel.ApplyKnockback(transform, transform.position - transform.forward, dmg * 0.3f);
         }
 
+        // SFX
+        if (isPlayer)
+            SFXSystem.Play(SFXSystem.SFXType.PlayerHit, transform.position);
+        else
+            SFXSystem.Play(dmg >= 8 ? SFXSystem.SFXType.CritHit : SFXSystem.SFXType.Hit, transform.position);
+
         if (killed)
         {
             isDead = true;
@@ -106,6 +112,7 @@ public class Health : MonoBehaviour
                 if (renderers.Length > 0 && renderers[0] != null)
                     deathColor = renderers[0].material.color;
                 GameFeel.SpawnDeathVFX(transform.position, deathColor);
+                SFXSystem.Play(SFXSystem.SFXType.EnemyDeath, transform.position);
                 if (TopDownCamera.Instance != null)
                     TopDownCamera.Instance.AddTrauma(0.15f);
             }

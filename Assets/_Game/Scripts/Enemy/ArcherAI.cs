@@ -17,6 +17,13 @@ public class ArcherAI : MonoBehaviour
     Renderer[] renderers;
     bool isDead;
 
+    // Telegraph
+    bool isAiming;
+    float aimTimer;
+    const float AimDuration = 0.5f;
+    Vector3 aimDir;
+    GameObject aimLine;
+
     void Start()
     {
         var player = FindAnyObjectByType<PlayerController>();
@@ -64,14 +71,45 @@ public class ArcherAI : MonoBehaviour
             transform.rotation = Quaternion.LookRotation(toPlayer.normalized);
         }
 
+        // Aiming telegraph
+        if (isAiming)
+        {
+            aimTimer -= Time.deltaTime;
+            // Flash bow
+            float flash = Mathf.PingPong(Time.time * 10f, 1f);
+            var bow = transform.Find("Bow");
+            if (bow != null)
+                bow.GetComponent<Renderer>().material.color = Color.Lerp(new Color(0.4f, 0.25f, 0.1f), Color.white, flash);
+
+            if (aimTimer <= 0)
+            {
+                isAiming = false;
+                if (aimLine != null) Destroy(aimLine);
+                EnemyProjectile.Create(transform.position, aimDir, projectileSpeed, attackDamage,
+                    new Color(0.3f, 0.8f, 0.3f));
+            }
+            return;
+        }
+
         // Shoot
         shootTimer -= Time.deltaTime;
         if (shootTimer <= 0 && dist < 12f)
         {
             shootTimer = shootCooldown;
-            Vector3 dir = toPlayer.normalized;
-            EnemyProjectile.Create(transform.position, dir, projectileSpeed, attackDamage,
-                new Color(0.3f, 0.8f, 0.3f));
+            aimDir = toPlayer.normalized;
+            isAiming = true;
+            aimTimer = AimDuration;
+
+            // Red aim line
+            aimLine = GameObject.CreatePrimitive(PrimitiveType.Cube);
+            Destroy(aimLine.GetComponent<BoxCollider>());
+            aimLine.name = "AimLine";
+            Vector3 mid = transform.position + aimDir * 5f;
+            aimLine.transform.position = mid + Vector3.up * 0.05f;
+            aimLine.transform.localScale = new Vector3(0.08f, 0.02f, 10f);
+            aimLine.transform.rotation = Quaternion.LookRotation(aimDir);
+            aimLine.GetComponent<Renderer>().material = ShaderCache.NewEmissive(new Color(1f, 0.2f, 0.1f), 2f);
+            Destroy(aimLine, AimDuration + 0.1f);
         }
     }
 
