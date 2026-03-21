@@ -1086,6 +1086,7 @@ public class GameHUD : MonoBehaviour
     }
 
     public void SetWave(int w) => waveLabel.text = $"Wave {w}";
+    public void SetWave(int w, int sub, int total) => waveLabel.text = total > 1 ? $"Wave {w} ({sub}/{total})" : $"Wave {w}";
 
     public void SetFloorRoom(int floor, int room) =>
         floorRoomLabel.text = $"Floor {floor} — Room {room}/10";

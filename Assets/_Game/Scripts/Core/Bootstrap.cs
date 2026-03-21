@@ -39,6 +39,11 @@ public class Bootstrap : MonoBehaviour
     GameObject currentBoss;
     GameObject rewardPickup;
 
+    // Multi-wave system
+    int subWave;
+    int totalSubWaves;
+    float reinforcementTimer;
+
     // Floor/Room system
     int currentFloor = 1; // 1-5
     int currentRoom = 1;  // 1-10
@@ -47,6 +52,11 @@ public class Bootstrap : MonoBehaviour
     FloorGenerator floorGen;
     GameObject currentRoomGO;
     bool roomCleared;
+
+    // Branching path system
+    enum NodeType { Combat, EliteCombat, Shop, Event, Rest, Boss }
+    struct MapNode { public NodeType type; public int depth; }
+    List<MapNode[]> floorMap; // floorMap[depth] = array of 2-3 node choices
 
     // Hub
     bool inHub;
@@ -110,6 +120,7 @@ public class Bootstrap : MonoBehaviour
 
         floorGen = new FloorGenerator();
         floorGen.Generate(roomsPerFloor, currentFloor - 1);
+        GenerateFloorMap();
         BuildCurrentRoom();
         CreatePlayer();
         ApplyMetaProgressionToPlayer();
@@ -133,6 +144,9 @@ public class Bootstrap : MonoBehaviour
             }
         }
 
+        // Apply selected loadout (starting spell + passive)
+        ApplyStartingLoadout();
+
         SpawnWave();
     }
 
@@ -151,6 +165,42 @@ public class Bootstrap : MonoBehaviour
 
         // Potions
         playerCtrl.SetPotions(MetaProgression.PotionsPerFloor);
+    }
+
+    void ApplyStartingLoadout()
+    {
+        var loadout = MetaProgression.GetSelectedLoadoutDef();
+        if (loadout.startElement == null || loadout.startForm == null) return;
+
+        // Find matching element and form
+        ElementSO elem = null;
+        foreach (var e in allElements) if (e.elementName == loadout.startElement) { elem = e; break; }
+        FormSO form = null;
+        foreach (var f in allForms) if (f.formName == loadout.startForm) { form = f; break; }
+        if (elem == null || form == null) return;
+
+        // Equip to slot 0
+        spellCaster.spellSlots[0] = new SpellData { element = elem, form = form };
+
+        // Apply passive bonus based on aspect
+        switch (loadout.id)
+        {
+            case "pyromancer": // +10% burn damage handled via burn DPS scaling
+                fireElem.statusDPS *= 1.1f;
+                break;
+            case "cryomancer": // +0.5s freeze duration
+                iceElem.statusDuration += 0.5f;
+                break;
+            case "stormcaller": // +1 chain target
+                lightningElem.chainCount += 1;
+                break;
+            case "plaguebringer": // +1 starting poison stack (enemies start with 1)
+                poisonElem.baseDamage += 1;
+                break;
+            case "voidwalker": // -20% dash cooldown
+                playerCtrl.dashCooldown *= 0.8f;
+                break;
+        }
     }
 
     void CleanupRun()
@@ -174,6 +224,21 @@ public class Bootstrap : MonoBehaviour
             var kb = Keyboard.current;
             if (kb != null && kb.rKey.wasPressedThisFrame)
                 ReturnToHub();
+        }
+
+        // Reinforcement timer for multi-wave rooms
+        if (reinforcementTimer > 0)
+        {
+            reinforcementTimer -= Time.deltaTime;
+            if (reinforcementTimer <= 0)
+            {
+                reinforcementTimer = -1;
+                int baseBudget = currentFloor switch { 1 => 10, 2 => 18, 3 => 28, 4 => 40, _ => 55 };
+                float budgetMult = currentNodeType == NodeType.EliteCombat ? 1.5f : 1f;
+                int totalBudget = Mathf.CeilToInt((baseBudget + (currentRoom - 1) * 2) * budgetMult);
+                int waveBudget = totalBudget / totalSubWaves;
+                SpawnSubWave(waveBudget, currentNodeType == NodeType.EliteCombat);
+            }
         }
     }
 
@@ -301,6 +366,157 @@ public class Bootstrap : MonoBehaviour
         return f;
     }
 
+    // ─── FLOOR MAP ──────────────────────────────────────────────
+
+    void GenerateFloorMap()
+    {
+        floorMap = new List<MapNode[]>();
+        // 10 depths: 0=start combat, 1-3=choices, 4=shop/devilDeal, 5-6=choices, 7=rest, 8=choice, 9=boss
+        for (int d = 0; d < roomsPerFloor; d++)
+        {
+            if (d == 0) // First room: always combat
+                floorMap.Add(new[] { new MapNode { type = NodeType.Combat, depth = d } });
+            else if (d == roomsPerFloor - 1) // Last room: always boss
+                floorMap.Add(new[] { new MapNode { type = NodeType.Boss, depth = d } });
+            else if (d == 4) // Depth 4: shop or devil deal
+            {
+                if (currentFloor >= 3 && Random.value < 0.5f)
+                    floorMap.Add(new[] {
+                        new MapNode { type = NodeType.Shop, depth = d },
+                        new MapNode { type = NodeType.Event, depth = d }
+                    });
+                else
+                    floorMap.Add(new[] {
+                        new MapNode { type = NodeType.Shop, depth = d },
+                        new MapNode { type = NodeType.Combat, depth = d }
+                    });
+            }
+            else if (d == 7) // Depth 7: rest or event
+                floorMap.Add(new[] {
+                    new MapNode { type = NodeType.Rest, depth = d },
+                    new MapNode { type = NodeType.Event, depth = d }
+                });
+            else // Choice rooms: 2-3 options
+            {
+                var options = new List<MapNode>();
+                options.Add(new MapNode { type = NodeType.Combat, depth = d });
+
+                // Second option
+                float roll = Random.value;
+                if (roll < 0.25f)
+                    options.Add(new MapNode { type = NodeType.EliteCombat, depth = d });
+                else if (roll < 0.5f)
+                    options.Add(new MapNode { type = NodeType.Event, depth = d });
+                else
+                    options.Add(new MapNode { type = NodeType.Combat, depth = d });
+
+                // Third option on later floors (50% chance)
+                if (currentFloor >= 2 && Random.value < 0.5f)
+                {
+                    if (Random.value < 0.4f)
+                        options.Add(new MapNode { type = NodeType.EliteCombat, depth = d });
+                    else
+                        options.Add(new MapNode { type = NodeType.Event, depth = d });
+                }
+
+                floorMap.Add(options.ToArray());
+            }
+        }
+    }
+
+    NodeType currentNodeType = NodeType.Combat;
+
+    void ShowPathChoice()
+    {
+        int nextDepth = currentRoom; // currentRoom is 1-indexed, next depth = currentRoom (0-indexed is currentRoom-1, so next = currentRoom)
+        if (nextDepth >= roomsPerFloor)
+        {
+            // Boss or end of floor
+            TransitionToRoom(NodeType.Boss);
+            return;
+        }
+
+        var nodes = floorMap[nextDepth];
+        if (nodes.Length <= 1)
+        {
+            TransitionToRoom(nodes[0].type);
+            return;
+        }
+
+        // Show choice UI
+        string[] labels = new string[nodes.Length];
+        string[] descs = new string[nodes.Length];
+        Color[] colors = new Color[nodes.Length];
+        for (int i = 0; i < nodes.Length; i++)
+        {
+            (labels[i], descs[i], colors[i]) = GetNodeDisplay(nodes[i].type);
+        }
+
+        hud.ShowEventRoom("CHOOSE YOUR PATH", $"Floor {currentFloor} — Depth {nextDepth + 1}/{roomsPerFloor}",
+            new Color(0.7f, 0.7f, 0.8f), labels, descs, colors, choice =>
+            {
+                TransitionToRoom(nodes[choice].type);
+            });
+    }
+
+    (string label, string desc, Color color) GetNodeDisplay(NodeType type) => type switch
+    {
+        NodeType.Combat => ("COMBAT", "Standard enemies", new Color(0.8f, 0.3f, 0.2f)),
+        NodeType.EliteCombat => ("ELITE COMBAT", "Harder enemies, better rewards", new Color(0.9f, 0.6f, 0.1f)),
+        NodeType.Shop => ("SHOP", "Buy relics with gold", new Color(1f, 0.85f, 0.2f)),
+        NodeType.Event => ("EVENT", "Risk and reward", new Color(0.3f, 0.7f, 0.9f)),
+        NodeType.Rest => ("REST", "Heal to full HP", new Color(0.3f, 0.9f, 0.5f)),
+        NodeType.Boss => ("BOSS", "Floor guardian", new Color(0.8f, 0.1f, 0.1f)),
+        _ => ("???", "Unknown", Color.gray)
+    };
+
+    void TransitionToRoom(NodeType nodeType)
+    {
+        // Clean up
+        if (rewardPickup != null) { Destroy(rewardPickup); rewardPickup = null; }
+        foreach (var e in enemies) if (e != null) Destroy(e);
+        enemies.Clear();
+        enemiesAlive = 0;
+
+        currentRoom++;
+        currentNodeType = nodeType;
+
+        if (currentRoom > roomsPerFloor)
+        {
+            // Floor complete
+            currentFloor++;
+            currentRoom = 1;
+
+            if (currentFloor > totalFloors)
+            {
+                MetaProgression.CompleteRun();
+                AscensionSystem.OnRunComplete();
+                isPlayerDead = true;
+                hud.ShowVictory(wave, currentFloor - 1);
+                playerCtrl.enabled = false;
+                spellCaster.enabled = false;
+                return;
+            }
+
+            floorGen = new FloorGenerator();
+            floorGen.Generate(roomsPerFloor, currentFloor - 1);
+            GenerateFloorMap();
+
+            if (playerCtrl != null)
+                playerCtrl.RefillPotions(MetaProgression.PotionsPerFloor);
+        }
+
+        BuildCurrentRoom();
+        player.transform.position = new Vector3(
+            currentRoomGO.transform.position.x + 6, 0,
+            currentRoomGO.transform.position.z + 2);
+
+        wave++;
+        hud.SetFloorRoom(currentFloor, currentRoom);
+        if (relicMgr != null) relicMgr.OnRoomEnter();
+        SpawnWaveForNodeType(nodeType);
+    }
+
     // ─── ROOM ─────────────────────────────────────────────────────
 
     void BuildCurrentRoom()
@@ -336,49 +552,7 @@ public class Bootstrap : MonoBehaviour
 
     void TransitionToNextRoom()
     {
-        // Clean up
-        if (rewardPickup != null) { Destroy(rewardPickup); rewardPickup = null; }
-        foreach (var e in enemies) if (e != null) Destroy(e);
-        enemies.Clear();
-        enemiesAlive = 0;
-
-        currentRoom++;
-
-        if (currentRoom > roomsPerFloor)
-        {
-            // Floor complete — transition to next floor
-            currentFloor++;
-            currentRoom = 1;
-
-            if (currentFloor > totalFloors)
-            {
-                MetaProgression.CompleteRun();
-                AscensionSystem.OnRunComplete();
-                isPlayerDead = true; // Allow R to return to hub
-                hud.ShowVictory(wave, currentFloor - 1);
-                playerCtrl.enabled = false;
-                spellCaster.enabled = false;
-                return;
-            }
-
-            floorGen = new FloorGenerator();
-            floorGen.Generate(roomsPerFloor, currentFloor - 1);
-
-            // Refill potions on new floor
-            if (playerCtrl != null)
-                playerCtrl.RefillPotions(MetaProgression.PotionsPerFloor);
-        }
-
-        BuildCurrentRoom();
-        player.transform.position = new Vector3(
-            currentRoomGO.transform.position.x + 6,
-            0,
-            currentRoomGO.transform.position.z + 2);
-
-        wave++;
-        hud.SetFloorRoom(currentFloor, currentRoom);
-        if (relicMgr != null) relicMgr.OnRoomEnter();
-        SpawnWave();
+        ShowPathChoice();
     }
 
     void OnDoorEntered(string doorName)
@@ -590,47 +764,61 @@ public class Bootstrap : MonoBehaviour
 
     // ─── ENEMIES ──────────────────────────────────────────────────
 
-    void SpawnWave()
+    void SpawnWaveForNodeType(NodeType nodeType)
     {
         hud.SetWave(wave);
         hud.SetFloorRoom(currentFloor, currentRoom);
         roomCleared = false;
 
-        // Boss room: last room of each floor
-        if (currentRoom == roomsPerFloor)
+        switch (nodeType)
         {
-            SpawnBossWave(currentFloor);
-            return;
+            case NodeType.Boss:
+                SpawnBossWave(currentFloor);
+                return;
+            case NodeType.Shop:
+                if (currentFloor >= 3 && Random.value < 0.5f)
+                    StartDevilDealRoom();
+                else
+                    StartShopRoom();
+                return;
+            case NodeType.Event:
+                StartEventRoom();
+                return;
+            case NodeType.Rest:
+                StartRestRoom();
+                return;
+            case NodeType.EliteCombat:
+                SpawnCombatWave(1.5f, true); // 1.5x budget, guaranteed elite
+                return;
+            default: // Combat
+                SpawnCombatWave(1f, false);
+                return;
         }
+    }
 
-        // Shop room: room 5 (Devil Deal on floor 3+, 50% chance)
-        if (currentRoom == 5)
-        {
-            if (currentFloor >= 3 && Random.value < 0.5f)
-                StartDevilDealRoom();
-            else
-                StartShopRoom();
-            return;
-        }
+    // Keep SpawnWave as alias for first room
+    void SpawnWave()
+    {
+        SpawnWaveForNodeType(currentRoom == roomsPerFloor ? NodeType.Boss : NodeType.Combat);
+    }
 
-        // Event room: room 3 (50% chance) or room 7
-        if ((currentRoom == 3 && Random.value < 0.5f) || currentRoom == 7)
-        {
-            StartEventRoom();
-            return;
-        }
-
-        // Rest room: room 8
-        if (currentRoom == 8)
-        {
-            StartRestRoom();
-            return;
-        }
-
-        // Threat budget scales with floor: Floor 1=10, 2=18, 3=28, 4=40, 5=55
+    void SpawnCombatWave(float budgetMult, bool forceElite)
+    {
         int baseBudget = currentFloor switch { 1 => 10, 2 => 18, 3 => 28, 4 => 40, _ => 55 };
-        int budget = baseBudget + (currentRoom - 1) * 2;
-        enemiesAlive = 0;
+        int totalBudget = Mathf.CeilToInt((baseBudget + (currentRoom - 1) * 2) * budgetMult);
+
+        // Split into 1-3 sub-waves based on floor
+        totalSubWaves = currentFloor >= 3 ? Random.Range(2, 4) : (currentFloor >= 2 ? Random.Range(1, 3) : 1);
+        subWave = 0;
+        reinforcementTimer = -1;
+
+        int waveBudget = totalBudget / totalSubWaves;
+        SpawnSubWave(waveBudget, forceElite);
+    }
+
+    void SpawnSubWave(int budget, bool forceElite)
+    {
+        subWave++;
 
         while (budget > 0)
         {
@@ -640,7 +828,7 @@ public class Bootstrap : MonoBehaviour
             if (cost > budget) break;
             budget -= cost;
 
-            if (type == 3) // Swarm group
+            if (type == 3)
             {
                 int sc = Random.Range(8, 13);
                 for (int s = 0; s < sc; s++) { SpawnEnemy(type); enemiesAlive++; }
@@ -648,6 +836,26 @@ public class Bootstrap : MonoBehaviour
             else { SpawnEnemy(type); enemiesAlive++; }
         }
         if (enemiesAlive == 0) { SpawnEnemy(0); enemiesAlive = 1; }
+
+        if (forceElite)
+        {
+            foreach (var e in enemies)
+            {
+                if (e == null) continue;
+                var affix = e.GetComponent<EnemyAffix>();
+                if (affix == null)
+                {
+                    affix = e.AddComponent<EnemyAffix>();
+                    AffixType rollType = EnemyAffix.RollAffix(5);
+                    if (rollType == AffixType.None) rollType = AffixType.Berserker;
+                    affix.Init(rollType);
+                }
+            }
+        }
+
+        // Show sub-wave indicator
+        if (totalSubWaves > 1 && hud != null)
+            hud.SetWave(wave, subWave, totalSubWaves);
     }
 
     void StartShopRoom()
@@ -1368,7 +1576,20 @@ public class Bootstrap : MonoBehaviour
         enemiesKilledThisRun++;
 
         if (enemiesAlive <= 0)
+        {
+            // Check for more sub-waves
+            if (subWave < totalSubWaves && !bossActive)
+            {
+                int baseBudget = currentFloor switch { 1 => 10, 2 => 18, 3 => 28, 4 => 40, _ => 55 };
+                float budgetMult = currentNodeType == NodeType.EliteCombat ? 1.5f : 1f;
+                int totalBudget = Mathf.CeilToInt((baseBudget + (currentRoom - 1) * 2) * budgetMult);
+                int waveBudget = totalBudget / totalSubWaves;
+                // Brief delay before reinforcements
+                reinforcementTimer = 1.5f;
+                return;
+            }
             SpawnRewardPickup();
+        }
     }
 
     void ShowRuneSelection()
@@ -1506,10 +1727,29 @@ public class Bootstrap : MonoBehaviour
             spellCaster.spellSlots[spellCaster.activeSlot] = spell;
         }
 
-        if (rune is ElementSO elem) spell.element = elem;
-        else if (rune is FormSO form) spell.form = form;
-        else if (rune is ModifierSO mod) spell.modifier = mod;
+        if (rune is ElementSO elem)
+        {
+            if (spell.element == elem)
+                spell.elementTier++; // Same element = upgrade tier
+            else
+                { spell.element = elem; spell.elementTier = 0; }
+        }
+        else if (rune is FormSO form)
+        {
+            if (spell.form == form)
+                spell.formTier++; // Same form = cooldown reduction
+            else
+                { spell.form = form; spell.formTier = 0; }
+        }
+        else if (rune is ModifierSO mod)
+        {
+            if (spell.modifier == mod)
+                spell.modifierTier++; // Same modifier = stronger effect
+            else
+                { spell.modifier = mod; spell.modifierTier = 0; }
+        }
 
+        SFXSystem.Play(SFXSystem.SFXType.LevelUp, player.transform.position);
         hud.Refresh();
     }
 

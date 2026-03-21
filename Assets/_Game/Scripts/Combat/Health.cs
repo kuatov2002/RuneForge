@@ -60,9 +60,20 @@ public class Health : MonoBehaviour
         currentHP = maxHP;
     }
 
+    // Player hit recovery
+    float hitRecoveryTimer;
+    const float HitRecoveryDuration = 0.5f;
+    public bool IsInHitRecovery => hitRecoveryTimer > 0;
+
     public void TakeDamage(float amount)
     {
         if (isDead) return;
+
+        // Player hit recovery: immune to damage during recovery window
+        var pc = GetComponent<PlayerController>();
+        bool isPlayer = pc != null;
+        if (isPlayer && hitRecoveryTimer > 0) return;
+        if (isPlayer && pc.isInvulnerable) return;
 
         // Relic: modify incoming damage (Shield blocks first hit per room)
         int dmg = Mathf.Max(1, Mathf.CeilToInt(amount));
@@ -75,12 +86,22 @@ public class Health : MonoBehaviour
         if (currentHP < 0) currentHP = 0;
         OnHPChanged?.Invoke(currentHP, maxHP);
 
-        bool isPlayer = GetComponent<PlayerController>() != null;
         bool killed = currentHP <= 0;
 
-        // Screen shake when player takes damage
-        if (isPlayer && TopDownCamera.Instance != null)
-            TopDownCamera.Instance.AddTrauma(0.4f);
+        // Player: hit recovery i-frames + knockback
+        if (isPlayer)
+        {
+            if (!killed)
+            {
+                hitRecoveryTimer = HitRecoveryDuration;
+                // Knockback player away from damage source
+                GameFeel.ApplyKnockback(transform, transform.position + transform.forward, 2f);
+            }
+            if (TopDownCamera.Instance != null)
+                TopDownCamera.Instance.AddTrauma(0.4f);
+            if (GameFeel.Instance != null)
+                GameFeel.Instance.Hitstop(0.04f);
+        }
 
         // Juice: floating damage number + hitstop + knockback
         Vector3 hitPos = transform.position + Vector3.up * 1.2f;
@@ -189,6 +210,18 @@ public class Health : MonoBehaviour
     void Update()
     {
         if (isDead) return;
+
+        // Hit recovery timer
+        if (hitRecoveryTimer > 0)
+        {
+            hitRecoveryTimer -= Time.deltaTime;
+            // Flash player during recovery
+            var renderers = GetComponentsInChildren<Renderer>();
+            bool visible = Mathf.PingPong(Time.time * 20f, 1f) > 0.5f;
+            foreach (var r in renderers) if (r != null) r.enabled = visible;
+            if (hitRecoveryTimer <= 0)
+                foreach (var r in renderers) if (r != null) r.enabled = true;
+        }
 
         // Burn
         if (burnTimer > 0)

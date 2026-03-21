@@ -33,7 +33,7 @@ public class SpellCaster : MonoBehaviour
         {
             var spell = ActiveSpell;
             if (spell == null || spell.form == null || spell.form.cooldown <= 0) return 0f;
-            return Mathf.Clamp01(cooldownTimer / spell.form.cooldown);
+            return Mathf.Clamp01(cooldownTimer / (spell.form.cooldown * spell.CooldownTierMult));
         }
     }
 
@@ -66,7 +66,7 @@ public class SpellCaster : MonoBehaviour
             if (mouse.leftButton.wasPressedThisFrame && cooldownTimer <= 0)
             {
                 Cast(spell);
-                cooldownTimer = spell.form.cooldown;
+                cooldownTimer = spell.form.cooldown * spell.CooldownTierMult;
 
                 // Dual-cast tracking
                 var dualCast = GetComponent<DualCast>();
@@ -133,7 +133,7 @@ public class SpellCaster : MonoBehaviour
         int count = 1;
         float spreadAngle = 0;
         float damageMult = spell.modifier != null ? spell.modifier.damageMultiplier : 1f;
-        float damage = spell.element.baseDamage * damageMult * MetaProgression.DamageMultiplier;
+        float damage = spell.element.baseDamage * spell.DamageTierMult * damageMult * MetaProgression.DamageMultiplier;
 
         // Dual-cast bonus
         var dualCast = GetComponent<DualCast>();

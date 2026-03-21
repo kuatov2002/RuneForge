@@ -70,6 +70,10 @@ public static class HubBuilder
         CreateNPCStation(hub.transform, new Vector3(3, 0, half),
             "Chronicle", new Color(0.7f, 0.7f, 0.5f), 1.0f);
 
+        // 5. Synergy Codex — northwest
+        CreateNPCStation(hub.transform, new Vector3(5, 0, size - 5),
+            "Codex", new Color(0.6f, 0.3f, 0.9f), 1.0f);
+
         // ── Decorations ──
 
         // Corner pillars

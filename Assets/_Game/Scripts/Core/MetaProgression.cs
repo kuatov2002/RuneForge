@@ -248,6 +248,124 @@ public static class MetaProgression
         return reward;
     }
 
+    // ─── STARTING LOADOUTS (Aspects) ─────────────────────────
+
+    const string KEY_LOADOUT_UNLOCK = "meta_loadout_";
+    const string KEY_SELECTED_LOADOUT = "meta_selected_loadout";
+
+    public struct LoadoutDef
+    {
+        public string id;
+        public string name;
+        public string description;
+        public string startElement;
+        public string startForm;
+        public Color color;
+        public int unlockCost;
+        public string passiveDesc;
+    }
+
+    public static LoadoutDef[] AllLoadouts => new LoadoutDef[]
+    {
+        new() { id = "default", name = "Apprentice", description = "No starting spell. Classic start.",
+            startElement = null, startForm = null, color = new Color(0.6f, 0.6f, 0.65f),
+            unlockCost = 0, passiveDesc = "No bonus" },
+        new() { id = "pyromancer", name = "Pyromancer", description = "Start with Fire Bolt. +10% burn damage.",
+            startElement = "Fire", startForm = "Bolt", color = new Color(1f, 0.4f, 0.1f),
+            unlockCost = 100, passiveDesc = "+10% burn damage" },
+        new() { id = "cryomancer", name = "Cryomancer", description = "Start with Ice Cone. Freeze lasts 0.5s longer.",
+            startElement = "Ice", startForm = "Cone", color = new Color(0.3f, 0.7f, 1f),
+            unlockCost = 100, passiveDesc = "+0.5s freeze duration" },
+        new() { id = "stormcaller", name = "Stormcaller", description = "Start with Lightning Beam. +1 chain target.",
+            startElement = "Lightning", startForm = "Beam", color = new Color(1f, 1f, 0.3f),
+            unlockCost = 150, passiveDesc = "+1 chain target" },
+        new() { id = "plaguebringer", name = "Plaguebringer", description = "Start with Poison Trap. +1 starting poison stack.",
+            startElement = "Poison", startForm = "Trap", color = new Color(0.2f, 0.9f, 0.1f),
+            unlockCost = 150, passiveDesc = "+1 starting poison stack" },
+        new() { id = "voidwalker", name = "Voidwalker", description = "Start with Void Orbit. Dash cooldown -20%.",
+            startElement = "Void", startForm = "Orbit", color = new Color(0.6f, 0.1f, 0.9f),
+            unlockCost = 200, passiveDesc = "-20% dash cooldown" },
+    };
+
+    public static bool IsLoadoutUnlocked(string loadoutId)
+    {
+        if (loadoutId == "default") return true;
+        return PlayerPrefs.GetInt(KEY_LOADOUT_UNLOCK + loadoutId, 0) > 0;
+    }
+
+    public static bool TryUnlockLoadout(string loadoutId)
+    {
+        if (IsLoadoutUnlocked(loadoutId)) return false;
+        LoadoutDef? def = null;
+        foreach (var l in AllLoadouts) if (l.id == loadoutId) { def = l; break; }
+        if (def == null) return false;
+        if (Currency < def.Value.unlockCost) return false;
+        Currency -= def.Value.unlockCost;
+        PlayerPrefs.SetInt(KEY_LOADOUT_UNLOCK + loadoutId, 1);
+        PlayerPrefs.Save();
+        return true;
+    }
+
+    public static string SelectedLoadout
+    {
+        get => PlayerPrefs.GetString(KEY_SELECTED_LOADOUT, "default");
+        set { PlayerPrefs.SetString(KEY_SELECTED_LOADOUT, value); PlayerPrefs.Save(); }
+    }
+
+    public static LoadoutDef GetSelectedLoadoutDef()
+    {
+        string sel = SelectedLoadout;
+        foreach (var l in AllLoadouts) if (l.id == sel) return l;
+        return AllLoadouts[0];
+    }
+
+    // ─── COMBO DISCOVERY ───────────────────────────────────────
+
+    const string KEY_COMBO_DISCOVERED = "meta_combo_";
+
+    public static readonly string[] AllComboIds = new[]
+    {
+        "SteamBurst", "Detonate", "Implode", "Shatter",
+        "ToxicFrost", "PlagueSpark", "RiftShock", "Corruption"
+    };
+
+    public static readonly (string id, string name, string elem1, string elem2, string desc)[] ComboDefinitions = new[]
+    {
+        ("SteamBurst", "Steam Burst", "Fire", "Ice", "AoE damage cloud (3m, 8 dmg)"),
+        ("Detonate", "Detonate", "Fire", "Poison", "Consumes poison stacks, 5 dmg each"),
+        ("Implode", "Implode", "Fire", "Void", "Pulls enemies in + 10 dmg"),
+        ("Shatter", "Shatter", "Ice", "Lightning", "Frozen target takes 15 burst dmg"),
+        ("ToxicFrost", "Toxic Frost", "Ice", "Poison", "Slow + poison AoE pool (4s)"),
+        ("PlagueSpark", "Plague Spark", "Lightning", "Poison", "Chain-detonates poisoned enemies"),
+        ("RiftShock", "Rift Shock", "Lightning", "Void", "Stuns all void-marked enemies 2s"),
+        ("Corruption", "Corruption", "Poison", "Void", "Spreads 3 poison stacks to nearby"),
+    };
+
+    public static bool IsComboDiscovered(string comboId)
+    {
+        return PlayerPrefs.GetInt(KEY_COMBO_DISCOVERED + comboId, 0) > 0;
+    }
+
+    public static void DiscoverCombo(string comboId)
+    {
+        if (!IsComboDiscovered(comboId))
+        {
+            PlayerPrefs.SetInt(KEY_COMBO_DISCOVERED + comboId, 1);
+            PlayerPrefs.Save();
+        }
+    }
+
+    public static int DiscoveredComboCount
+    {
+        get
+        {
+            int count = 0;
+            foreach (var id in AllComboIds)
+                if (IsComboDiscovered(id)) count++;
+            return count;
+        }
+    }
+
     // ─── RESET (debug) ─────────────────────────────────────────
 
     public static void ResetAll()

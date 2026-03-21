@@ -113,6 +113,11 @@ public class HubUI : MonoBehaviour
                 panelTitle.style.color = station.stationColor;
                 BuildPortalPanel();
                 break;
+            case "Codex":
+                panelTitle.text = "SYNERGY CODEX";
+                panelTitle.style.color = station.stationColor;
+                BuildCodexPanel();
+                break;
         }
     }
 
@@ -575,6 +580,25 @@ public class HubUI : MonoBehaviour
             }
         }
 
+        // ── Loadout (Aspect) selector ──
+        var loadoutTitle = Lbl("STARTING LOADOUT", 20, new Color(0.8f, 0.7f, 1f), FontStyle.Bold);
+        loadoutTitle.style.unityTextAlign = TextAnchor.MiddleCenter;
+        loadoutTitle.style.marginBottom = 12;
+        panelContent.Add(loadoutTitle);
+
+        var loadoutGrid = new VisualElement();
+        loadoutGrid.style.flexDirection = FlexDirection.Row;
+        loadoutGrid.style.flexWrap = Wrap.Wrap;
+        loadoutGrid.style.justifyContent = Justify.Center;
+        loadoutGrid.style.marginBottom = 20;
+
+        foreach (var loadout in MetaProgression.AllLoadouts)
+        {
+            var lCard = BuildLoadoutCard(loadout);
+            loadoutGrid.Add(lCard);
+        }
+        panelContent.Add(loadoutGrid);
+
         // Start button
         var startBtn = new VisualElement();
         startBtn.style.alignSelf = Align.Center;
@@ -601,6 +625,215 @@ public class HubUI : MonoBehaviour
 
         panelContent.Add(startBtn);
     }
+
+    // ─── LOADOUT CARD ──────────────────────────────────────────
+
+    VisualElement BuildLoadoutCard(MetaProgression.LoadoutDef loadout)
+    {
+        bool unlocked = MetaProgression.IsLoadoutUnlocked(loadout.id);
+        bool selected = MetaProgression.SelectedLoadout == loadout.id;
+        bool canAfford = MetaProgression.Currency >= loadout.unlockCost;
+
+        var card = new VisualElement();
+        card.style.width = 130;
+        card.style.marginTop = 4; card.style.marginBottom = 4;
+        card.style.marginLeft = 4; card.style.marginRight = 4;
+        card.style.backgroundColor = selected ? new Color(0.12f, 0.1f, 0.18f, 0.95f) : CardBg;
+        Radius(card, 10);
+        Border(card, selected ? loadout.color : (unlocked ? new Color(0.4f, 0.4f, 0.45f) : new Color(0.25f, 0.25f, 0.3f)), selected ? 3 : 1);
+        card.style.overflow = Overflow.Hidden;
+        if (!unlocked) card.style.opacity = 0.6f;
+
+        // Color header
+        var header = new VisualElement();
+        header.style.backgroundColor = unlocked ? loadout.color : new Color(0.2f, 0.2f, 0.25f);
+        Pad(header, 6, 8);
+        header.Add(Lbl(loadout.name, 14, Color.white, FontStyle.Bold));
+        card.Add(header);
+
+        var body = new VisualElement();
+        Pad(body, 6, 8);
+
+        if (unlocked)
+        {
+            body.Add(Lbl(loadout.passiveDesc, 11, new Color(0.7f, 0.7f, 0.75f)));
+            if (selected)
+            {
+                var selLabel = Lbl("SELECTED", 11, new Color(0.4f, 1f, 0.5f), FontStyle.Bold);
+                selLabel.style.marginTop = 4;
+                body.Add(selLabel);
+            }
+            else
+            {
+                var selBtn = Lbl("[ SELECT ]", 11, new Color(0.7f, 0.8f, 1f), FontStyle.Bold);
+                selBtn.style.marginTop = 4;
+                body.Add(selBtn);
+            }
+
+            var capturedId = loadout.id;
+            card.RegisterCallback<ClickEvent>(_ =>
+            {
+                MetaProgression.SelectedLoadout = capturedId;
+                panelContent.Clear();
+                BuildPortalPanel();
+            });
+        }
+        else
+        {
+            var costLbl = Lbl($"Cost: {loadout.unlockCost}", 12,
+                canAfford ? new Color(0.8f, 0.6f, 1f) : new Color(0.6f, 0.3f, 0.3f), FontStyle.Bold);
+            costLbl.style.marginTop = 4;
+            body.Add(costLbl);
+
+            if (canAfford)
+            {
+                var capturedId = loadout.id;
+                card.RegisterCallback<ClickEvent>(_ =>
+                {
+                    if (MetaProgression.TryUnlockLoadout(capturedId))
+                    {
+                        RefreshCurrency();
+                        panelContent.Clear();
+                        BuildPortalPanel();
+                    }
+                });
+            }
+        }
+
+        card.Add(body);
+
+        // Hover
+        var capturedLoadout = loadout;
+        var capturedSelected = selected;
+        card.RegisterCallback<MouseEnterEvent>(_ =>
+        {
+            card.style.backgroundColor = CardBgHover;
+            Border(card, capturedLoadout.color, 2);
+        });
+        card.RegisterCallback<MouseLeaveEvent>(_ =>
+        {
+            bool sel = MetaProgression.SelectedLoadout == capturedLoadout.id;
+            bool unl = MetaProgression.IsLoadoutUnlocked(capturedLoadout.id);
+            card.style.backgroundColor = sel ? new Color(0.12f, 0.1f, 0.18f, 0.95f) : CardBg;
+            Border(card, sel ? capturedLoadout.color : (unl ? new Color(0.4f, 0.4f, 0.45f) : new Color(0.25f, 0.25f, 0.3f)), sel ? 3 : 1);
+        });
+
+        return card;
+    }
+
+    // ─── CODEX PANEL (Synergy Codex) ─────────────────────────
+
+    void BuildCodexPanel()
+    {
+        int discovered = MetaProgression.DiscoveredComboCount;
+        int total = MetaProgression.ComboDefinitions.Length;
+
+        var summary = Lbl($"Synergies Discovered: {discovered} / {total}", 18,
+            new Color(0.8f, 0.7f, 1f), FontStyle.Bold);
+        summary.style.marginBottom = 16;
+        summary.style.unityTextAlign = TextAnchor.MiddleCenter;
+        panelContent.Add(summary);
+
+        var desc = Lbl("Combine two different elements on the same enemy to trigger a synergy reaction.", 14, Dim);
+        desc.style.whiteSpace = WhiteSpace.Normal;
+        desc.style.marginBottom = 16;
+        desc.style.unityTextAlign = TextAnchor.MiddleCenter;
+        panelContent.Add(desc);
+
+        var grid = new VisualElement();
+        grid.style.flexDirection = FlexDirection.Row;
+        grid.style.flexWrap = Wrap.Wrap;
+        grid.style.justifyContent = Justify.Center;
+
+        foreach (var combo in MetaProgression.ComboDefinitions)
+        {
+            bool found = MetaProgression.IsComboDiscovered(combo.id);
+            var card = BuildComboCard(combo, found);
+            grid.Add(card);
+        }
+        panelContent.Add(grid);
+    }
+
+    VisualElement BuildComboCard((string id, string name, string elem1, string elem2, string desc) combo, bool discovered)
+    {
+        var card = new VisualElement();
+        card.style.width = 200;
+        card.style.marginTop = 6; card.style.marginBottom = 6;
+        card.style.marginLeft = 6; card.style.marginRight = 6;
+        card.style.backgroundColor = discovered ? CardBg : new Color(0.04f, 0.04f, 0.06f, 0.9f);
+        Radius(card, 10);
+        Border(card, discovered ? new Color(0.6f, 0.5f, 0.8f) : new Color(0.2f, 0.2f, 0.25f), discovered ? 2 : 1);
+        card.style.overflow = Overflow.Hidden;
+
+        // Header with element dots
+        var header = new VisualElement();
+        header.style.flexDirection = FlexDirection.Row;
+        header.style.alignItems = Align.Center;
+        header.style.backgroundColor = discovered ? new Color(0.15f, 0.1f, 0.2f) : new Color(0.1f, 0.1f, 0.12f);
+        Pad(header, 8, 10);
+
+        Color elem1Col = GetElementColor(combo.elem1);
+        Color elem2Col = GetElementColor(combo.elem2);
+
+        var dot1 = new VisualElement();
+        dot1.style.width = 12; dot1.style.height = 12;
+        Radius(dot1, 6);
+        dot1.style.backgroundColor = discovered ? elem1Col : new Color(0.3f, 0.3f, 0.35f);
+        dot1.style.marginRight = 4;
+        header.Add(dot1);
+
+        header.Add(Lbl("+", 14, Dim));
+
+        var dot2 = new VisualElement();
+        dot2.style.width = 12; dot2.style.height = 12;
+        Radius(dot2, 6);
+        dot2.style.backgroundColor = discovered ? elem2Col : new Color(0.3f, 0.3f, 0.35f);
+        dot2.style.marginLeft = 4;
+        dot2.style.marginRight = 8;
+        header.Add(dot2);
+
+        var nameLabel = Lbl(discovered ? combo.name : "???", 16,
+            discovered ? Color.white : new Color(0.4f, 0.4f, 0.45f), FontStyle.Bold);
+        header.Add(nameLabel);
+        card.Add(header);
+
+        // Body
+        var body = new VisualElement();
+        Pad(body, 8, 10);
+
+        if (discovered)
+        {
+            var elemNames = Lbl($"{combo.elem1} + {combo.elem2}", 12, new Color(0.6f, 0.6f, 0.7f));
+            body.Add(elemNames);
+
+            var descLabel = Lbl(combo.desc, 12, new Color(0.8f, 0.8f, 0.85f));
+            descLabel.style.whiteSpace = WhiteSpace.Normal;
+            descLabel.style.marginTop = 4;
+            body.Add(descLabel);
+        }
+        else
+        {
+            var hint = Lbl("Not yet discovered", 12, new Color(0.4f, 0.4f, 0.45f));
+            body.Add(hint);
+            var hintDetail = Lbl("Combine two elements in combat to discover", 11, new Color(0.35f, 0.35f, 0.4f));
+            hintDetail.style.whiteSpace = WhiteSpace.Normal;
+            hintDetail.style.marginTop = 4;
+            body.Add(hintDetail);
+        }
+
+        card.Add(body);
+        return card;
+    }
+
+    static Color GetElementColor(string elemName) => elemName switch
+    {
+        "Fire" => new Color(1f, 0.4f, 0.1f),
+        "Ice" => new Color(0.3f, 0.7f, 1f),
+        "Lightning" => new Color(1f, 1f, 0.3f),
+        "Poison" => new Color(0.2f, 0.9f, 0.1f),
+        "Void" => new Color(0.6f, 0.1f, 0.9f),
+        _ => Color.white,
+    };
 
     // ─── HELPERS ────────────────────────────────────────────────
 

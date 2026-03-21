@@ -94,6 +94,7 @@ public static class ElementCombo
         vfx.AddComponent<ComboExpandVFX>().Init(radius * 2, 0.5f, new Color(0.8f, 0.8f, 0.9f));
 
         ComboLabel(pos, "STEAM BURST", new Color(0.8f, 0.8f, 0.9f));
+        MetaProgression.DiscoverCombo("SteamBurst");
 
         if (TopDownCamera.Instance != null)
             TopDownCamera.Instance.AddTrauma(0.25f);
@@ -119,6 +120,7 @@ public static class ElementCombo
         vfx.AddComponent<ComboExpandVFX>().Init(2f, 0.3f, detonateCol);
 
         ComboLabel(target.transform.position, $"DETONATE x{stacks}", detonateCol);
+        MetaProgression.DiscoverCombo("Detonate");
 
         if (TopDownCamera.Instance != null)
             TopDownCamera.Instance.AddTrauma(0.2f);
@@ -160,6 +162,7 @@ public static class ElementCombo
         vfx.AddComponent<ComboShrinkVFX>().Init(0.4f);
 
         ComboLabel(pos, "IMPLODE", voidCol);
+        MetaProgression.DiscoverCombo("Implode");
 
         if (TopDownCamera.Instance != null)
             TopDownCamera.Instance.AddTrauma(0.3f);
@@ -191,6 +194,7 @@ public static class ElementCombo
         }
 
         ComboLabel(pos, "SHATTER!", iceCol);
+        MetaProgression.DiscoverCombo("Shatter");
 
         if (TopDownCamera.Instance != null)
             TopDownCamera.Instance.AddTrauma(0.2f);
@@ -220,6 +224,7 @@ public static class ElementCombo
 
         Object.Destroy(pool, 4f);
         ComboLabel(pos, "TOXIC FROST", toxicCol);
+        MetaProgression.DiscoverCombo("ToxicFrost");
     }
 
     /// <summary>Lightning + Poison = PLAGUE SPARK — Chain-detonate poisoned enemies.</summary>
@@ -248,6 +253,7 @@ public static class ElementCombo
 
         Color sparkCol = new Color(0.5f, 0.9f, 0.2f);
         ComboLabel(target.transform.position, $"PLAGUE SPARK x{chainCount + 1}", sparkCol);
+        MetaProgression.DiscoverCombo("PlagueSpark");
 
         if (TopDownCamera.Instance != null)
             TopDownCamera.Instance.AddTrauma(0.15f);
@@ -280,6 +286,7 @@ public static class ElementCombo
         }
 
         ComboLabel(target.transform.position, $"RIFT SHOCK ({stunned})", new Color(0.7f, 0.3f, 1f));
+        MetaProgression.DiscoverCombo("RiftShock");
     }
 
     /// <summary>Poison + Void = CORRUPTION — Spread poison to nearby enemies.</summary>
@@ -307,6 +314,7 @@ public static class ElementCombo
         }
 
         ComboLabel(pos, $"CORRUPTION ({infected})", new Color(0.4f, 0.1f, 0.7f));
+        MetaProgression.DiscoverCombo("Corruption");
     }
 
     // ─── VFX HELPERS ────────────────────────────────────────────
