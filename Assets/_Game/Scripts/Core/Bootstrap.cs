@@ -65,6 +65,7 @@ public class Bootstrap : MonoBehaviour
         CreateLighting();
         CreateHUD();
         hud.RefreshRelics(relicMgr.OwnedRelics);
+        CreateGameFeel();
         DoorTrigger.OnDoorEntered += OnDoorEntered;
         SpawnWave();
     }
@@ -413,6 +414,14 @@ public class Bootstrap : MonoBehaviour
         hud.Init(spellCaster, playerHealth);
     }
 
+    // ─── GAME FEEL ──────────────────────────────────────────────
+
+    void CreateGameFeel()
+    {
+        var go = new GameObject("GameFeel");
+        go.AddComponent<GameFeel>();
+    }
+
     // ─── ENEMIES ──────────────────────────────────────────────────
 
     void SpawnWave()
@@ -529,6 +538,9 @@ public class Bootstrap : MonoBehaviour
         var enemyRef = enemy;
         health.OnDeath += () => OnEnemyDeath(enemyRef);
         enemies.Add(enemy);
+
+        // Track damage numbers
+        if (hud != null) hud.TrackEnemyDamage(health);
     }
 
     static void AddCapsuleCol(GameObject go, float h, float r, float cy)
@@ -659,7 +671,11 @@ public class Bootstrap : MonoBehaviour
         if (currentBoss != null)
         {
             var bossHP = currentBoss.GetComponent<Health>();
-            if (bossHP != null) hud.ShowBossHP(bossHP, GetBossName(bossIndex));
+            if (bossHP != null)
+            {
+                hud.ShowBossHP(bossHP, GetBossName(bossIndex));
+                hud.TrackEnemyDamage(bossHP);
+            }
         }
     }
 

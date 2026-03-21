@@ -19,6 +19,10 @@ public class WardenBoss : MonoBehaviour
     float wallTimer;
     List<GameObject> walls = new();
     bool phase2;
+    bool slamWindup;
+    float slamWindupTimer;
+    const float SlamWindupDuration = 0.6f;
+    GameObject slamTelegraph;
 
     void Start()
     {
@@ -44,6 +48,24 @@ public class WardenBoss : MonoBehaviour
         toPlayer.y = 0;
         float dist = toPlayer.magnitude;
 
+        // Slam wind-up (don't move during)
+        if (slamWindup)
+        {
+            slamWindupTimer -= Time.deltaTime;
+            // Flash white
+            float flash = Mathf.PingPong(Time.time * 10f, 1f);
+            foreach (var r in renderers)
+                if (r != null && r.gameObject.name != "Eye")
+                    r.material.color = Color.Lerp(baseColor, Color.white, flash);
+            if (slamWindupTimer <= 0)
+            {
+                slamWindup = false;
+                if (slamTelegraph != null) Destroy(slamTelegraph);
+                DoSlam();
+            }
+            return;
+        }
+
         // Move toward player
         if (dist > slamRange)
         {
@@ -57,7 +79,15 @@ public class WardenBoss : MonoBehaviour
         if (dist <= slamRange && slamTimer <= 0)
         {
             slamTimer = slamCooldown;
-            DoSlam();
+            slamWindup = true;
+            slamWindupTimer = SlamWindupDuration;
+            // Telegraph: red circle on ground
+            slamTelegraph = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
+            Destroy(slamTelegraph.GetComponent<CapsuleCollider>());
+            slamTelegraph.transform.position = transform.position + Vector3.up * 0.03f;
+            slamTelegraph.transform.localScale = new Vector3(slamRange * 2, 0.03f, slamRange * 2);
+            slamTelegraph.GetComponent<Renderer>().material = ShaderCache.NewEmissive(new Color(1f, 0.2f, 0.1f, 0.6f), 2f);
+            Destroy(slamTelegraph, SlamWindupDuration + 0.1f);
         }
 
         // Spawn blocking walls

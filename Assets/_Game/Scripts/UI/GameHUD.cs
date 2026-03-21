@@ -8,12 +8,16 @@ public class GameHUD : MonoBehaviour
 {
     SpellCaster caster;
     Health playerHealth;
+    PlayerController playerCtrl;
     UIDocument uiDoc;
 
     VisualElement hpBar;
     Label waveLabel;
     Label floorRoomLabel;
     VisualElement spell1Card, spell2Card;
+    VisualElement spell1CDFill, spell2CDFill;
+    VisualElement dashCDContainer;
+    VisualElement dashCDFill;
     VisualElement runeOverlay;
     VisualElement runePanel;
     VisualElement currentSpellPreview;
@@ -31,6 +35,19 @@ public class GameHUD : MonoBehaviour
     Label bossNameLabel;
     Health trackedBossHP;
 
+    // Floating damage numbers
+    VisualElement damageNumberLayer;
+    readonly List<DamageNumberState> activeDamageNumbers = new();
+
+    struct DamageNumberState
+    {
+        public Label label;
+        public Vector3 worldPos;
+        public float elapsed;
+        public float duration;
+        public Vector3 velocity;
+    }
+
     static readonly Color CardBg = new(0.06f, 0.06f, 0.1f, 0.92f);
     static readonly Color CardBgHover = new(0.12f, 0.12f, 0.18f, 0.95f);
     static readonly Color ActiveBorder = new(1f, 0.85f, 0.2f);
@@ -43,6 +60,7 @@ public class GameHUD : MonoBehaviour
     {
         caster = sc;
         playerHealth = hp;
+        playerCtrl = hp.GetComponent<PlayerController>();
 
         uiDoc = gameObject.AddComponent<UIDocument>();
         var ps = ScriptableObject.CreateInstance<PanelSettings>();
@@ -58,9 +76,21 @@ public class GameHUD : MonoBehaviour
         uiDoc.rootVisualElement.style.unityFontDefinition = FontDefinition.FromFont(font);
 
         playerHealth.OnHPChanged += (_, _) => RefreshHP();
+        playerHealth.OnDamaged += OnPlayerOrEnemyDamaged;
         caster.OnSpellChanged += RefreshSpells;
         RefreshHP();
         RefreshSpells();
+    }
+
+    /// <summary>Register an enemy's Health for floating damage numbers.</summary>
+    public void TrackEnemyDamage(Health enemyHP)
+    {
+        enemyHP.OnDamaged += OnPlayerOrEnemyDamaged;
+    }
+
+    void OnPlayerOrEnemyDamaged(int amount, Vector3 worldPos, bool killed)
+    {
+        SpawnDamageNumber(amount, worldPos, killed);
     }
 
     void BuildUI()
@@ -230,7 +260,38 @@ public class GameHUD : MonoBehaviour
         controls.style.marginTop = 8;
         bottomArea.Add(controls);
 
+        // ── Dash cooldown indicator ──
+        dashCDContainer = new VisualElement();
+        dashCDContainer.pickingMode = PickingMode.Ignore;
+        dashCDContainer.style.width = 80;
+        dashCDContainer.style.height = 8;
+        dashCDContainer.style.marginTop = 6;
+        dashCDContainer.style.backgroundColor = new Color(0.15f, 0.15f, 0.2f);
+        Radius(dashCDContainer, 4);
+
+        dashCDFill = new VisualElement();
+        dashCDFill.pickingMode = PickingMode.Ignore;
+        dashCDFill.style.height = new StyleLength(Length.Percent(100));
+        dashCDFill.style.width = new StyleLength(Length.Percent(100));
+        dashCDFill.style.backgroundColor = new Color(0.3f, 0.7f, 1f);
+        Radius(dashCDFill, 4);
+        dashCDContainer.Add(dashCDFill);
+
+        var dashLabel = Lbl("DASH", 11, Dim, FontStyle.Bold);
+        dashLabel.style.alignSelf = Align.Center;
+        bottomArea.Add(dashCDContainer);
+
         root.Add(bottomArea);
+
+        // ── Damage number layer (fullscreen, ignores input) ──
+        damageNumberLayer = new VisualElement();
+        damageNumberLayer.pickingMode = PickingMode.Ignore;
+        damageNumberLayer.style.position = Position.Absolute;
+        damageNumberLayer.style.top = 0;
+        damageNumberLayer.style.bottom = 0;
+        damageNumberLayer.style.left = 0;
+        damageNumberLayer.style.right = 0;
+        root.Add(damageNumberLayer);
     }
 
     // ─── SPELL CARDS (bottom) ─────────────────────────────────────
@@ -245,6 +306,7 @@ public class GameHUD : MonoBehaviour
         Radius(card, 12);
         Border(card, InactiveBorder, 2);
         card.style.minWidth = 260;
+        card.style.overflow = Overflow.Hidden;
 
         var header = new VisualElement();
         header.style.flexDirection = FlexDirection.Row;
@@ -261,6 +323,13 @@ public class GameHUD : MonoBehaviour
         Pad(activeTag, 2, 8);
         Radius(activeTag, 4);
         header.Add(activeTag);
+
+        // Cooldown label
+        var cdLabel = Lbl("READY", 11, new Color(0.5f, 1f, 0.5f), FontStyle.Bold);
+        cdLabel.name = "cd-label";
+        cdLabel.style.marginLeft = 10;
+        header.Add(cdLabel);
+
         card.Add(header);
 
         var pills = new VisualElement();
@@ -268,6 +337,21 @@ public class GameHUD : MonoBehaviour
         pills.style.flexDirection = FlexDirection.Row;
         pills.style.flexWrap = Wrap.Wrap;
         card.Add(pills);
+
+        // Cooldown overlay fill (covers card from bottom)
+        var cdFill = new VisualElement();
+        cdFill.name = "cd-fill";
+        cdFill.pickingMode = PickingMode.Ignore;
+        cdFill.style.position = Position.Absolute;
+        cdFill.style.bottom = 0;
+        cdFill.style.left = 0;
+        cdFill.style.right = 0;
+        cdFill.style.height = new StyleLength(Length.Percent(0));
+        cdFill.style.backgroundColor = new Color(0f, 0f, 0f, 0.5f);
+        card.Add(cdFill);
+
+        if (index == 0) spell1CDFill = cdFill;
+        else spell2CDFill = cdFill;
 
         return card;
     }
@@ -776,6 +860,123 @@ public class GameHUD : MonoBehaviour
     }
 
     public void Refresh() { RefreshSpells(); RefreshHP(); }
+
+    void Update()
+    {
+        UpdateCooldownUI();
+        UpdateDamageNumbers();
+    }
+
+    void UpdateCooldownUI()
+    {
+        if (caster == null) return;
+
+        // Spell cooldown fill
+        float spellCD = caster.CooldownNormalized;
+        bool isSlot0Active = caster.activeSlot == 0;
+
+        // Active slot shows cooldown, inactive shows 0
+        float cd0 = isSlot0Active ? spellCD : 0f;
+        float cd1 = isSlot0Active ? 0f : spellCD;
+
+        if (spell1CDFill != null)
+            spell1CDFill.style.height = new StyleLength(Length.Percent(cd0 * 100f));
+        if (spell2CDFill != null)
+            spell2CDFill.style.height = new StyleLength(Length.Percent(cd1 * 100f));
+
+        // Cooldown labels
+        UpdateCDLabel(spell1Card, cd0);
+        UpdateCDLabel(spell2Card, cd1);
+
+        // Dash cooldown
+        if (playerCtrl != null && dashCDFill != null)
+        {
+            float dashCD = playerCtrl.DashCooldownNormalized;
+            float fillPct = (1f - dashCD) * 100f;
+            dashCDFill.style.width = new StyleLength(Length.Percent(fillPct));
+            dashCDFill.style.backgroundColor = dashCD > 0
+                ? new Color(0.4f, 0.4f, 0.5f)
+                : new Color(0.3f, 0.7f, 1f);
+        }
+    }
+
+    void UpdateCDLabel(VisualElement card, float cd)
+    {
+        var lbl = card?.Q<Label>("cd-label");
+        if (lbl == null) return;
+        if (cd <= 0)
+        {
+            lbl.text = "READY";
+            lbl.style.color = new Color(0.5f, 1f, 0.5f);
+        }
+        else
+        {
+            lbl.text = "CD";
+            lbl.style.color = new Color(1f, 0.5f, 0.3f);
+        }
+    }
+
+    // ─── DAMAGE NUMBERS ────────────────────────────────────────
+
+    void SpawnDamageNumber(int amount, Vector3 worldPos, bool killed)
+    {
+        if (damageNumberLayer == null || Camera.main == null) return;
+
+        var lbl = Lbl(amount.ToString(), killed ? 32 : 22,
+            killed ? new Color(1f, 0.3f, 0.1f) : new Color(1f, 0.95f, 0.4f),
+            FontStyle.Bold);
+        lbl.pickingMode = PickingMode.Ignore;
+        lbl.style.position = Position.Absolute;
+        damageNumberLayer.Add(lbl);
+
+        activeDamageNumbers.Add(new DamageNumberState
+        {
+            label = lbl,
+            worldPos = worldPos,
+            elapsed = 0,
+            duration = 0.8f,
+            velocity = new Vector3(UnityEngine.Random.Range(-0.5f, 0.5f), 2f, 0)
+        });
+    }
+
+    void UpdateDamageNumbers()
+    {
+        if (Camera.main == null) return;
+
+        for (int i = activeDamageNumbers.Count - 1; i >= 0; i--)
+        {
+            var state = activeDamageNumbers[i];
+            state.elapsed += Time.unscaledDeltaTime;
+            state.worldPos += state.velocity * Time.unscaledDeltaTime;
+            activeDamageNumbers[i] = state;
+
+            float t = state.elapsed / state.duration;
+            if (t >= 1f)
+            {
+                damageNumberLayer.Remove(state.label);
+                activeDamageNumbers.RemoveAt(i);
+                continue;
+            }
+
+            // Project world position to screen
+            Vector3 screenPos = Camera.main.WorldToScreenPoint(state.worldPos);
+            if (screenPos.z < 0) { state.label.style.display = DisplayStyle.None; continue; }
+
+            // Convert to UI Toolkit coordinates (Y is flipped)
+            float uiX = screenPos.x / Screen.width * 1920f;
+            float uiY = (1f - screenPos.y / Screen.height) * 1080f;
+
+            state.label.style.left = uiX - 20;
+            state.label.style.top = uiY - 20;
+            state.label.style.display = DisplayStyle.Flex;
+
+            // Fade and scale
+            float alpha = 1f - t * t;
+            float scale = 1f + (1f - t) * 0.3f;
+            state.label.style.opacity = alpha;
+            state.label.transform.scale = new Vector3(scale, scale, 1f);
+        }
+    }
 
     void RefreshSpells()
     {

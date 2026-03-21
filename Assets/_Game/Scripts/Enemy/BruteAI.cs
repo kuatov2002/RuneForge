@@ -18,9 +18,13 @@ public class BruteAI : MonoBehaviour
 
     float chargeTimer;
     bool isCharging;
+    bool isWindingUp;
+    float windupTimer;
+    const float WindupDuration = 0.5f;
     Vector3 chargeDir;
     float chargeDist;
     float chargeDistLeft;
+    GameObject telegraphVFX;
 
     void Start()
     {
@@ -46,6 +50,28 @@ public class BruteAI : MonoBehaviour
         if (health.IsStunned) return;
         float speedMult = health.SpeedMultiplier;
 
+        // Wind-up phase: flash and show telegraph before charge
+        if (isWindingUp)
+        {
+            windupTimer -= Time.deltaTime;
+            // Flash the brute red/white
+            float flash = Mathf.PingPong(Time.time * 12f, 1f);
+            foreach (var r in renderers)
+                if (r != null && r.gameObject.name != "Eye")
+                    r.material.color = Color.Lerp(baseColor, Color.white, flash);
+
+            if (windupTimer <= 0)
+            {
+                isWindingUp = false;
+                isCharging = true;
+                if (telegraphVFX != null) Destroy(telegraphVFX);
+                // Screen shake warning
+                if (TopDownCamera.Instance != null)
+                    TopDownCamera.Instance.AddTrauma(0.15f);
+            }
+            return;
+        }
+
         if (isCharging)
         {
             float step = chargeSpeed * speedMult * Time.deltaTime;
@@ -65,14 +91,18 @@ public class BruteAI : MonoBehaviour
 
         chargeTimer -= Time.deltaTime;
 
-        // Charge if in range
+        // Charge if in range — start wind-up first
         if (dist <= chargeRange && dist > 1.5f && chargeTimer <= 0)
         {
             chargeTimer = chargeCooldown;
-            isCharging = true;
             chargeDir = toPlayer.normalized;
             chargeDistLeft = dist;
             transform.rotation = Quaternion.LookRotation(chargeDir);
+
+            // Telegraph: show red line on ground in charge direction
+            isWindingUp = true;
+            windupTimer = WindupDuration;
+            CreateChargeTelegraph(dist);
             return;
         }
 
@@ -120,5 +150,28 @@ public class BruteAI : MonoBehaviour
             if (r != null && r.gameObject.name != "Eye") r.material.color = col;
     }
 
-    void OnDestroy() { if (health != null) health.OnDeath -= OnDie; }
+    void CreateChargeTelegraph(float distance)
+    {
+        if (telegraphVFX != null) Destroy(telegraphVFX);
+
+        telegraphVFX = GameObject.CreatePrimitive(PrimitiveType.Cube);
+        Destroy(telegraphVFX.GetComponent<BoxCollider>());
+        telegraphVFX.name = "ChargeTelegraph";
+
+        // Red rectangle on floor showing charge path
+        Vector3 midPoint = transform.position + chargeDir * (distance * 0.5f);
+        telegraphVFX.transform.position = midPoint + Vector3.up * 0.05f;
+        telegraphVFX.transform.localScale = new Vector3(1.2f, 0.04f, distance);
+        telegraphVFX.transform.rotation = Quaternion.LookRotation(chargeDir);
+
+        var mat = ShaderCache.NewEmissive(new Color(1f, 0.15f, 0.1f), 3f);
+        telegraphVFX.GetComponent<Renderer>().material = mat;
+        Destroy(telegraphVFX, WindupDuration + 0.1f); // auto-cleanup
+    }
+
+    void OnDestroy()
+    {
+        if (health != null) health.OnDeath -= OnDie;
+        if (telegraphVFX != null) Destroy(telegraphVFX);
+    }
 }

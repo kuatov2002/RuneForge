@@ -9,6 +9,9 @@ public class Health : MonoBehaviour
     public event Action<int, int> OnHPChanged;
     public event Action OnDeath;
 
+    /// <summary>Fired on every hit: (damageAmount, worldPosition, wasKillingBlow)</summary>
+    public event Action<int, Vector3, bool> OnDamaged;
+
     // Burn
     float burnDPS;
     float burnTimer;
@@ -71,12 +74,41 @@ public class Health : MonoBehaviour
         if (currentHP < 0) currentHP = 0;
         OnHPChanged?.Invoke(currentHP, maxHP);
 
+        bool isPlayer = GetComponent<PlayerController>() != null;
+        bool killed = currentHP <= 0;
+
         // Screen shake when player takes damage
-        if (GetComponent<PlayerController>() != null && TopDownCamera.Instance != null)
+        if (isPlayer && TopDownCamera.Instance != null)
             TopDownCamera.Instance.AddTrauma(0.4f);
-        if (currentHP <= 0)
+
+        // Juice: floating damage number + hitstop + knockback
+        Vector3 hitPos = transform.position + Vector3.up * 1.2f;
+        OnDamaged?.Invoke(dmg, hitPos, killed);
+
+        if (!isPlayer && GameFeel.Instance != null)
+        {
+            // Hitstop on significant hits (not DoT ticks)
+            if (dmg >= 3)
+                GameFeel.Instance.Hitstop(dmg >= 8 ? 0.05f : 0.03f);
+
+            // Knockback enemies
+            GameFeel.ApplyKnockback(transform, transform.position - transform.forward, dmg * 0.3f);
+        }
+
+        if (killed)
         {
             isDead = true;
+            // Death VFX for enemies
+            if (!isPlayer)
+            {
+                Color deathColor = Color.white;
+                var renderers = GetComponentsInChildren<Renderer>();
+                if (renderers.Length > 0 && renderers[0] != null)
+                    deathColor = renderers[0].material.color;
+                GameFeel.SpawnDeathVFX(transform.position, deathColor);
+                if (TopDownCamera.Instance != null)
+                    TopDownCamera.Instance.AddTrauma(0.15f);
+            }
             OnDeath?.Invoke();
         }
     }

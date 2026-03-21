@@ -26,6 +26,17 @@ public class SpellCaster : MonoBehaviour
 
     public SpellData ActiveSpell => spellSlots[activeSlot];
 
+    /// <summary>Spell cooldown progress: 0 = ready, 1 = full CD.</summary>
+    public float CooldownNormalized
+    {
+        get
+        {
+            var spell = ActiveSpell;
+            if (spell == null || spell.form == null || spell.form.cooldown <= 0) return 0f;
+            return Mathf.Clamp01(cooldownTimer / spell.form.cooldown);
+        }
+    }
+
     void Update()
     {
         var kb = Keyboard.current;

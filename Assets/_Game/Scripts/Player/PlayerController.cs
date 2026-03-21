@@ -16,6 +16,10 @@ public class PlayerController : MonoBehaviour
     float dashCDTimer;
     bool isDashing;
     float dashTimer;
+    float ghostTimer;
+
+    /// <summary>Dash cooldown progress 0 (ready) to 1 (full CD).</summary>
+    public float DashCooldownNormalized => dashCooldown > 0 ? Mathf.Clamp01(dashCDTimer / dashCooldown) : 0f;
 
     void Start()
     {
@@ -27,6 +31,16 @@ public class PlayerController : MonoBehaviour
         if (isDashing)
         {
             dashTimer -= Time.deltaTime;
+
+            // Spawn afterimage ghosts during dash
+            ghostTimer -= Time.deltaTime;
+            if (ghostTimer <= 0)
+            {
+                ghostTimer = 0.03f;
+                var renderers = GetComponentsInChildren<Renderer>();
+                GameFeel.SpawnDashGhost(renderers, transform.position, transform.rotation);
+            }
+
             if (dashTimer <= 0)
                 isDashing = false;
             return;
