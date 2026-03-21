@@ -18,12 +18,26 @@ public class PlayerController : MonoBehaviour
     float dashTimer;
     float ghostTimer;
 
+    // Multi-dash charges
+    int maxDashCharges = 1;
+    int currentDashCharges;
+    float chargeRechargeTimer;
+
     /// <summary>Dash cooldown progress 0 (ready) to 1 (full CD).</summary>
-    public float DashCooldownNormalized => dashCooldown > 0 ? Mathf.Clamp01(dashCDTimer / dashCooldown) : 0f;
+    public float DashCooldownNormalized => dashCooldown > 0 ? Mathf.Clamp01(chargeRechargeTimer / dashCooldown) : 0f;
+    public int CurrentDashCharges => currentDashCharges;
+    public int MaxDashCharges => maxDashCharges;
+
+    public void SetExtraDashCharges(int extra)
+    {
+        maxDashCharges = 1 + extra;
+        currentDashCharges = maxDashCharges;
+    }
 
     void Start()
     {
         rb = GetComponent<Rigidbody>();
+        currentDashCharges = maxDashCharges;
     }
 
     void Update()
@@ -75,15 +89,38 @@ public class PlayerController : MonoBehaviour
             }
         }
 
+        // Potion (F key)
+        if (kb.fKey.wasPressedThisFrame && potionsRemaining > 0)
+        {
+            var hp = GetComponent<Health>();
+            if (hp != null && hp.currentHP < hp.maxHP)
+            {
+                hp.Heal(potionHealAmount);
+                potionsRemaining--;
+            }
+        }
+
+        // Recharge dash charges
+        if (currentDashCharges < maxDashCharges)
+        {
+            chargeRechargeTimer -= Time.deltaTime;
+            if (chargeRechargeTimer <= 0)
+            {
+                currentDashCharges++;
+                chargeRechargeTimer = dashCooldown;
+            }
+        }
+
         // Dash
-        dashCDTimer -= Time.deltaTime;
-        if (mouse != null && mouse.rightButton.wasPressedThisFrame && dashCDTimer <= 0)
+        if (mouse != null && mouse.rightButton.wasPressedThisFrame && currentDashCharges > 0)
         {
             Vector3 dashFrom = transform.position;
             isDashing = true;
             isInvulnerable = true;
             dashTimer = DashDuration;
-            dashCDTimer = dashCooldown;
+            currentDashCharges--;
+            if (currentDashCharges < maxDashCharges && chargeRechargeTimer <= 0)
+                chargeRechargeTimer = dashCooldown;
             rb.linearVelocity = transform.forward * (dashDistance / DashDuration);
             Invoke(nameof(EndIFrames), IFrameDuration);
 
@@ -93,6 +130,16 @@ public class PlayerController : MonoBehaviour
                 relicMgr.OnDash(dashFrom, dashFrom + transform.forward * dashDistance);
         }
     }
+
+    // Potions
+    int potionsRemaining;
+    int potionHealAmount = 3;
+
+    public int PotionsRemaining => potionsRemaining;
+
+    public void SetPotions(int count) => potionsRemaining = count;
+
+    public void RefillPotions(int perFloor) => potionsRemaining = Mathf.Min(potionsRemaining + perFloor, 9);
 
     void EndIFrames()
     {

@@ -123,6 +123,10 @@ public class Health : MonoBehaviour
     public void ApplyStatusEffect(ElementSO element)
     {
         if (element == null || isDead) return;
+
+        // Check combo BEFORE applying (we need pre-existing status)
+        ElementCombo.CheckCombo(this, element);
+
         switch (element.statusEffect)
         {
             case StatusEffectType.Burn:

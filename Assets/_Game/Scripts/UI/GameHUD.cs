@@ -29,6 +29,12 @@ public class GameHUD : MonoBehaviour
     // Relics
     VisualElement relicBar;
 
+    // Gold
+    Label goldLabel;
+
+    // Potions
+    Label potionLabel;
+
     // Boss HUD
     VisualElement bossHPContainer;
     VisualElement bossHPFill;
@@ -140,6 +146,26 @@ public class GameHUD : MonoBehaviour
         root.Add(topBar);
 
         // ── Relic bar (under top bar, left side) ──
+        // ── Gold display (under HP) ──
+        var goldRow = new VisualElement();
+        goldRow.pickingMode = PickingMode.Ignore;
+        goldRow.style.flexDirection = FlexDirection.Row;
+        goldRow.style.alignItems = Align.Center;
+        goldRow.style.paddingLeft = 20;
+        goldRow.style.paddingTop = 4;
+
+        var goldIcon = new VisualElement();
+        goldIcon.style.width = 16;
+        goldIcon.style.height = 16;
+        Radius(goldIcon, 8);
+        goldIcon.style.backgroundColor = new Color(1f, 0.85f, 0.2f);
+        goldIcon.style.marginRight = 6;
+        goldRow.Add(goldIcon);
+
+        goldLabel = Lbl("0", 20, new Color(1f, 0.9f, 0.3f), FontStyle.Bold);
+        goldRow.Add(goldLabel);
+        root.Add(goldRow);
+
         relicBar = new VisualElement();
         relicBar.pickingMode = PickingMode.Ignore;
         relicBar.style.flexDirection = FlexDirection.Row;
@@ -183,7 +209,7 @@ public class GameHUD : MonoBehaviour
         deathWaveLabel = Lbl("Reached wave 1", 26, Dim);
         deathWaveLabel.style.marginTop = 12;
         deathOverlay.Add(deathWaveLabel);
-        var restartHint = Lbl("Press  R  to restart", 22, new Color(0.7f, 0.7f, 0.7f));
+        var restartHint = Lbl("Press  R  to return to the Sanctum", 22, new Color(0.7f, 0.7f, 0.7f));
         restartHint.style.marginTop = 24;
         deathOverlay.Add(restartHint);
         root.Add(deathOverlay);
@@ -195,7 +221,7 @@ public class GameHUD : MonoBehaviour
         var vicSub = Lbl("You have conquered the dungeon!", 24, new Color(0.8f, 0.8f, 0.85f));
         vicSub.style.marginTop = 12;
         victoryOverlay.Add(vicSub);
-        var vicHint = Lbl("Press  R  to start a new run", 22, new Color(0.7f, 0.7f, 0.7f));
+        var vicHint = Lbl("Press  R  to return to the Sanctum", 22, new Color(0.7f, 0.7f, 0.7f));
         vicHint.style.marginTop = 24;
         victoryOverlay.Add(vicHint);
         root.Add(victoryOverlay);
@@ -256,7 +282,7 @@ public class GameHUD : MonoBehaviour
         slotRow.Add(spell2Card);
         bottomArea.Add(slotRow);
 
-        var controls = Lbl("WASD Move   LMB Cast   RMB Dash   Q Swap", 14, new Color(0.35f, 0.35f, 0.4f));
+        var controls = Lbl("WASD Move   LMB Cast   RMB Dash   Q Swap   F Potion", 14, new Color(0.35f, 0.35f, 0.4f));
         controls.style.marginTop = 8;
         bottomArea.Add(controls);
 
@@ -280,6 +306,25 @@ public class GameHUD : MonoBehaviour
         var dashLabel = Lbl("DASH", 11, Dim, FontStyle.Bold);
         dashLabel.style.alignSelf = Align.Center;
         bottomArea.Add(dashCDContainer);
+
+        // Potion indicator
+        var potionRow = new VisualElement();
+        potionRow.pickingMode = PickingMode.Ignore;
+        potionRow.style.flexDirection = FlexDirection.Row;
+        potionRow.style.alignItems = Align.Center;
+        potionRow.style.marginTop = 4;
+
+        var potionIcon = new VisualElement();
+        potionIcon.style.width = 14;
+        potionIcon.style.height = 14;
+        Radius(potionIcon, 3);
+        potionIcon.style.backgroundColor = new Color(0.3f, 0.9f, 0.4f);
+        potionIcon.style.marginRight = 4;
+        potionRow.Add(potionIcon);
+
+        potionLabel = Lbl("[F] Potion x0", 13, new Color(0.3f, 0.9f, 0.4f), FontStyle.Bold);
+        potionRow.Add(potionLabel);
+        bottomArea.Add(potionRow);
 
         root.Add(bottomArea);
 
@@ -403,21 +448,76 @@ public class GameHUD : MonoBehaviour
 
     // ─── RUNE SELECTION ───────────────────────────────────────────
 
-    public void ShowRuneSelection(ScriptableObject[] options, Action<int> onSelect)
+    int rerollsRemaining;
+    Action rerollCallback;
+    Action<int> currentRuneOnSelect;
+    ScriptableObject[] currentRuneOptions;
+
+    public void ShowRuneSelection(ScriptableObject[] options, int rerolls, Action<int> onSelect, Action onReroll)
     {
         runeOverlay.style.display = DisplayStyle.Flex;
+        rerollsRemaining = rerolls;
+        rerollCallback = onReroll;
+        currentRuneOnSelect = onSelect;
+        currentRuneOptions = options;
+        RebuildRuneCards();
+    }
+
+    void RebuildRuneCards()
+    {
         runePanel.Clear();
         RefreshCurrentSpellPreview();
 
-        for (int i = 0; i < options.Length; i++)
+        for (int i = 0; i < currentRuneOptions.Length; i++)
         {
             int idx = i;
-            var card = BuildRuneCard(options[i], () =>
+            var card = BuildRuneCard(currentRuneOptions[i], () =>
             {
                 runeOverlay.style.display = DisplayStyle.None;
-                onSelect?.Invoke(idx);
+                currentRuneOnSelect?.Invoke(idx);
             });
             runePanel.Add(card);
+        }
+
+        // Reroll button
+        if (rerollsRemaining > 0 && rerollCallback != null)
+        {
+            var rerollCard = new VisualElement();
+            rerollCard.style.flexDirection = FlexDirection.Column;
+            rerollCard.style.width = 120;
+            rerollCard.style.marginLeft = 8;
+            rerollCard.style.backgroundColor = CardBg;
+            Radius(rerollCard, 14);
+            Border(rerollCard, new Color(0.6f, 0.4f, 0.9f), 2);
+            rerollCard.style.alignItems = Align.Center;
+            rerollCard.style.justifyContent = Justify.Center;
+            Pad(rerollCard, 20, 16);
+
+            var rerollIcon = Lbl("\u21BB", 28, new Color(0.7f, 0.5f, 1f), FontStyle.Bold);
+            rerollCard.Add(rerollIcon);
+            var rerollLbl = Lbl("REROLL", 16, new Color(0.7f, 0.5f, 1f), FontStyle.Bold);
+            rerollCard.Add(rerollLbl);
+            var rerollCount = Lbl($"x{rerollsRemaining}", 14, Dim, FontStyle.Bold);
+            rerollCount.style.marginTop = 4;
+            rerollCard.Add(rerollCount);
+
+            rerollCard.RegisterCallback<ClickEvent>(_ =>
+            {
+                rerollsRemaining--;
+                rerollCallback?.Invoke();
+                RebuildRuneCards();
+            });
+            rerollCard.RegisterCallback<MouseEnterEvent>(_ =>
+            {
+                rerollCard.style.backgroundColor = CardBgHover;
+                Border(rerollCard, new Color(0.8f, 0.6f, 1f), 3);
+            });
+            rerollCard.RegisterCallback<MouseLeaveEvent>(_ =>
+            {
+                rerollCard.style.backgroundColor = CardBg;
+                Border(rerollCard, new Color(0.6f, 0.4f, 0.9f), 2);
+            });
+            runePanel.Add(rerollCard);
         }
     }
 
@@ -660,13 +760,13 @@ public class GameHUD : MonoBehaviour
         }
     }
 
-    public void ShowShopRoom(RelicSO[] allRelics, RelicManager mgr, Action<RelicSO> onDone)
+    public void ShowShopRoom(RelicSO[] allRelics, RelicManager mgr, int price, int playerGold, Action<RelicSO> onDone)
     {
         runeOverlay.style.display = DisplayStyle.Flex;
         runePanel.Clear();
         currentSpellPreview.Clear();
         currentSpellPreview.Add(Lbl("SHOP", 24, new Color(1f, 0.85f, 0.2f), FontStyle.Bold));
-        slotHintLabel.text = "Pick a relic or skip";
+        slotHintLabel.text = $"Your gold: {playerGold}";
 
         // Gather available relics
         var available = new List<RelicSO>();
@@ -685,6 +785,7 @@ public class GameHUD : MonoBehaviour
         for (int i = 0; i < count; i++)
         {
             var relic = options[i];
+            bool canAfford = playerGold >= price;
             var card = new VisualElement();
             card.style.flexDirection = FlexDirection.Column;
             card.style.width = 220;
@@ -692,8 +793,9 @@ public class GameHUD : MonoBehaviour
             card.style.marginRight = 8;
             card.style.backgroundColor = CardBg;
             Radius(card, 14);
-            Border(card, InactiveBorder, 2);
+            Border(card, canAfford ? InactiveBorder : new Color(0.4f, 0.2f, 0.2f), 2);
             card.style.overflow = Overflow.Hidden;
+            if (!canAfford) card.style.opacity = 0.55f;
 
             card.RegisterCallback<ClickEvent>(_ =>
             {
@@ -712,6 +814,24 @@ public class GameHUD : MonoBehaviour
             var descLbl = Lbl(relic.description, 16, new Color(0.85f, 0.85f, 0.9f));
             descLbl.style.whiteSpace = WhiteSpace.Normal;
             body.Add(descLbl);
+
+            // Price tag
+            var priceRow = new VisualElement();
+            priceRow.style.flexDirection = FlexDirection.Row;
+            priceRow.style.alignItems = Align.Center;
+            priceRow.style.marginTop = 10;
+
+            var goldDot = new VisualElement();
+            goldDot.style.width = 12;
+            goldDot.style.height = 12;
+            Radius(goldDot, 6);
+            goldDot.style.backgroundColor = new Color(1f, 0.85f, 0.2f);
+            goldDot.style.marginRight = 6;
+            priceRow.Add(goldDot);
+
+            var priceLbl = Lbl($"{price} Gold", 18, canAfford ? new Color(1f, 0.9f, 0.3f) : new Color(0.8f, 0.3f, 0.3f), FontStyle.Bold);
+            priceRow.Add(priceLbl);
+            body.Add(priceRow);
             card.Add(body);
 
             card.RegisterCallback<MouseEnterEvent>(_ =>
@@ -722,7 +842,7 @@ public class GameHUD : MonoBehaviour
             card.RegisterCallback<MouseLeaveEvent>(_ =>
             {
                 card.style.backgroundColor = CardBg;
-                Border(card, InactiveBorder, 2);
+                Border(card, canAfford ? InactiveBorder : new Color(0.4f, 0.2f, 0.2f), 2);
             });
 
             runePanel.Add(card);
@@ -819,6 +939,11 @@ public class GameHUD : MonoBehaviour
 
     // ─── PUBLIC API ───────────────────────────────────────────────
 
+    public void SetGold(int amount)
+    {
+        if (goldLabel != null) goldLabel.text = amount.ToString();
+    }
+
     public void SetWave(int w) => waveLabel.text = $"Wave {w}";
 
     public void SetFloorRoom(int floor, int room) =>
@@ -852,11 +977,15 @@ public class GameHUD : MonoBehaviour
         bossHPFill.style.width = new StyleLength(Length.Percent(pct * 100f));
     }
 
-    public void ShowDeath(bool show)
+    public void ShowDeath(bool show, int metaReward = 0)
     {
         deathOverlay.style.display = show ? DisplayStyle.Flex : DisplayStyle.None;
         victoryOverlay.style.display = DisplayStyle.None;
-        if (show) deathWaveLabel.text = $"Reached wave {waveLabel.text.Replace("Wave ", "")}";
+        if (show)
+        {
+            string rewardText = metaReward > 0 ? $"\n+{metaReward} Soul Essence" : "";
+            deathWaveLabel.text = $"Reached wave {waveLabel.text.Replace("Wave ", "")}{rewardText}";
+        }
     }
 
     public void Refresh() { RefreshSpells(); RefreshHP(); }
@@ -888,15 +1017,27 @@ public class GameHUD : MonoBehaviour
         UpdateCDLabel(spell1Card, cd0);
         UpdateCDLabel(spell2Card, cd1);
 
-        // Dash cooldown
+        // Dash cooldown + charges
         if (playerCtrl != null && dashCDFill != null)
         {
+            int charges = playerCtrl.CurrentDashCharges;
+            int maxCharges = playerCtrl.MaxDashCharges;
             float dashCD = playerCtrl.DashCooldownNormalized;
-            float fillPct = (1f - dashCD) * 100f;
+
+            // Show fill based on partial recharge progress
+            float fillPct = charges >= maxCharges ? 100f : ((charges + (1f - dashCD)) / maxCharges * 100f);
             dashCDFill.style.width = new StyleLength(Length.Percent(fillPct));
-            dashCDFill.style.backgroundColor = dashCD > 0
-                ? new Color(0.4f, 0.4f, 0.5f)
-                : new Color(0.3f, 0.7f, 1f);
+            dashCDFill.style.backgroundColor = charges > 0
+                ? new Color(0.3f, 0.7f, 1f)
+                : new Color(0.4f, 0.4f, 0.5f);
+        }
+
+        // Potion count
+        if (playerCtrl != null && potionLabel != null)
+        {
+            int pots = playerCtrl.PotionsRemaining;
+            potionLabel.text = pots > 0 ? $"[F] Potion x{pots}" : "No Potions";
+            potionLabel.style.color = pots > 0 ? new Color(0.3f, 0.9f, 0.4f) : Dim;
         }
     }
 

@@ -1,6 +1,8 @@
 using UnityEngine;
 using UnityEngine.InputSystem;
+using System;
 using System.Collections.Generic;
+using Random = UnityEngine.Random;
 
 public class Bootstrap : MonoBehaviour
 {
@@ -31,6 +33,7 @@ public class Bootstrap : MonoBehaviour
     List<GameObject> enemies = new();
     int wave = 1;
     int enemiesAlive;
+    int enemiesKilledThisRun;
     bool isPlayerDead;
     bool bossActive;
     GameObject currentBoss;
@@ -45,6 +48,12 @@ public class Bootstrap : MonoBehaviour
     GameObject currentRoomGO;
     bool roomCleared;
 
+    // Hub
+    bool inHub;
+    GameObject hubGO;
+    HubUI hubUI;
+    GoldSystem goldSystem;
+
     static Material litMat;
 
     [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
@@ -57,17 +66,104 @@ public class Bootstrap : MonoBehaviour
     void Start()
     {
         CreateSpellData();
+        CreateLighting();
+        CreateGameFeel();
+        CreateGoldSystem();
+        DoorTrigger.OnDoorEntered += OnDoorEntered;
+        EnterHub();
+    }
+
+    void EnterHub()
+    {
+        inHub = true;
+        CleanupRun();
+
+        hubGO = HubBuilder.Build();
+        CreatePlayer();
+        player.transform.position = new Vector3(10, 0, 10); // Hub center
+        CreateCamera();
+
+        // Hub UI
+        var hubUIGO = new GameObject("HubUI");
+        hubUI = hubUIGO.AddComponent<HubUI>();
+        hubUI.Init(StartRunFromHub, allElements);
+    }
+
+    void StartRunFromHub()
+    {
+        inHub = false;
+
+        // Cleanup hub
+        if (hubGO != null) { Destroy(hubGO); hubGO = null; }
+        if (hubUI != null) { Destroy(hubUI.gameObject); hubUI = null; }
+        if (player != null) { Destroy(player); player = null; }
+        if (cam != null) { Destroy(cam.gameObject); cam = null; }
+
+        // Start run
+        wave = 1;
+        currentFloor = 1;
+        currentRoom = 1;
+        roomCleared = false;
+        bossActive = false;
+        enemiesKilledThisRun = 0;
+
         floorGen = new FloorGenerator();
         floorGen.Generate(roomsPerFloor, currentFloor - 1);
         BuildCurrentRoom();
         CreatePlayer();
+        ApplyMetaProgressionToPlayer();
         CreateCamera();
-        CreateLighting();
         CreateHUD();
         hud.RefreshRelics(relicMgr.OwnedRelics);
-        CreateGameFeel();
-        DoorTrigger.OnDoorEntered += OnDoorEntered;
+
+        // Gold: starting gold from meta-progression
+        if (goldSystem != null)
+            goldSystem.Init(MetaProgression.StartingGold);
+        hud.SetGold(goldSystem != null ? goldSystem.Gold : 0);
+
+        // Starting relic from meta-progression
+        if (MetaProgression.HasStartingRelic && allRelics.Length > 0)
+        {
+            var randomRelic = allRelics[Random.Range(0, allRelics.Length)];
+            if (!relicMgr.HasRelic(randomRelic.relicType))
+            {
+                relicMgr.AddRelic(randomRelic);
+                hud.RefreshRelics(relicMgr.OwnedRelics);
+            }
+        }
+
         SpawnWave();
+    }
+
+    void ApplyMetaProgressionToPlayer()
+    {
+        // HP bonus
+        int baseHP = 5 + MetaProgression.MaxHPBonus;
+        playerHealth.maxHP = baseHP;
+        playerHealth.currentHP = baseHP;
+
+        // Speed bonus
+        playerCtrl.moveSpeed = 6f * MetaProgression.SpeedMultiplier;
+
+        // Extra dash charges
+        playerCtrl.SetExtraDashCharges(MetaProgression.ExtraDashCharges);
+
+        // Potions
+        playerCtrl.SetPotions(MetaProgression.PotionsPerFloor);
+    }
+
+    void CleanupRun()
+    {
+        if (player != null) { Destroy(player); player = null; }
+        if (cam != null) { Destroy(cam.gameObject); cam = null; }
+        if (hud != null) { Destroy(hud.gameObject); hud = null; }
+        if (currentRoomGO != null) { Destroy(currentRoomGO); currentRoomGO = null; }
+        if (currentBoss != null) { Destroy(currentBoss); currentBoss = null; }
+        if (rewardPickup != null) { Destroy(rewardPickup); rewardPickup = null; }
+        foreach (var e in enemies) if (e != null) Destroy(e);
+        enemies.Clear();
+        enemiesAlive = 0;
+        bossActive = false;
     }
 
     void Update()
@@ -76,7 +172,7 @@ public class Bootstrap : MonoBehaviour
         {
             var kb = Keyboard.current;
             if (kb != null && kb.rKey.wasPressedThisFrame)
-                Restart();
+                ReturnToHub();
         }
     }
 
@@ -211,6 +307,11 @@ public class Bootstrap : MonoBehaviour
         doorN = currentRoom < roomsPerFloor; // Has next room
 
         currentRoomGO = RoomBuilder.Build(w, h, doorN, doorS, false, false, currentFloor - 1);
+
+        // Add environmental hazards to combat rooms (not start, shop, rest, or boss)
+        bool isCombatRoom = !isStart && !isBossRoom && currentRoom != 5 && currentRoom != 8;
+        if (isCombatRoom && w >= 10)
+            RoomHazards.Populate(currentRoomGO.transform, w, h, currentFloor - 1);
     }
 
     void TransitionToNextRoom()
@@ -232,7 +333,7 @@ public class Bootstrap : MonoBehaviour
             if (currentFloor > totalFloors)
             {
                 MetaProgression.CompleteRun();
-                isPlayerDead = true; // Allow R to restart
+                isPlayerDead = true; // Allow R to return to hub
                 hud.ShowVictory(wave, currentFloor - 1);
                 playerCtrl.enabled = false;
                 spellCaster.enabled = false;
@@ -241,6 +342,10 @@ public class Bootstrap : MonoBehaviour
 
             floorGen = new FloorGenerator();
             floorGen.Generate(roomsPerFloor, currentFloor - 1);
+
+            // Refill potions on new floor
+            if (playerCtrl != null)
+                playerCtrl.RefillPotions(MetaProgression.PotionsPerFloor);
         }
 
         BuildCurrentRoom();
@@ -340,22 +445,30 @@ public class Bootstrap : MonoBehaviour
         playerHealth.maxHP = baseHP;
         playerHealth.currentHP = baseHP;
 
-        // Starting spells: Fire Bolt, Ice Cone + Split
-        spellCaster.spellSlots[0] = new SpellData { element = fireElem, form = boltForm, modifier = noneMod };
-        spellCaster.spellSlots[1] = new SpellData { element = iceElem, form = coneForm, modifier = splitMod };
-
         relicMgr = player.AddComponent<RelicManager>();
         relicMgr.Init(playerHealth, playerCtrl, allRelics);
 
-        playerHealth.OnDeath += OnPlayerDeath;
-
-        // Update staff tip color when spell changes
-        spellCaster.OnSpellChanged += () =>
+        if (!inHub)
         {
-            var spell = spellCaster.ActiveSpell;
-            if (spell?.element != null && staffTip != null)
-                staffTip.GetComponent<Renderer>().material = MakeEmissive(spell.element.color);
-        };
+            // Starting spells: Fire Bolt, Ice Cone + Split
+            spellCaster.spellSlots[0] = new SpellData { element = fireElem, form = boltForm, modifier = noneMod };
+            spellCaster.spellSlots[1] = new SpellData { element = iceElem, form = coneForm, modifier = splitMod };
+
+            playerHealth.OnDeath += OnPlayerDeath;
+
+            // Update staff tip color when spell changes
+            spellCaster.OnSpellChanged += () =>
+            {
+                var spell = spellCaster.ActiveSpell;
+                if (spell?.element != null && staffTip != null)
+                    staffTip.GetComponent<Renderer>().material = MakeEmissive(spell.element.color);
+            };
+        }
+        else
+        {
+            // Hub: disable spell casting
+            spellCaster.enabled = false;
+        }
     }
 
     // ─── CAMERA ───────────────────────────────────────────────────
@@ -407,19 +520,41 @@ public class Bootstrap : MonoBehaviour
 
     // ─── HUD ──────────────────────────────────────────────────────
 
+    // Cached delegate so we can unsubscribe on next run
+    Action<int> goldUICallback;
+
     void CreateHUD()
     {
         var hudGO = new GameObject("HUD");
         hud = hudGO.AddComponent<GameHUD>();
         hud.Init(spellCaster, playerHealth);
+
+        // Wire gold UI — remove old sub, add new
+        if (goldSystem != null)
+        {
+            if (goldUICallback != null)
+                goldSystem.OnGoldChanged -= goldUICallback;
+            var currentHud = hud;
+            goldUICallback = g => { if (currentHud != null) currentHud.SetGold(g); };
+            goldSystem.OnGoldChanged += goldUICallback;
+        }
     }
 
     // ─── GAME FEEL ──────────────────────────────────────────────
 
     void CreateGameFeel()
     {
+        if (GameFeel.Instance != null) return;
         var go = new GameObject("GameFeel");
         go.AddComponent<GameFeel>();
+    }
+
+    void CreateGoldSystem()
+    {
+        if (GoldSystem.Instance != null) return;
+        var go = new GameObject("GoldSystem");
+        goldSystem = go.AddComponent<GoldSystem>();
+        goldSystem.Init(0);
     }
 
     // ─── ENEMIES ──────────────────────────────────────────────────
@@ -476,13 +611,18 @@ public class Bootstrap : MonoBehaviour
 
     void StartShopRoom()
     {
-        // Shop: show 3 relics to buy (auto-offer, no combat)
-        hud.ShowShopRoom(allRelics, relicMgr, relic =>
+        int price = 30 + currentFloor * 5;
+        int gold = goldSystem != null ? goldSystem.Gold : 0;
+
+        hud.ShowShopRoom(allRelics, relicMgr, price, gold, relic =>
         {
             if (relic != null)
             {
-                relicMgr.AddRelic(relic);
-                hud.RefreshRelics(relicMgr.OwnedRelics);
+                if (goldSystem != null && goldSystem.TrySpend(price))
+                {
+                    relicMgr.AddRelic(relic);
+                    hud.RefreshRelics(relicMgr.OwnedRelics);
+                }
             }
             TransitionToNextRoom();
         });
@@ -824,6 +964,11 @@ public class Bootstrap : MonoBehaviour
         enemies.Remove(boss);
         enemiesAlive = 0;
         MetaProgression.AwardBossCurrency(currentFloor);
+        MetaProgression.RecordFloor(currentFloor);
+
+        // Boss gold drop
+        int goldDrop = GoldSystem.CalculateEnemyDrop(wave, true);
+        GoldSystem.SpawnGoldDrop(boss.transform.position, goldDrop);
         // bossActive stays true so ShowRuneSelection knows to advance floor
         SpawnRewardPickup();
     }
@@ -906,6 +1051,10 @@ public class Bootstrap : MonoBehaviour
 
     void OnEnemyDeath(GameObject enemy)
     {
+        // Gold drop
+        int goldDrop = GoldSystem.CalculateEnemyDrop(wave, false);
+        GoldSystem.SpawnGoldDrop(enemy.transform.position, goldDrop);
+
         // Void pull effect
         var health = enemy.GetComponent<Health>();
         if (health != null && health.voidMarked)
@@ -936,6 +1085,7 @@ public class Bootstrap : MonoBehaviour
 
         enemies.Remove(enemy);
         enemiesAlive--;
+        enemiesKilledThisRun++;
 
         if (enemiesAlive <= 0)
             SpawnRewardPickup();
@@ -964,23 +1114,42 @@ public class Bootstrap : MonoBehaviour
         else if (currentFloor <= 3) { elemW = 0.3f; formW = 0.5f; }
         else { elemW = 0.1f; formW = 0.3f; }
 
+        // Build unlocked element pool
+        var unlockedElements = new List<ElementSO>();
+        foreach (var e in allElements)
+            if (MetaProgression.IsElementUnlocked(e.elementName)) unlockedElements.Add(e);
+
         for (int i = 0; i < count; i++)
         {
             float r = Random.value;
-            if (r < elemW)
-                options[i] = allElements[Random.Range(0, allElements.Length)];
+            if (r < elemW && unlockedElements.Count > 0)
+                options[i] = unlockedElements[Random.Range(0, unlockedElements.Count)];
             else if (r < elemW + formW)
                 options[i] = allForms[Random.Range(0, allForms.Length)];
             else
                 options[i] = allModifiers[Random.Range(0, allModifiers.Length)];
         }
 
-        hud.ShowRuneSelection(options, idx =>
+        int rerolls = MetaProgression.Rerolls;
+        hud.ShowRuneSelection(options, rerolls, idx =>
         {
             ApplyRune(options[idx]);
             if (bossActive)
                 bossActive = false;
             TransitionToNextRoom();
+        }, () =>
+        {
+            // Reroll callback: regenerate options
+            for (int i = 0; i < count; i++)
+            {
+                float r = Random.value;
+                if (r < elemW && unlockedElements.Count > 0)
+                    options[i] = unlockedElements[Random.Range(0, unlockedElements.Count)];
+                else if (r < elemW + formW)
+                    options[i] = allForms[Random.Range(0, allForms.Length)];
+                else
+                    options[i] = allModifiers[Random.Range(0, allModifiers.Length)];
+            }
         });
     }
 
@@ -1020,18 +1189,22 @@ public class Bootstrap : MonoBehaviour
     {
         var options = new ScriptableObject[3];
         float elemW = 0.3f, formW = 0.3f;
+        var unlockedElements = new List<ElementSO>();
+        foreach (var e in allElements)
+            if (MetaProgression.IsElementUnlocked(e.elementName)) unlockedElements.Add(e);
+
         for (int i = 0; i < 3; i++)
         {
             float r = Random.value;
-            if (r < elemW) options[i] = allElements[Random.Range(0, allElements.Length)];
+            if (r < elemW && unlockedElements.Count > 0) options[i] = unlockedElements[Random.Range(0, unlockedElements.Count)];
             else if (r < elemW + formW) options[i] = allForms[Random.Range(0, allForms.Length)];
             else options[i] = allModifiers[Random.Range(0, allModifiers.Length)];
         }
-        hud.ShowRuneSelection(options, idx =>
+        hud.ShowRuneSelection(options, 0, idx =>
         {
             ApplyRune(options[idx]);
             TransitionToNextRoom();
-        });
+        }, null);
     }
 
     void ApplyRune(ScriptableObject rune)
@@ -1053,48 +1226,18 @@ public class Bootstrap : MonoBehaviour
     void OnPlayerDeath()
     {
         isPlayerDead = true;
-        hud.ShowDeath(true);
+        MetaProgression.RecordFloor(currentFloor);
+        int metaReward = MetaProgression.AwardDeathCurrency(currentFloor, currentRoom, enemiesKilledThisRun);
+        hud.ShowDeath(true, metaReward);
         playerCtrl.enabled = false;
         spellCaster.enabled = false;
     }
 
-    void Restart()
+    void ReturnToHub()
     {
         isPlayerDead = false;
-        hud.ShowDeath(false);
-        hud.HideBossHP();
-        bossActive = false;
-        if (currentBoss != null) { Destroy(currentBoss); currentBoss = null; }
-        if (rewardPickup != null) { Destroy(rewardPickup); rewardPickup = null; }
-
-        foreach (var e in enemies)
-            if (e != null) Destroy(e);
-        enemies.Clear();
-
-        playerHealth.ResetHealth();
-        playerCtrl.enabled = true;
-        spellCaster.enabled = true;
-
-        // Clear relics on death — roguelite reset
-        if (relicMgr != null) relicMgr.ClearRelics();
-        hud.RefreshRelics(relicMgr.OwnedRelics);
-
-        // Reset base stats that relics may have modified
-        playerCtrl.moveSpeed = 6f;
-        int baseHP = 5 + MetaProgression.MaxHPBonus;
-        playerHealth.maxHP = baseHP;
-        playerHealth.currentHP = baseHP;
-
-        wave = 1;
-        currentFloor = 1;
-        currentRoom = 1;
-        roomCleared = false;
-        floorGen = new FloorGenerator();
-        floorGen.Generate(roomsPerFloor, 0);
-        BuildCurrentRoom();
-        player.transform.position = new Vector3(6, 0, 6);
-        hud.Refresh();
-        SpawnWave();
+        CleanupRun();
+        EnterHub();
     }
 
     // ─── MATERIAL HELPERS ─────────────────────────────────────────

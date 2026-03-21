@@ -107,7 +107,11 @@ public class SpellCaster : MonoBehaviour
         int count = 1;
         float spreadAngle = 0;
         float damageMult = spell.modifier != null ? spell.modifier.damageMultiplier : 1f;
-        float damage = spell.element.baseDamage * damageMult;
+        float damage = spell.element.baseDamage * damageMult * MetaProgression.DamageMultiplier;
+
+        // Crit chance from meta-progression
+        if (UnityEngine.Random.value < MetaProgression.CritChance)
+            damage *= 2f;
 
         // Volatile: 1.5x damage
         if (modType == ModifierType.Volatile)
@@ -270,11 +274,13 @@ public class SpellCaster : MonoBehaviour
 
     float CalculateDamage(SpellData spell)
     {
-        float dmg = spell.element.baseDamage;
+        float dmg = spell.element.baseDamage * MetaProgression.DamageMultiplier;
         if (spell.modifier != null) dmg *= spell.modifier.damageMultiplier;
         var mod = GetActiveModifier(spell);
         if (mod != null && mod.modifierType == ModifierType.Volatile)
             dmg *= 1.5f;
+        if (UnityEngine.Random.value < MetaProgression.CritChance)
+            dmg *= 2f;
         return dmg;
     }
 

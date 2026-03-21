@@ -2,27 +2,29 @@ using UnityEngine;
 
 public static class MetaProgression
 {
+    // ─── KEYS ───────────────────────────────────────────────────
     const string KEY_CURRENCY = "meta_currency";
-    const string KEY_MAX_HP_BONUS = "meta_maxhp_bonus";
-    const string KEY_REROLLS = "meta_rerolls";
     const string KEY_RUNS_COMPLETED = "meta_runs_completed";
+    const string KEY_BEST_FLOOR = "meta_best_floor";
+
+    // Upgrade keys
+    const string KEY_MAX_HP_BONUS = "meta_maxhp_bonus";          // +1 max HP each
+    const string KEY_BASE_DAMAGE = "meta_base_damage";            // +5% damage each
+    const string KEY_DASH_CHARGES = "meta_dash_charges";          // extra dash charges
+    const string KEY_SPEED_BONUS = "meta_speed_bonus";            // +8% speed each
+    const string KEY_STARTING_GOLD = "meta_starting_gold";        // gold at run start
+    const string KEY_POTION_SLOT = "meta_potion_slot";            // heal potion per floor
+    const string KEY_CRIT_CHANCE = "meta_crit_chance";            // +3% crit chance each
+    const string KEY_REROLLS = "meta_rerolls";                    // rune rerolls
+    const string KEY_STARTING_RELIC = "meta_starting_relic";      // start with random relic
+    const string KEY_ELEMENT_UNLOCK = "meta_elem_unlock_";        // per-element unlock prefix
+
+    // ─── CURRENCY ───────────────────────────────────────────────
 
     public static int Currency
     {
         get => PlayerPrefs.GetInt(KEY_CURRENCY, 0);
         set { PlayerPrefs.SetInt(KEY_CURRENCY, value); PlayerPrefs.Save(); }
-    }
-
-    public static int MaxHPBonus
-    {
-        get => PlayerPrefs.GetInt(KEY_MAX_HP_BONUS, 0);
-        set { PlayerPrefs.SetInt(KEY_MAX_HP_BONUS, value); PlayerPrefs.Save(); }
-    }
-
-    public static int Rerolls
-    {
-        get => PlayerPrefs.GetInt(KEY_REROLLS, 0);
-        set { PlayerPrefs.SetInt(KEY_REROLLS, value); PlayerPrefs.Save(); }
     }
 
     public static int RunsCompleted
@@ -31,41 +33,193 @@ public static class MetaProgression
         set { PlayerPrefs.SetInt(KEY_RUNS_COMPLETED, value); PlayerPrefs.Save(); }
     }
 
-    // Boss currency drops by floor
-    public static int GetBossCurrencyDrop(int floor)
+    public static int BestFloor
     {
-        return floor switch
+        get => PlayerPrefs.GetInt(KEY_BEST_FLOOR, 0);
+        set
         {
-            1 => 50,
-            2 => 80,
-            3 => 120,
-            4 => 170,
-            5 => 250,
-            _ => 50
-        };
+            if (value > PlayerPrefs.GetInt(KEY_BEST_FLOOR, 0))
+            { PlayerPrefs.SetInt(KEY_BEST_FLOOR, value); PlayerPrefs.Save(); }
+        }
     }
 
-    // Upgrade costs
-    public static int MaxHPUpgradeCost => 100 + MaxHPBonus * 50;
-    public static int RerollUpgradeCost => 75;
+    // ─── UPGRADE LEVELS ─────────────────────────────────────────
 
-    public static bool TryBuyMaxHP()
+    public static int MaxHPBonus
     {
-        int cost = MaxHPUpgradeCost;
+        get => PlayerPrefs.GetInt(KEY_MAX_HP_BONUS, 0);
+        set { PlayerPrefs.SetInt(KEY_MAX_HP_BONUS, value); PlayerPrefs.Save(); }
+    }
+
+    public static int BaseDamageLevel
+    {
+        get => PlayerPrefs.GetInt(KEY_BASE_DAMAGE, 0);
+        set { PlayerPrefs.SetInt(KEY_BASE_DAMAGE, value); PlayerPrefs.Save(); }
+    }
+
+    public static int DashChargesLevel
+    {
+        get => PlayerPrefs.GetInt(KEY_DASH_CHARGES, 0);
+        set { PlayerPrefs.SetInt(KEY_DASH_CHARGES, value); PlayerPrefs.Save(); }
+    }
+
+    public static int SpeedBonusLevel
+    {
+        get => PlayerPrefs.GetInt(KEY_SPEED_BONUS, 0);
+        set { PlayerPrefs.SetInt(KEY_SPEED_BONUS, value); PlayerPrefs.Save(); }
+    }
+
+    public static int StartingGoldLevel
+    {
+        get => PlayerPrefs.GetInt(KEY_STARTING_GOLD, 0);
+        set { PlayerPrefs.SetInt(KEY_STARTING_GOLD, value); PlayerPrefs.Save(); }
+    }
+
+    public static int PotionSlotLevel
+    {
+        get => PlayerPrefs.GetInt(KEY_POTION_SLOT, 0);
+        set { PlayerPrefs.SetInt(KEY_POTION_SLOT, value); PlayerPrefs.Save(); }
+    }
+
+    public static int CritChanceLevel
+    {
+        get => PlayerPrefs.GetInt(KEY_CRIT_CHANCE, 0);
+        set { PlayerPrefs.SetInt(KEY_CRIT_CHANCE, value); PlayerPrefs.Save(); }
+    }
+
+    public static int Rerolls
+    {
+        get => PlayerPrefs.GetInt(KEY_REROLLS, 0);
+        set { PlayerPrefs.SetInt(KEY_REROLLS, value); PlayerPrefs.Save(); }
+    }
+
+    public static int StartingRelicLevel
+    {
+        get => PlayerPrefs.GetInt(KEY_STARTING_RELIC, 0);
+        set { PlayerPrefs.SetInt(KEY_STARTING_RELIC, value); PlayerPrefs.Save(); }
+    }
+
+    // ─── COMPUTED VALUES ────────────────────────────────────────
+
+    public static float DamageMultiplier => 1f + BaseDamageLevel * 0.05f;
+    public static float SpeedMultiplier => 1f + SpeedBonusLevel * 0.08f;
+    public static int ExtraDashCharges => DashChargesLevel;
+    public static int StartingGold => StartingGoldLevel * 25;
+    public static int PotionsPerFloor => PotionSlotLevel;
+    public static float CritChance => CritChanceLevel * 0.03f;
+    public static bool HasStartingRelic => StartingRelicLevel > 0;
+
+    // Element unlocks (player starts with Fire+Ice, can unlock rest)
+    public static bool IsElementUnlocked(string elemName)
+    {
+        if (elemName == "Fire" || elemName == "Ice") return true; // always available
+        return PlayerPrefs.GetInt(KEY_ELEMENT_UNLOCK + elemName, 0) > 0;
+    }
+
+    public static void UnlockElement(string elemName)
+    {
+        PlayerPrefs.SetInt(KEY_ELEMENT_UNLOCK + elemName, 1);
+        PlayerPrefs.Save();
+    }
+
+    // ─── UPGRADE DEFINITIONS ────────────────────────────────────
+
+    public struct UpgradeDef
+    {
+        public string id;
+        public string name;
+        public string description;
+        public int maxLevel;
+        public Color color;
+        public System.Func<int> getLevel;
+        public System.Action<int> setLevel;
+        public System.Func<int, int> getCost;
+    }
+
+    public static UpgradeDef[] AllUpgrades => new UpgradeDef[]
+    {
+        new() { id = "maxhp", name = "Vitality", description = "+1 Max HP",
+            maxLevel = 5, color = new Color(0.9f, 0.2f, 0.2f),
+            getLevel = () => MaxHPBonus, setLevel = v => MaxHPBonus = v,
+            getCost = lvl => 80 + lvl * 40 },
+
+        new() { id = "damage", name = "Arcane Power", description = "+5% Spell Damage",
+            maxLevel = 8, color = new Color(0.9f, 0.5f, 0.1f),
+            getLevel = () => BaseDamageLevel, setLevel = v => BaseDamageLevel = v,
+            getCost = lvl => 60 + lvl * 30 },
+
+        new() { id = "speed", name = "Swift Feet", description = "+8% Move Speed",
+            maxLevel = 5, color = new Color(0.3f, 0.8f, 1f),
+            getLevel = () => SpeedBonusLevel, setLevel = v => SpeedBonusLevel = v,
+            getCost = lvl => 50 + lvl * 25 },
+
+        new() { id = "dash", name = "Shadow Step", description = "+1 Dash Charge",
+            maxLevel = 2, color = new Color(0.5f, 0.3f, 0.8f),
+            getLevel = () => DashChargesLevel, setLevel = v => DashChargesLevel = v,
+            getCost = lvl => 150 + lvl * 100 },
+
+        new() { id = "gold", name = "Merchant's Favor", description = "+25 Starting Gold",
+            maxLevel = 4, color = new Color(1f, 0.85f, 0.2f),
+            getLevel = () => StartingGoldLevel, setLevel = v => StartingGoldLevel = v,
+            getCost = lvl => 40 + lvl * 20 },
+
+        new() { id = "crit", name = "Precision", description = "+3% Critical Hit Chance",
+            maxLevel = 5, color = new Color(1f, 0.3f, 0.5f),
+            getLevel = () => CritChanceLevel, setLevel = v => CritChanceLevel = v,
+            getCost = lvl => 70 + lvl * 35 },
+
+        new() { id = "potion", name = "Alchemist's Gift", description = "+1 Healing Potion per Floor",
+            maxLevel = 3, color = new Color(0.3f, 0.9f, 0.4f),
+            getLevel = () => PotionSlotLevel, setLevel = v => PotionSlotLevel = v,
+            getCost = lvl => 100 + lvl * 60 },
+
+        new() { id = "reroll", name = "Fate's Hand", description = "+1 Rune Reroll",
+            maxLevel = 5, color = new Color(0.6f, 0.4f, 0.9f),
+            getLevel = () => Rerolls, setLevel = v => Rerolls = v,
+            getCost = lvl => 50 + lvl * 15 },
+
+        new() { id = "relic", name = "Heirloom", description = "Start with a Random Relic",
+            maxLevel = 1, color = new Color(0.8f, 0.6f, 0.2f),
+            getLevel = () => StartingRelicLevel, setLevel = v => StartingRelicLevel = v,
+            getCost = _ => 300 },
+    };
+
+    // Element unlock costs
+    public static int GetElementUnlockCost(string elemName) => elemName switch
+    {
+        "Lightning" => 120,
+        "Poison" => 150,
+        "Void" => 200,
+        _ => 100
+    };
+
+    public static bool TryBuyUpgrade(UpgradeDef def)
+    {
+        int level = def.getLevel();
+        if (level >= def.maxLevel) return false;
+        int cost = def.getCost(level);
         if (Currency < cost) return false;
         Currency -= cost;
-        MaxHPBonus++;
+        def.setLevel(level + 1);
         return true;
     }
 
-    public static bool TryBuyReroll()
+    public static bool TryUnlockElement(string elemName)
     {
-        int cost = RerollUpgradeCost;
+        if (IsElementUnlocked(elemName)) return false;
+        int cost = GetElementUnlockCost(elemName);
         if (Currency < cost) return false;
         Currency -= cost;
-        Rerolls++;
+        UnlockElement(elemName);
         return true;
     }
+
+    // ─── CURRENCY REWARDS ───────────────────────────────────────
+
+    public static int GetBossCurrencyDrop(int floor) => floor switch
+    {
+        1 => 50, 2 => 80, 3 => 120, 4 => 170, 5 => 250, _ => 50
+    };
 
     public static void AwardBossCurrency(int floor)
     {
@@ -75,6 +229,29 @@ public static class MetaProgression
     public static void CompleteRun()
     {
         RunsCompleted++;
-        Currency += 100; // Bonus for completing a run
+        Currency += 100;
+    }
+
+    public static void RecordFloor(int floor)
+    {
+        BestFloor = floor;
+    }
+
+    /// <summary>Award meta-currency on death based on progress (rooms cleared, floor reached).</summary>
+    public static int AwardDeathCurrency(int floor, int room, int enemiesKilled)
+    {
+        // Base: 10 per floor reached + 2 per room cleared + 1 per 3 enemies killed
+        int reward = floor * 10 + room * 2 + enemiesKilled / 3;
+        reward = Mathf.Max(reward, 5); // Minimum 5 even for early deaths
+        Currency += reward;
+        return reward;
+    }
+
+    // ─── RESET (debug) ─────────────────────────────────────────
+
+    public static void ResetAll()
+    {
+        PlayerPrefs.DeleteAll();
+        PlayerPrefs.Save();
     }
 }
