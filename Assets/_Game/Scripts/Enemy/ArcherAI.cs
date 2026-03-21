@@ -9,6 +9,7 @@ public class ArcherAI : MonoBehaviour
     public float projectileSpeed = 8f;
     public int attackDamage = 1;
     public Color baseColor = new Color(0.2f, 0.6f, 0.2f);
+    public int floorLevel = 1;
 
     Transform target;
     float shootTimer;
@@ -23,6 +24,13 @@ public class ArcherAI : MonoBehaviour
     const float AimDuration = 0.5f;
     Vector3 aimDir;
     GameObject aimLine;
+
+    // Floor 3+: burst fire
+    int burstShotsRemaining;
+    float burstTimer;
+
+    // Floor 4+: scatter shot
+    float scatterCooldown;
 
     void Start()
     {
@@ -87,8 +95,46 @@ public class ArcherAI : MonoBehaviour
                 if (aimLine != null) Destroy(aimLine);
                 EnemyProjectile.Create(transform.position, aimDir, projectileSpeed, attackDamage,
                     new Color(0.3f, 0.8f, 0.3f));
+
+                // Floor 3+: burst fire (2 extra shots)
+                if (floorLevel >= 3)
+                    burstShotsRemaining = 2;
             }
             return;
+        }
+
+        // Burst fire (rapid follow-up shots)
+        if (burstShotsRemaining > 0)
+        {
+            burstTimer -= Time.deltaTime;
+            if (burstTimer <= 0)
+            {
+                burstTimer = 0.2f;
+                burstShotsRemaining--;
+                Vector3 burstDir = (target.position - transform.position).normalized;
+                burstDir = Quaternion.Euler(0, Random.Range(-8f, 8f), 0) * burstDir; // slight spread
+                EnemyProjectile.Create(transform.position, burstDir, projectileSpeed * 1.1f, attackDamage,
+                    new Color(0.3f, 0.8f, 0.3f));
+            }
+            return;
+        }
+
+        // Floor 4+: scatter shot (3 arrows in a fan)
+        if (floorLevel >= 4)
+        {
+            scatterCooldown -= Time.deltaTime;
+            if (scatterCooldown <= 0 && dist < 8f)
+            {
+                scatterCooldown = 6f;
+                Vector3 scatterDir = toPlayer.normalized;
+                for (int i = -1; i <= 1; i++)
+                {
+                    Vector3 dir = Quaternion.Euler(0, i * 20f, 0) * scatterDir;
+                    EnemyProjectile.Create(transform.position, dir, projectileSpeed * 0.8f, attackDamage,
+                        new Color(0.8f, 0.3f, 0.3f)); // red = scatter
+                }
+                SFXSystem.Play(SFXSystem.SFXType.Cast, transform.position, 0.5f);
+            }
         }
 
         // Shoot

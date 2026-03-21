@@ -467,7 +467,7 @@ public class Bootstrap : MonoBehaviour
         playerHealth.currentHP = baseHP;
 
         relicMgr = player.AddComponent<RelicManager>();
-        relicMgr.Init(playerHealth, playerCtrl, allRelics);
+        relicMgr.Init(playerHealth, playerCtrl, allRelics, allElements);
 
         var dualCast = player.AddComponent<DualCast>();
         dualCast.Init(spellCaster);
@@ -613,6 +613,13 @@ public class Bootstrap : MonoBehaviour
             return;
         }
 
+        // Event room: room 3 (50% chance) or room 7
+        if ((currentRoom == 3 && Random.value < 0.5f) || currentRoom == 7)
+        {
+            StartEventRoom();
+            return;
+        }
+
         // Rest room: room 8
         if (currentRoom == 8)
         {
@@ -691,6 +698,191 @@ public class Bootstrap : MonoBehaviour
     }
 
     bool runeOverlayActive;
+
+    void StartEventRoom()
+    {
+        roomCleared = true; // Allow door transition after event
+
+        int eventType = Random.Range(0, 4);
+        switch (eventType)
+        {
+            case 0: // Sacrifice: trade HP for a relic
+                StartSacrificeEvent();
+                break;
+            case 1: // Curse choice: pick a curse, gain gold
+                StartCurseChoiceEvent();
+                break;
+            case 2: // Gamble: risk gold for reward
+                StartGambleEvent();
+                break;
+            default: // Mystery: random positive/negative
+                StartMysteryEvent();
+                break;
+        }
+    }
+
+    void StartSacrificeEvent()
+    {
+        hud.ShowEventRoom(
+            "BLOOD ALTAR", "A dark altar pulses with power. Sacrifice your vitality?",
+            new Color(0.8f, 0.1f, 0.15f),
+            new[] { "SACRIFICE 2 HP", "SACRIFICE 1 HP", "LEAVE" },
+            new[] { "Gain a random relic", "Heal 3 HP + 20 gold", "Continue safely" },
+            new[] { new Color(0.8f, 0.1f, 0.15f), new Color(0.8f, 0.4f, 0.1f), new Color(0.5f, 0.5f, 0.5f) },
+            choice =>
+            {
+                switch (choice)
+                {
+                    case 0:
+                        playerHealth.maxHP = Mathf.Max(1, playerHealth.maxHP - 2);
+                        if (playerHealth.currentHP > playerHealth.maxHP)
+                            playerHealth.currentHP = playerHealth.maxHP;
+                        playerHealth.InvokeHPChanged();
+                        // Give random relic
+                        var available = new List<RelicSO>();
+                        foreach (var r in allRelics) if (!relicMgr.HasRelic(r.relicType)) available.Add(r);
+                        if (available.Count > 0)
+                        {
+                            var relic = available[Random.Range(0, available.Count)];
+                            relicMgr.AddRelic(relic);
+                            hud.RefreshRelics(relicMgr.OwnedRelics);
+                        }
+                        break;
+                    case 1:
+                        playerHealth.maxHP = Mathf.Max(1, playerHealth.maxHP - 1);
+                        if (playerHealth.currentHP > playerHealth.maxHP)
+                            playerHealth.currentHP = playerHealth.maxHP;
+                        playerHealth.Heal(3);
+                        if (goldSystem != null) goldSystem.AddGold(20);
+                        break;
+                }
+                hud.Refresh();
+                TransitionToNextRoom();
+            });
+    }
+
+    void StartCurseChoiceEvent()
+    {
+        hud.ShowEventRoom(
+            "WITCH'S BARGAIN", "A cackling witch offers forbidden power...",
+            new Color(0.5f, 0.1f, 0.6f),
+            new[] { "ACCEPT CURSE", "STEAL GOLD", "REFUSE" },
+            new[] { "Random curse relic + 50 gold", "Gain 30 gold, lose 1 HP", "Walk away" },
+            new[] { new Color(0.5f, 0.1f, 0.6f), new Color(1f, 0.85f, 0.2f), new Color(0.5f, 0.5f, 0.5f) },
+            choice =>
+            {
+                switch (choice)
+                {
+                    case 0:
+                        var cursed = new List<RelicSO>();
+                        foreach (var r in allRelics) if (r.isCursed && !relicMgr.HasRelic(r.relicType)) cursed.Add(r);
+                        if (cursed.Count > 0)
+                        {
+                            var relic = cursed[Random.Range(0, cursed.Count)];
+                            relicMgr.AddRelic(relic);
+                            hud.RefreshRelics(relicMgr.OwnedRelics);
+                        }
+                        if (goldSystem != null) goldSystem.AddGold(50);
+                        break;
+                    case 1:
+                        if (goldSystem != null) goldSystem.AddGold(30);
+                        playerHealth.TakeDamage(1);
+                        break;
+                }
+                hud.Refresh();
+                TransitionToNextRoom();
+            });
+    }
+
+    void StartGambleEvent()
+    {
+        int bet = 25;
+        int currentGold = goldSystem != null ? goldSystem.Gold : 0;
+        bool canBet = currentGold >= bet;
+
+        hud.ShowEventRoom(
+            "FORTUNE'S WHEEL", "A mysterious gambler beckons you to try your luck.",
+            new Color(1f, 0.85f, 0.2f),
+            new[] { canBet ? "BET 25 GOLD" : "NOT ENOUGH GOLD", "BET 1 MAX HP", "LEAVE" },
+            new[] { "50% chance: win 75 gold or lose bet", "50% chance: +2 max HP or lose 2 max HP", "Continue safely" },
+            new[] { new Color(1f, 0.85f, 0.2f), new Color(0.8f, 0.2f, 0.2f), new Color(0.5f, 0.5f, 0.5f) },
+            choice =>
+            {
+                switch (choice)
+                {
+                    case 0:
+                        if (canBet && goldSystem != null)
+                        {
+                            if (Random.value < 0.5f)
+                            {
+                                goldSystem.AddGold(75);
+                                SFXSystem.Play(SFXSystem.SFXType.LevelUp, player.transform.position);
+                            }
+                            else
+                            {
+                                goldSystem.TrySpend(bet);
+                                SFXSystem.Play(SFXSystem.SFXType.PlayerHit, player.transform.position);
+                            }
+                        }
+                        break;
+                    case 1:
+                        if (Random.value < 0.5f)
+                        {
+                            playerHealth.maxHP += 2;
+                            playerHealth.Heal(2);
+                            SFXSystem.Play(SFXSystem.SFXType.LevelUp, player.transform.position);
+                        }
+                        else
+                        {
+                            playerHealth.maxHP = Mathf.Max(1, playerHealth.maxHP - 2);
+                            if (playerHealth.currentHP > playerHealth.maxHP)
+                                playerHealth.currentHP = playerHealth.maxHP;
+                            playerHealth.InvokeHPChanged();
+                            SFXSystem.Play(SFXSystem.SFXType.PlayerHit, player.transform.position);
+                        }
+                        break;
+                }
+                hud.Refresh();
+                TransitionToNextRoom();
+            });
+    }
+
+    void StartMysteryEvent()
+    {
+        hud.ShowEventRoom(
+            "STRANGE SHRINE", "An ancient shrine hums with unknown energy.",
+            new Color(0.3f, 0.7f, 0.9f),
+            new[] { "PRAY", "SMASH IT", "IGNORE" },
+            new[] { "Random blessing or curse", "Guaranteed 40 gold + enemies may appear", "Leave undisturbed" },
+            new[] { new Color(0.3f, 0.7f, 0.9f), new Color(0.9f, 0.3f, 0.1f), new Color(0.5f, 0.5f, 0.5f) },
+            choice =>
+            {
+                switch (choice)
+                {
+                    case 0: // Pray: random effect
+                        int roll = Random.Range(0, 4);
+                        if (roll == 0) { playerHealth.Heal(playerHealth.maxHP); } // Full heal
+                        else if (roll == 1) { playerHealth.maxHP += 1; playerHealth.Heal(1); } // +1 max HP
+                        else if (roll == 2) { playerHealth.TakeDamage(2); } // Damage
+                        else { if (goldSystem != null) goldSystem.AddGold(40); } // Gold
+                        break;
+                    case 1: // Smash: guaranteed gold + possible fight
+                        if (goldSystem != null) goldSystem.AddGold(40);
+                        // 40% chance to spawn enemies
+                        if (Random.value < 0.4f)
+                        {
+                            roomCleared = false;
+                            enemiesAlive = 0;
+                            for (int i = 0; i < 3; i++) { SpawnEnemy(0); enemiesAlive++; }
+                        }
+                        break;
+                }
+                hud.Refresh();
+                if (roomCleared)
+                    TransitionToNextRoom();
+                // If enemies spawned, room will transition after they're killed
+            });
+    }
 
     void StartRestRoom()
     {
@@ -795,7 +987,7 @@ public class Bootstrap : MonoBehaviour
         var e = new GameObject("Shambler"); Color c = new(0.75f, 0.15f, 0.15f);
         AddCapsuleCol(e, 1.2f, 0.35f, 0.6f); BuildBody(e.transform, c, 1f);
         RegisterEnemy(e, 20 + wave * 5);
-        var ai = e.AddComponent<ShamblerAI>(); ai.moveSpeed = 2.5f + wave * 0.2f; ai.baseColor = c;
+        var ai = e.AddComponent<ShamblerAI>(); ai.moveSpeed = 2.5f + wave * 0.2f; ai.baseColor = c; ai.floorLevel = currentFloor;
     }
 
     void SpawnArcher()
@@ -809,7 +1001,7 @@ public class Bootstrap : MonoBehaviour
         bow.transform.localRotation = Quaternion.Euler(0, 0, -30);
         bow.GetComponent<Renderer>().material = MakeLit(new Color(0.4f, 0.25f, 0.1f));
         RegisterEnemy(e, 15 + wave * 3);
-        e.AddComponent<ArcherAI>().baseColor = c;
+        var archerAI = e.AddComponent<ArcherAI>(); archerAI.baseColor = c; archerAI.floorLevel = currentFloor;
     }
 
     void SpawnBrute()
@@ -1050,8 +1242,10 @@ public class Bootstrap : MonoBehaviour
         MetaProgression.AwardBossCurrency(currentFloor);
         MetaProgression.RecordFloor(currentFloor);
 
-        // Boss gold drop
+        // Boss gold drop (CursedGold: 3x)
         int goldDrop = GoldSystem.CalculateEnemyDrop(wave, true);
+        if (relicMgr != null && relicMgr.HasRelic(RelicType.CursedGold))
+            goldDrop *= 3;
         GoldSystem.SpawnGoldDrop(boss.transform.position, goldDrop);
         // bossActive stays true so ShowRuneSelection knows to advance floor
         SpawnRewardPickup();
@@ -1135,8 +1329,10 @@ public class Bootstrap : MonoBehaviour
 
     void OnEnemyDeath(GameObject enemy)
     {
-        // Gold drop
+        // Gold drop (CursedGold: 3x)
         int goldDrop = GoldSystem.CalculateEnemyDrop(wave, false);
+        if (relicMgr != null && relicMgr.HasRelic(RelicType.CursedGold))
+            goldDrop *= 3;
         GoldSystem.SpawnGoldDrop(enemy.transform.position, goldDrop);
 
         // Void pull effect

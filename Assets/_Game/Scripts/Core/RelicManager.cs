@@ -7,22 +7,39 @@ public class RelicManager : MonoBehaviour
     List<RelicSO> ownedRelics = new();
     Health playerHealth;
     PlayerController playerCtrl;
+    ElementSO[] allElementsRef;
 
     // Relic state
     int hitCounter;
     float regenTimer;
     bool roomShieldActive;
 
+    // Synergy state
+    float synergyBerserkerGlassTimer; // Berserker+GlassCannon: lifesteal window
+    float synergyVampireThornsHeal;   // VampireAura+Thorns: stored overkill heal
+    int synergyDoubleStrikeChaosCounter; // DoubleStrike+Chaos: AoE on proc
+
     public List<RelicSO> OwnedRelics => ownedRelics;
 
-    public void Init(Health hp, PlayerController ctrl, RelicSO[] allRelics)
+    public void Init(Health hp, PlayerController ctrl, RelicSO[] allRelics, ElementSO[] allElements = null)
     {
         playerHealth = hp;
         playerCtrl = ctrl;
+        allElementsRef = allElements;
         ownedRelics.Clear();
         hitCounter = 0;
         regenTimer = 0;
         roomShieldActive = false;
+        synergyBerserkerGlassTimer = 0;
+        synergyVampireThornsHeal = 0;
+        synergyDoubleStrikeChaosCounter = 0;
+    }
+
+    /// <summary>Returns a random element for Chaos relic.</summary>
+    public ElementSO GetRandomElement()
+    {
+        if (allElementsRef == null || allElementsRef.Length == 0) return null;
+        return allElementsRef[Random.Range(0, allElementsRef.Length)];
     }
 
     public void AddRelic(RelicSO relic)
@@ -69,11 +86,14 @@ public class RelicManager : MonoBehaviour
     {
         if (playerHealth == null || playerHealth.IsDead) return;
 
-        // Regeneration: heal 1 HP every 30s
+        if (synergyBerserkerGlassTimer > 0) synergyBerserkerGlassTimer -= Time.deltaTime;
+
+        // Regeneration: heal 1 HP every 30s (15s with BloodPact synergy)
         if (HasRelic(RelicType.Regeneration))
         {
+            float interval = (HasRelic(RelicType.BloodPact)) ? 15f : 30f;
             regenTimer += Time.deltaTime;
-            if (regenTimer >= 30f)
+            if (regenTimer >= interval)
             {
                 regenTimer = 0;
                 playerHealth.Heal(1);
@@ -99,7 +119,8 @@ public class RelicManager : MonoBehaviour
 
         // DoubleStrike: every 5th hit deals 2x
         hitCounter++;
-        if (HasRelic(RelicType.DoubleStrike) && hitCounter % 5 == 0)
+        bool isDoubleStrike = HasRelic(RelicType.DoubleStrike) && hitCounter % 5 == 0;
+        if (isDoubleStrike)
             dmg *= 2f;
 
         // Cursed Power: +75% damage
@@ -114,7 +135,41 @@ public class RelicManager : MonoBehaviour
         if (HasRelic(RelicType.Chaos))
             dmg *= 1.3f;
 
+        // ─── SYNERGIES ─────────────────────────────────────────
+        // Berserker + GlassCannon = "Rage Glass": 10% lifesteal while below 50% HP
+        if (HasRelic(RelicType.Berserker) && HasRelic(RelicType.GlassCannon) && playerHealth != null)
+        {
+            if (playerHealth.currentHP <= playerHealth.maxHP / 2)
+            {
+                int heal = Mathf.Max(1, Mathf.FloorToInt(dmg * 0.1f));
+                playerHealth.Heal(heal);
+            }
+        }
+
+        // DoubleStrike + Chaos = "Chaotic Surge": double-strike procs AoE explosion
+        if (isDoubleStrike && HasRelic(RelicType.Chaos))
+        {
+            synergyDoubleStrikeChaosCounter++;
+            // Trigger AoE via flag — checked by SpellProjectile on hit
+        }
+
+        // BloodPact + Regeneration = "Blood Renewal": regen ticks every 15s instead of 30s
+        // (handled in Update)
+
+        // Shield + Thorns = "Retribution": blocked hit reflects 5 damage instead of 1
+        // (handled in ModifyIncomingDamage)
+
+        // DashFire + CursedSpeed = "Inferno Dash": fire trail deals 2x damage + lasts 2x longer
+        // (handled in CreateFireTrail and OnDash)
+
         return dmg;
+    }
+
+    /// <summary>Whether the Chaotic Surge synergy just triggered (DoubleStrike+Chaos AoE).</summary>
+    public bool ConsumeChaoticSurge()
+    {
+        if (synergyDoubleStrikeChaosCounter > 0) { synergyDoubleStrikeChaosCounter--; return true; }
+        return false;
     }
 
     // Called when player takes damage
@@ -124,13 +179,29 @@ public class RelicManager : MonoBehaviour
         if (roomShieldActive && HasRelic(RelicType.Shield))
         {
             roomShieldActive = false;
+
+            // Shield + Thorns synergy: blocked hit reflects 5 damage to nearby enemies
+            if (HasRelic(RelicType.Thorns))
+            {
+                Collider[] nearby = Physics.OverlapSphere(transform.position, 3f);
+                foreach (var col in nearby)
+                {
+                    if (col.GetComponent<PlayerController>() != null) continue;
+                    var hp = col.GetComponent<Health>();
+                    if (hp != null && !hp.IsDead) hp.TakeDamage(5);
+                }
+                SFXSystem.Play(SFXSystem.SFXType.Explosion, transform.position, 0.5f);
+            }
+
             return 0;
         }
 
-        // Thorns: reflect 1 damage back (handled elsewhere via event)
-
         // Cursed Power: take 1 extra damage per hit
         if (HasRelic(RelicType.CursedPower))
+            damage += 1;
+
+        // BloodPact: take 1 extra damage per hit (stacks with CursedPower)
+        if (HasRelic(RelicType.BloodPact))
             damage += 1;
 
         return damage;
@@ -144,7 +215,13 @@ public class RelicManager : MonoBehaviour
 
         // VampireAura: heal 1 HP per room cleared
         if (HasRelic(RelicType.VampireAura) && playerHealth != null)
-            playerHealth.Heal(1);
+        {
+            int heal = 1;
+            // Lucky + VampireAura = "Fortune's Vitality": heal 2 HP per room + 20% chance for 3
+            if (HasRelic(RelicType.Lucky))
+                heal = Random.value < 0.2f ? 3 : 2;
+            playerHealth.Heal(heal);
+        }
     }
 
     // Called when player dashes
@@ -152,33 +229,40 @@ public class RelicManager : MonoBehaviour
     {
         if (!HasRelic(RelicType.DashFire)) return;
 
-        // Create fire trail
+        bool infernoSynergy = HasRelic(RelicType.CursedSpeed); // DashFire+CursedSpeed = "Inferno Dash"
+        float spacing = infernoSynergy ? 0.5f : 0.8f; // denser trail
+        float lifetime = infernoSynergy ? 4f : 2f;     // lasts longer
+        int dmg = infernoSynergy ? 4 : 2;              // double damage
+
         Vector3 dir = (to - from);
         float dist = dir.magnitude;
         dir.Normalize();
-        int segments = Mathf.CeilToInt(dist / 0.8f);
+        int segments = Mathf.CeilToInt(dist / spacing);
         for (int i = 0; i < segments; i++)
         {
-            Vector3 pos = from + dir * (i * 0.8f);
-            CreateFireTrail(pos);
+            Vector3 pos = from + dir * (i * spacing);
+            CreateFireTrail(pos, lifetime, dmg, infernoSynergy);
         }
     }
 
-    void CreateFireTrail(Vector3 pos)
+    void CreateFireTrail(Vector3 pos, float lifetime = 2f, int dmg = 2, bool inferno = false)
     {
         var fire = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
         fire.name = "DashFire";
         Destroy(fire.GetComponent<CapsuleCollider>());
         var col = fire.AddComponent<SphereCollider>();
         col.isTrigger = true;
-        col.radius = 0.6f;
+        col.radius = inferno ? 0.9f : 0.6f;
         fire.transform.position = pos + Vector3.up * 0.05f;
-        fire.transform.localScale = new Vector3(0.8f, 0.05f, 0.8f);
-        var mat = ShaderCache.NewEmissive(new Color(1f, 0.4f, 0.1f, 0.6f));
-        mat.SetColor("_EmissionColor", new Color(1f, 0.3f, 0f) * 3f);
+        float scale = inferno ? 1.1f : 0.8f;
+        fire.transform.localScale = new Vector3(scale, 0.05f, scale);
+        Color fireColor = inferno ? new Color(1f, 0.2f, 0.0f, 0.8f) : new Color(1f, 0.4f, 0.1f, 0.6f);
+        var mat = ShaderCache.NewEmissive(fireColor);
+        mat.SetColor("_EmissionColor", (inferno ? new Color(1f, 0.1f, 0f) : new Color(1f, 0.3f, 0f)) * 3f);
         fire.GetComponent<Renderer>().material = mat;
-        fire.AddComponent<DashFireZone>();
-        Destroy(fire, 2f);
+        var zone = fire.AddComponent<DashFireZone>();
+        zone.damage = dmg;
+        Destroy(fire, lifetime);
     }
 
     // Extra rune choice from Lucky relic
@@ -188,6 +272,7 @@ public class RelicManager : MonoBehaviour
 // Fire zone from dash relic — damages enemies standing in it
 public class DashFireZone : MonoBehaviour
 {
+    public int damage = 2;
     float tickTimer;
 
     void OnTriggerStay(Collider other)
@@ -199,6 +284,6 @@ public class DashFireZone : MonoBehaviour
         if (other.GetComponent<PlayerController>() != null) return;
         var hp = other.GetComponent<Health>();
         if (hp != null && !hp.IsDead)
-            hp.TakeDamage(2);
+            hp.TakeDamage(damage);
     }
 }

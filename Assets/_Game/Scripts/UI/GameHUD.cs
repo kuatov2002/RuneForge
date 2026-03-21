@@ -32,6 +32,9 @@ public class GameHUD : MonoBehaviour
     // Gold
     Label goldLabel;
 
+    // Status effects
+    VisualElement statusBar;
+
     // Potions
     Label potionLabel;
 
@@ -172,6 +175,15 @@ public class GameHUD : MonoBehaviour
         relicBar.style.paddingLeft = 20;
         relicBar.style.paddingTop = 4;
         root.Add(relicBar);
+
+        // ── Status effects bar ──
+        statusBar = new VisualElement();
+        statusBar.pickingMode = PickingMode.Ignore;
+        statusBar.style.flexDirection = FlexDirection.Row;
+        statusBar.style.paddingLeft = 20;
+        statusBar.style.paddingTop = 4;
+        statusBar.style.alignItems = Align.Center;
+        root.Add(statusBar);
 
         // ── Boss HP bar ──
         bossHPContainer = new VisualElement();
@@ -1005,6 +1017,44 @@ public class GameHUD : MonoBehaviour
         runePanel.Add(continueCard);
     }
 
+    /// <summary>Show an event room with multiple choice options.</summary>
+    public void ShowEventRoom(string title, string description, Color titleColor,
+        string[] choiceLabels, string[] choiceDescs, Color[] choiceColors, Action<int> onChoice)
+    {
+        runeOverlay.style.display = DisplayStyle.Flex;
+        runePanel.Clear();
+        currentSpellPreview.Clear();
+        currentSpellPreview.Add(Lbl(title, 24, titleColor, FontStyle.Bold));
+        slotHintLabel.text = description;
+
+        for (int i = 0; i < choiceLabels.Length; i++)
+        {
+            int idx = i;
+            var card = new VisualElement();
+            card.style.flexDirection = FlexDirection.Column;
+            card.style.width = 200;
+            card.style.backgroundColor = CardBg;
+            Radius(card, 14);
+            Border(card, choiceColors[i], 2);
+            card.style.alignItems = Align.Center;
+            Pad(card, 18, 16);
+
+            card.Add(Lbl(choiceLabels[i], 18, choiceColors[i], FontStyle.Bold));
+            card.Add(Lbl(choiceDescs[i], 12, Dim));
+
+            card.RegisterCallback<ClickEvent>(_ =>
+            {
+                runeOverlay.style.display = DisplayStyle.None;
+                onChoice?.Invoke(idx);
+            });
+            Color hoverBorder = choiceColors[idx] * 1.3f;
+            Color baseBorder = choiceColors[idx];
+            card.RegisterCallback<MouseEnterEvent>(_ => { card.style.backgroundColor = CardBgHover; Border(card, hoverBorder, 3); });
+            card.RegisterCallback<MouseLeaveEvent>(_ => { card.style.backgroundColor = CardBg; Border(card, baseBorder, 2); });
+            runePanel.Add(card);
+        }
+    }
+
     public void RefreshRelics(List<RelicSO> relics)
     {
         relicBar.Clear();
@@ -1130,6 +1180,53 @@ public class GameHUD : MonoBehaviour
             potionLabel.text = pots > 0 ? $"[F] Potion x{pots}" : "No Potions";
             potionLabel.style.color = pots > 0 ? new Color(0.3f, 0.9f, 0.4f) : Dim;
         }
+
+        // Status effects
+        UpdateStatusBar();
+    }
+
+    void UpdateStatusBar()
+    {
+        if (statusBar == null || playerHealth == null) return;
+        statusBar.Clear();
+
+        if (playerHealth.IsStunned)
+        {
+            Color col = playerHealth.IsFrozen ? new Color(0.4f, 0.8f, 1f) : new Color(1f, 1f, 0.3f);
+            string txt = playerHealth.IsFrozen ? "FROZEN" : "STUNNED";
+            statusBar.Add(MakeStatusIcon(txt, col));
+        }
+        else if (playerHealth.IsSlowed)
+            statusBar.Add(MakeStatusIcon("SLOWED", new Color(0.4f, 0.6f, 1f)));
+
+        if (playerHealth.PoisonStacks > 0)
+            statusBar.Add(MakeStatusIcon($"POISON x{playerHealth.PoisonStacks}", new Color(0.2f, 0.9f, 0.1f)));
+
+        // Check burn via reflection-free approach: if HP is ticking down and not from poison
+        // We expose IsBurning on Health instead
+        if (playerHealth.IsBurning)
+            statusBar.Add(MakeStatusIcon("BURNING", new Color(1f, 0.4f, 0.1f)));
+
+        // Dual-cast bonus active
+        var dc = playerHealth.GetComponent<DualCast>();
+        if (dc != null && dc.IsBonusActive)
+            statusBar.Add(MakeStatusIcon("DUAL CAST", new Color(0.8f, 0.6f, 1f)));
+    }
+
+    VisualElement MakeStatusIcon(string text, Color color)
+    {
+        var el = new VisualElement();
+        el.pickingMode = PickingMode.Ignore;
+        el.style.backgroundColor = new Color(color.r * 0.2f, color.g * 0.2f, color.b * 0.2f, 0.8f);
+        Radius(el, 4);
+        Border(el, color, 1);
+        el.style.paddingLeft = 6;
+        el.style.paddingRight = 6;
+        el.style.paddingTop = 2;
+        el.style.paddingBottom = 2;
+        el.style.marginRight = 4;
+        el.Add(Lbl(text, 11, color, FontStyle.Bold));
+        return el;
     }
 
     void UpdateCDLabel(VisualElement card, float cd)

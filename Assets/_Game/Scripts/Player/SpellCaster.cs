@@ -105,6 +105,26 @@ public class SpellCaster : MonoBehaviour
 
     void Cast(SpellData spell)
     {
+        var relicMgr = GetComponent<RelicManager>();
+
+        // BloodPact: spells cost 1 HP to cast
+        if (relicMgr != null && relicMgr.HasRelic(RelicType.BloodPact))
+        {
+            var hp = GetComponent<Health>();
+            if (hp != null && !hp.IsDead)
+            {
+                hp.currentHP = Mathf.Max(1, hp.currentHP - 1);
+                hp.InvokeHPChanged();
+            }
+        }
+
+        // Chaos: randomize element on this cast
+        if (relicMgr != null && relicMgr.HasRelic(RelicType.Chaos))
+        {
+            var randomElem = relicMgr.GetRandomElement();
+            if (randomElem != null) spell = new SpellData { element = randomElem, form = spell.form, modifier = spell.modifier };
+        }
+
         OnSpellFired?.Invoke(spell.element);
 
         var mod = GetActiveModifier(spell);

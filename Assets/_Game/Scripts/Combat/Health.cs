@@ -53,6 +53,7 @@ public class Health : MonoBehaviour
     }
 
     public bool IsStunned => stunTimer > 0 || freezeTimer > 0;
+    public bool IsBurning => burnTimer > 0;
 
     void Awake()
     {
@@ -119,6 +120,9 @@ public class Health : MonoBehaviour
             OnDeath?.Invoke();
         }
     }
+
+    /// <summary>Force-fire the HP changed event (e.g. after direct HP modification).</summary>
+    public void InvokeHPChanged() => OnHPChanged?.Invoke(currentHP, maxHP);
 
     public void Heal(int amount)
     {

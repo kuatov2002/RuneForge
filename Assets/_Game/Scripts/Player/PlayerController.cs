@@ -146,8 +146,25 @@ public class PlayerController : MonoBehaviour
 
     public void RefillPotions(int perFloor) => potionsRemaining = Mathf.Min(potionsRemaining + perFloor, 9);
 
+    bool dodgedThroughAttack;
+
     void EndIFrames()
     {
         isInvulnerable = false;
+
+        // Check if enemies were close during dash (successful dodge feedback)
+        Collider[] nearby = Physics.OverlapSphere(transform.position, 2.5f);
+        foreach (var col in nearby)
+        {
+            if (col.gameObject == gameObject) continue;
+            var hp = col.GetComponent<Health>();
+            if (hp != null && !hp.IsDead && col.GetComponent<PlayerController>() == null)
+            {
+                // Successful dodge! Show feedback
+                SFXSystem.Play(SFXSystem.SFXType.DualCast, transform.position, 0.3f);
+                GameFeel.SpawnDodgeVFX(transform.position);
+                break;
+            }
+        }
     }
 }

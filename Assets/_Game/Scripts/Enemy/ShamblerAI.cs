@@ -7,6 +7,7 @@ public class ShamblerAI : MonoBehaviour
     public float attackCooldown = 1f;
     public int attackDamage = 1;
     public Color baseColor = new Color(0.8f, 0.2f, 0.2f);
+    public int floorLevel = 1;
 
     Transform target;
     float attackTimer;
@@ -23,6 +24,15 @@ public class ShamblerAI : MonoBehaviour
     bool isWindingUp;
     float windupTimer;
     const float WindupDuration = 0.35f;
+
+    // Floor 3+: leap attack
+    float leapCooldown;
+    bool isLeaping;
+    float leapTimer;
+    Vector3 leapTarget;
+
+    // Floor 5+: slam AoE
+    float slamCooldown;
 
     void Start()
     {
@@ -95,6 +105,84 @@ public class ShamblerAI : MonoBehaviour
                 }
             }
             return;
+        }
+
+        // Floor 3+: leap attack when far from player
+        if (floorLevel >= 3 && !isLeaping)
+        {
+            leapCooldown -= Time.deltaTime;
+            if (leapCooldown <= 0 && dist > 4f && dist < 10f)
+            {
+                leapCooldown = 5f - (floorLevel - 3) * 0.5f; // faster on higher floors
+                isLeaping = true;
+                leapTimer = 0.4f;
+                leapTarget = target.position;
+                // Telegraph: red circle at landing spot
+                var warn = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
+                Destroy(warn.GetComponent<CapsuleCollider>());
+                warn.transform.position = leapTarget + Vector3.up * 0.02f;
+                warn.transform.localScale = new Vector3(2f, 0.01f, 2f);
+                warn.GetComponent<Renderer>().material = ShaderCache.NewEmissive(new Color(1f, 0.2f, 0.1f, 0.5f), 2f);
+                Destroy(warn, 0.5f);
+                return;
+            }
+        }
+
+        // Leap in progress
+        if (isLeaping)
+        {
+            leapTimer -= Time.deltaTime;
+            Vector3 toTarget = leapTarget - transform.position;
+            toTarget.y = 0;
+            rb.MovePosition(transform.position + toTarget.normalized * 18f * Time.deltaTime + Vector3.up * 0.02f);
+
+            if (leapTimer <= 0 || toTarget.magnitude < 0.5f)
+            {
+                isLeaping = false;
+                // Slam damage on landing
+                Collider[] hits = Physics.OverlapSphere(transform.position, 1.8f);
+                foreach (var h in hits)
+                {
+                    var pc = h.GetComponent<PlayerController>();
+                    if (pc != null && !pc.isInvulnerable)
+                    {
+                        var php = h.GetComponent<Health>();
+                        if (php != null && !php.IsDead) php.TakeDamage(attackDamage + 1);
+                    }
+                }
+                // VFX: impact ring
+                GameFeel.SpawnDeathVFX(transform.position, baseColor);
+                if (TopDownCamera.Instance != null) TopDownCamera.Instance.AddTrauma(0.15f);
+            }
+            return;
+        }
+
+        // Floor 5+: periodic slam AoE (telegraphed shockwave)
+        if (floorLevel >= 5 && dist <= attackRange + 1f)
+        {
+            slamCooldown -= Time.deltaTime;
+            if (slamCooldown <= 0)
+            {
+                slamCooldown = 4f;
+                // AoE slam: damage + knockback in radius
+                var ring = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
+                Destroy(ring.GetComponent<CapsuleCollider>());
+                ring.transform.position = transform.position + Vector3.up * 0.05f;
+                ring.transform.localScale = new Vector3(0.5f, 0.02f, 0.5f);
+                ring.GetComponent<Renderer>().material = ShaderCache.NewEmissive(new Color(1f, 0.3f, 0.1f), 3f);
+                ring.AddComponent<DeathRingEffect>().Init(5f, 0.5f);
+
+                Collider[] slamHits = Physics.OverlapSphere(transform.position, 2.5f);
+                foreach (var h in slamHits)
+                {
+                    var pc = h.GetComponent<PlayerController>();
+                    if (pc != null && !pc.isInvulnerable)
+                    {
+                        var php = h.GetComponent<Health>();
+                        if (php != null && !php.IsDead) php.TakeDamage(attackDamage);
+                    }
+                }
+            }
         }
 
         if (dist > attackRange)

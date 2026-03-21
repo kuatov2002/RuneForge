@@ -150,6 +150,19 @@ public class GameFeel : MonoBehaviour
 
         ghost.AddComponent<GhostFade>().Init(0.25f);
     }
+
+    // ─── DODGE VFX ─────────────────────────────────────────────
+
+    /// <summary>Visual feedback for successful dodge (expanding white ring).</summary>
+    public static void SpawnDodgeVFX(Vector3 position)
+    {
+        var ring = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
+        Object.Destroy(ring.GetComponent<CapsuleCollider>());
+        ring.transform.position = position + Vector3.up * 0.1f;
+        ring.transform.localScale = new Vector3(0.3f, 0.02f, 0.3f);
+        ring.GetComponent<Renderer>().material = ShaderCache.NewEmissive(new Color(1f, 1f, 1f, 0.7f), 3f);
+        ring.AddComponent<DeathRingEffect>().Init(2.5f, 0.3f);
+    }
 }
 
 // ─── HELPER COMPONENTS ──────────────────────────────────────────
