@@ -31,6 +31,12 @@ public class WardenBoss : MonoBehaviour
         health = GetComponent<Health>();
         rb = GetComponent<Rigidbody>();
         renderers = GetComponentsInChildren<Renderer>();
+
+        // Boss immunity: Earth (stone/earth creature)
+        var elemData = gameObject.GetComponent<EnemyElementData>();
+        if (elemData == null) elemData = gameObject.AddComponent<EnemyElementData>();
+        elemData.AssignBossImmunity(ElementType.Earth);
+
         if (health != null)
         {
             health.OnDeath += () => { isDead = true; CleanupWalls(); Destroy(gameObject, 0.5f); };

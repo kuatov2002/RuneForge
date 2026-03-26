@@ -33,6 +33,12 @@ public class LichBoss : MonoBehaviour
         renderers = GetComponentsInChildren<Renderer>();
         teleportTimer = teleportCooldown;
         orbTimer = 1f;
+
+        // Boss immunity: Void (void creature)
+        var elemData = gameObject.GetComponent<EnemyElementData>();
+        if (elemData == null) elemData = gameObject.AddComponent<EnemyElementData>();
+        elemData.AssignBossImmunity(ElementType.Void);
+
         if (health != null)
         {
             health.OnDeath += () => { isDead = true; Destroy(gameObject, 0.5f); };

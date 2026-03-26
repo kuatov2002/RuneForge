@@ -385,7 +385,8 @@ public class HubUI : MonoBehaviour
     VisualElement BuildElementCard(ElementSO elem)
     {
         bool unlocked = MetaProgression.IsElementUnlocked(elem.elementName);
-        bool isBase = elem.elementName == "Fire" || elem.elementName == "Ice";
+        bool isBase = elem.elementName == "Fire" || elem.elementName == "Water"
+            || elem.elementName == "Earth" || elem.elementName == "Air";
         int cost = MetaProgression.GetElementUnlockCost(elem.elementName);
         bool canAfford = MetaProgression.Currency >= cost;
 
@@ -422,13 +423,13 @@ public class HubUI : MonoBehaviour
 
         string effectDesc = elem.elementType switch
         {
-            ElementType.Fire => "Burst damage, burning",
-            ElementType.Water => "Freezing, control",
-            ElementType.Earth => "Defense, walls",
-            ElementType.Air => "Mobility, knockback",
+            ElementType.Fire => "Burst damage, burning DOT",
+            ElementType.Water => "Freeze, slow, control",
+            ElementType.Earth => "AoE, defense, stone walls",
+            ElementType.Air => "Dash, knockback, mobility",
             ElementType.Lightning => "Chain damage, stun",
-            ElementType.Poison => "DoT, spreading",
-            ElementType.Void => "Gravity, implosion",
+            ElementType.Poison => "DoT, spreading stacks",
+            ElementType.Void => "Gravity pull, implosion",
             _ => ""
         };
         body.Add(Lbl(effectDesc, 13, Dim));
@@ -830,7 +831,9 @@ public class HubUI : MonoBehaviour
     static Color GetElementColor(string elemName) => elemName switch
     {
         "Fire" => new Color(1f, 0.4f, 0.1f),
-        "Ice" => new Color(0.3f, 0.7f, 1f),
+        "Water" => new Color(0.3f, 0.7f, 1f),
+        "Earth" => new Color(0.6f, 0.4f, 0.2f),
+        "Air" => new Color(0.7f, 0.9f, 1f),
         "Lightning" => new Color(1f, 1f, 0.3f),
         "Poison" => new Color(0.2f, 0.9f, 0.1f),
         "Void" => new Color(0.6f, 0.1f, 0.9f),

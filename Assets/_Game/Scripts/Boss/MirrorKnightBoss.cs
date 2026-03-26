@@ -33,6 +33,12 @@ public class MirrorKnightBoss : MonoBehaviour
         rb = GetComponent<Rigidbody>();
         renderers = GetComponentsInChildren<Renderer>();
         stateTimer = shieldUpTime;
+
+        // Boss immunity: Air
+        var elemData = gameObject.GetComponent<EnemyElementData>();
+        if (elemData == null) elemData = gameObject.AddComponent<EnemyElementData>();
+        elemData.AssignBossImmunity(ElementType.Air);
+
         if (health != null)
             health.OnDeath += () => { isDead = true; Destroy(gameObject, 0.5f); };
     }

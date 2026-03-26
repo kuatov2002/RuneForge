@@ -170,6 +170,10 @@ public class WildfireBoltBehavior : MonoBehaviour
         if (other.GetComponent<SpellProjectile>() != null) return;
         if (other.GetComponent<FireballProjectile>() != null) return;
 
+        // Fire zone interactions
+        if (SpellInteractionSystem.TryFireInteraction(other, transform.position, _damage))
+        { _hit = true; SpawnHitBurst(transform.position); Destroy(gameObject); return; }
+
         var hp = other.GetComponent<Health>();
         if (hp != null && !hp.IsDead)
         {

@@ -126,9 +126,9 @@ public class FireballProjectile : MonoBehaviour
         if (other.GetComponent<FireballProjectile>() != null) return;
         if (other.GetComponent<SpellProjectile>() != null) return;
 
-        // Check if it's a steam cloud to ignite
-        var steam = other.GetComponent<SteamCloudZone>();
-        if (steam != null) { steam.Ignite(); Explode(); return; }
+        // Check spell zone interactions (Fire + Steam, Fire + Permafrost, etc.)
+        if (SpellInteractionSystem.TryFireInteraction(other, transform.position, _damage))
+        { Explode(); return; }
 
         var hp = other.GetComponent<Health>();
         if (hp != null && !hp.IsDead)

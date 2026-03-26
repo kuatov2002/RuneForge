@@ -146,6 +146,24 @@ public class Bootstrap : MonoBehaviour
         ApplyStartingLoadout();
 
         SpawnWave();
+
+        // Start ambient music
+        if (SFXSystem.Instance != null) SFXSystem.Instance.StartMusic();
+
+        // Tutorial hints (first run only)
+        if (PlayerPrefs.GetInt("TutorialShown", 0) == 0)
+        {
+            PlayerPrefs.SetInt("TutorialShown", 1);
+            PlayerPrefs.Save();
+            ShowTutorialHints();
+        }
+    }
+
+    void ShowTutorialHints()
+    {
+        if (hud == null) return;
+        var runner = hud.gameObject.AddComponent<TutorialHintRunner>();
+        runner.Run(hud);
     }
 
     void ApplyMetaProgressionToPlayer()
@@ -472,7 +490,7 @@ public class Bootstrap : MonoBehaviour
                 MetaProgression.CompleteRun();
                 AscensionSystem.OnRunComplete();
                 isPlayerDead = true;
-                hud.ShowVictory(wave, currentFloor - 1);
+                hud.ShowVictory(wave, currentFloor - 1, enemiesKilledThisRun);
                 playerCtrl.enabled = false;
                 spellCaster.enabled = false;
                 return;
@@ -707,6 +725,7 @@ public class Bootstrap : MonoBehaviour
         var hudGO = new GameObject("HUD");
         hud = hudGO.AddComponent<GameHUD>();
         hud.Init(spellCaster, playerHealth);
+        hud.OnReturnToHub = ReturnToHub;
 
         // Wire gold UI — remove old sub, add new
         if (goldSystem != null)
@@ -1701,7 +1720,7 @@ public class Bootstrap : MonoBehaviour
         isPlayerDead = true;
         MetaProgression.RecordFloor(currentFloor);
         int metaReward = MetaProgression.AwardDeathCurrency(currentFloor, currentRoom, enemiesKilledThisRun);
-        hud.ShowDeath(true, metaReward);
+        hud.ShowDeath(true, metaReward, currentFloor, currentRoom, enemiesKilledThisRun);
         playerCtrl.enabled = false;
         spellCaster.enabled = false;
     }
@@ -1709,6 +1728,7 @@ public class Bootstrap : MonoBehaviour
     void ReturnToHub()
     {
         isPlayerDead = false;
+        if (SFXSystem.Instance != null) SFXSystem.Instance.StopMusic();
         CleanupRun();
         EnterHub();
     }

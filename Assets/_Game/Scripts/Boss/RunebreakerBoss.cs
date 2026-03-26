@@ -18,8 +18,7 @@ public class RunebreakerBoss : MonoBehaviour
     bool isDead;
     float meleeTimer;
     float rangedTimer;
-    int phase = 1; // 1=both slots, 2=slot1 disabled, 3=slot2 disabled+slot1 re-enabled
-    int disabledSlot = -1; // -1=none, 0=slot1, 1=slot2
+    int phase = 1;
     SpellCaster playerCaster;
 
     void Start()
@@ -33,12 +32,17 @@ public class RunebreakerBoss : MonoBehaviour
         health = GetComponent<Health>();
         rb = GetComponent<Rigidbody>();
         renderers = GetComponentsInChildren<Renderer>();
+
+        // Boss immunity: Earth (stone creature)
+        var elemData = gameObject.GetComponent<EnemyElementData>();
+        if (elemData == null) elemData = gameObject.AddComponent<EnemyElementData>();
+        elemData.AssignBossImmunity(ElementType.Earth);
+
         if (health != null)
         {
             health.OnDeath += () =>
             {
                 isDead = true;
-                RestoreSlots();
                 Destroy(gameObject, 0.5f);
             };
             health.OnHPChanged += OnHPChanged;
@@ -51,40 +55,39 @@ public class RunebreakerBoss : MonoBehaviour
         if (ratio < 0.33f && phase < 3)
         {
             phase = 3;
-            RestoreSlot(0); // Re-enable slot 1
-            DisableSlot(1); // Disable slot 2
+            ForceOverheatRandomSlot();
             UpdateVisual();
         }
         else if (ratio < 0.66f && phase < 2)
         {
             phase = 2;
-            DisableSlot(0); // Disable slot 1
+            ForceOverheatRandomSlot();
             UpdateVisual();
         }
     }
 
-    void DisableSlot(int slot)
+    void ForceOverheatRandomSlot()
     {
-        disabledSlot = slot;
-        // Force overheat on the element slot to temporarily disable it
-        if (playerCaster != null && slot < playerCaster.equippedElements.Length)
+        if (playerCaster == null) return;
+
+        // Pick a random equipped element slot to overheat
+        int slotCount = playerCaster.equippedElements.Length;
+        if (slotCount == 0) return;
+
+        // Try to find a non-overheated slot
+        int attempts = 0;
+        int slot;
+        do
         {
-            // Overheat is handled internally — just drain charges
-            // The element will recharge naturally
+            slot = Random.Range(0, slotCount);
+            attempts++;
         }
+        while (playerCaster.IsOverheated(slot) && attempts < slotCount * 2);
 
-        // VFX: flash to indicate slot disabled
+        playerCaster.ForceOverheat(slot);
+
+        // VFX: shockwave to indicate element disruption
         CreateDisableVFX();
-    }
-
-    void RestoreSlot(int slot)
-    {
-        // Elements restore naturally via overheat recharge
-    }
-
-    void RestoreSlots()
-    {
-        // Elements restore naturally via overheat recharge
     }
 
     void Update()
@@ -174,6 +177,4 @@ public class RunebreakerBoss : MonoBehaviour
         vfx.GetComponent<Renderer>().material = mat;
         Destroy(vfx, 0.4f);
     }
-
-    void OnDestroy() { RestoreSlots(); }
 }

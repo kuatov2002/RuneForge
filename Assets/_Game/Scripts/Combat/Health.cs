@@ -59,10 +59,6 @@ public class Health : MonoBehaviour
 
         int dmg = Mathf.Max(1, Mathf.CeilToInt(amount));
 
-        // Weakness / immunity check
-        var elemData = GetComponent<EnemyElementData>();
-        // (weakness/immunity applied at cast time via EnemyElementData.ModifyDamage)
-
         // Relic: modify incoming damage (Shield blocks first hit per room)
         var relicMgr = GetComponent<RelicManager>();
         if (relicMgr != null)
@@ -122,6 +118,24 @@ public class Health : MonoBehaviour
             }
             OnDeath?.Invoke();
         }
+    }
+
+    /// <summary>Take damage with element type — checks weakness/immunity.</summary>
+    public void TakeDamage(float amount, ElementType element)
+    {
+        var elemData = GetComponent<EnemyElementData>();
+        if (elemData != null)
+        {
+            if (elemData.IsImmuneToElement(element))
+            {
+                // Show "IMMUNE" feedback
+                Vector3 hitPos = transform.position + Vector3.up * 1.2f;
+                OnDamaged?.Invoke(0, hitPos, false);
+                return;
+            }
+            amount = elemData.ModifyDamage(amount, element);
+        }
+        TakeDamage(amount);
     }
 
     /// <summary>Force-fire the HP changed event.</summary>

@@ -92,6 +92,14 @@ public class SpellCaster : MonoBehaviour
     /// <summary>Is element slot overheated?</summary>
     public bool IsOverheated(int slot) => slot >= 0 && slot < 4 && overheatTimers[slot] > 0;
 
+    /// <summary>Force-overheat an element slot (e.g. boss mechanic). Sets charges to 0 and starts overheat timer.</summary>
+    public void ForceOverheat(int slot)
+    {
+        if (slot < 0 || slot >= 4 || equippedElements[slot] == null) return;
+        charges[slot] = 0;
+        overheatTimers[slot] = equippedElements[slot].overheatRechargeTime;
+    }
+
     /// <summary>Get overheat recharge progress (0 = overheated, 1 = ready).</summary>
     public float GetOverheatProgress(int slot)
     {

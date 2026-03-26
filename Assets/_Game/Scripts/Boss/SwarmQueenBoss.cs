@@ -27,6 +27,12 @@ public class SwarmQueenBoss : MonoBehaviour
         health = GetComponent<Health>();
         rb = GetComponent<Rigidbody>();
         renderers = GetComponentsInChildren<Renderer>();
+
+        // Boss immunity: Poison (controls poison creatures)
+        var elemData = gameObject.GetComponent<EnemyElementData>();
+        if (elemData == null) elemData = gameObject.AddComponent<EnemyElementData>();
+        elemData.AssignBossImmunity(ElementType.Poison);
+
         if (health != null)
         {
             health.OnDeath += () => { isDead = true; CleanupMinions(); Destroy(gameObject, 0.5f); };

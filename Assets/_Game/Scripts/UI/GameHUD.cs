@@ -62,6 +62,17 @@ public class GameHUD : MonoBehaviour
     VisualElement dashCDContainer;
     VisualElement dashCDFill;
 
+    // Pause menu
+    VisualElement pauseOverlay;
+    bool isPaused;
+    public Action OnReturnToHub;
+
+    // Tutorial hints
+    VisualElement hintBar;
+    Label hintLabel;
+    float hintTimer;
+    float hintDuration;
+
     // Floating damage numbers
     VisualElement damageNumberLayer;
     readonly List<DamageNumberState> activeDamageNumbers = new();
@@ -105,6 +116,10 @@ public class GameHUD : MonoBehaviour
         caster.OnComboNameChanged += OnComboNameChanged;
         RefreshHP();
         RefreshComboDisplay();
+
+        // Damage vignette feedback
+        var vignette = gameObject.AddComponent<DamageVignette>();
+        vignette.Init(uiDoc, playerHealth);
     }
 
     public void TrackEnemyDamage(Health enemyHP)
@@ -316,6 +331,80 @@ public class GameHUD : MonoBehaviour
         synContainer.Add(synergyPanel);
         synergyOverlay.Add(synContainer);
         root.Add(synergyOverlay);
+
+        // ── Pause overlay ──
+        pauseOverlay = MakeOverlay(new Color(0, 0, 0, 0.8f));
+        pauseOverlay.focusable = true;
+
+        var pauseTitle = Lbl("PAUSED", 64, new Color(0.9f, 0.85f, 0.6f), FontStyle.Bold);
+        pauseOverlay.Add(pauseTitle);
+
+        var resumeBtn = new Button(() => ResumeGame());
+        resumeBtn.text = "Resume";
+        resumeBtn.style.fontSize = 24;
+        resumeBtn.style.marginTop = 24;
+        resumeBtn.style.paddingTop = 10;
+        resumeBtn.style.paddingBottom = 10;
+        resumeBtn.style.paddingLeft = 40;
+        resumeBtn.style.paddingRight = 40;
+        resumeBtn.style.color = Color.white;
+        resumeBtn.style.backgroundColor = new Color(0.2f, 0.5f, 0.3f);
+        Radius(resumeBtn, 8);
+        pauseOverlay.Add(resumeBtn);
+
+        // Volume slider
+        var volumeRow = new VisualElement();
+        volumeRow.style.flexDirection = FlexDirection.Row;
+        volumeRow.style.alignItems = Align.Center;
+        volumeRow.style.marginTop = 20;
+
+        var volLabel = Lbl("Volume", 20, Color.white);
+        volLabel.style.marginRight = 12;
+        volumeRow.Add(volLabel);
+
+        var volumeSlider = new Slider(0f, 1f);
+        volumeSlider.value = AudioListener.volume;
+        volumeSlider.style.width = 200;
+        volumeSlider.RegisterValueChangedCallback(evt => AudioListener.volume = evt.newValue);
+        volumeRow.Add(volumeSlider);
+        pauseOverlay.Add(volumeRow);
+
+        var hubBtn = new Button(() =>
+        {
+            ResumeGame();
+            OnReturnToHub?.Invoke();
+        });
+        hubBtn.text = "Return to Hub";
+        hubBtn.style.fontSize = 20;
+        hubBtn.style.marginTop = 16;
+        hubBtn.style.paddingTop = 8;
+        hubBtn.style.paddingBottom = 8;
+        hubBtn.style.paddingLeft = 30;
+        hubBtn.style.paddingRight = 30;
+        hubBtn.style.color = Color.white;
+        hubBtn.style.backgroundColor = new Color(0.5f, 0.2f, 0.2f);
+        Radius(hubBtn, 8);
+        pauseOverlay.Add(hubBtn);
+
+        root.Add(pauseOverlay);
+
+        // ── Hint bar (tutorial) ──
+        hintBar = new VisualElement();
+        hintBar.pickingMode = PickingMode.Ignore;
+        hintBar.style.position = Position.Absolute;
+        hintBar.style.top = 80;
+        hintBar.style.left = new StyleLength(Length.Percent(25));
+        hintBar.style.right = new StyleLength(Length.Percent(25));
+        hintBar.style.backgroundColor = new Color(0, 0, 0, 0.6f);
+        hintBar.style.alignItems = Align.Center;
+        hintBar.style.justifyContent = Justify.Center;
+        Pad(hintBar, 10, 20);
+        Radius(hintBar, 8);
+        hintBar.style.display = DisplayStyle.None;
+
+        hintLabel = Lbl("", 22, Color.white, FontStyle.Bold);
+        hintBar.Add(hintLabel);
+        root.Add(hintBar);
 
         // ── Bottom area: element hotbar + combo display ──
         var bottomArea = new VisualElement();
@@ -841,16 +930,67 @@ public class GameHUD : MonoBehaviour
     public void SetGold(int gold) { if (goldLabel != null) goldLabel.text = gold.ToString(); }
     public void Refresh() { RefreshHP(); RefreshComboDisplay(); }
 
-    public void ShowDeath(bool show, int metaCurrency = 0)
+    public void ShowDeath(bool show, int metaCurrency = 0, int floor = 0, int room = 0, int kills = 0)
     {
         deathOverlay.style.display = show ? DisplayStyle.Flex : DisplayStyle.None;
         if (show)
-            deathWaveLabel.text = metaCurrency > 0 ? $"+{metaCurrency} Soul Essence" : "";
+        {
+            deathOverlay.Clear();
+
+            var title = Lbl("YOU DIED", 64, new Color(0.9f, 0.1f, 0.1f), FontStyle.Bold);
+            deathOverlay.Add(title);
+
+            // Stats
+            var statsContainer = new VisualElement();
+            statsContainer.style.alignItems = Align.Center;
+            statsContainer.style.marginTop = 16;
+
+            if (floor > 0)
+                statsContainer.Add(Lbl($"Floor {floor} — Room {room}", 22, new Color(0.7f, 0.7f, 0.75f)));
+            if (kills > 0)
+                statsContainer.Add(Lbl($"Enemies defeated: {kills}", 20, new Color(0.8f, 0.8f, 0.85f)));
+
+            var momentum = playerCtrl != null ? playerCtrl.GetComponent<MomentumSystem>() : null;
+            if (momentum != null && momentum.KillStreak > 0)
+                statsContainer.Add(Lbl($"Best streak: {momentum.KillStreak}", 18, new Color(1f, 0.8f, 0.2f)));
+
+            if (metaCurrency > 0)
+            {
+                var reward = Lbl($"+{metaCurrency} Soul Essence", 24, new Color(0.8f, 0.6f, 1f), FontStyle.Bold);
+                reward.style.marginTop = 12;
+                statsContainer.Add(reward);
+            }
+
+            deathOverlay.Add(statsContainer);
+
+            var hint = Lbl("Press  R  to return to the Sanctum", 20, new Color(0.6f, 0.6f, 0.65f));
+            hint.style.marginTop = 24;
+            deathOverlay.Add(hint);
+        }
     }
 
-    public void ShowVictory(int wave, int floor)
+    public void ShowVictory(int wave, int floor, int kills = 0)
     {
         victoryOverlay.style.display = DisplayStyle.Flex;
+        victoryOverlay.Clear();
+
+        var title = Lbl("VICTORY!", 64, new Color(1f, 0.85f, 0.2f), FontStyle.Bold);
+        victoryOverlay.Add(title);
+
+        var sub = Lbl("You have conquered the dungeon!", 24, new Color(0.8f, 0.8f, 0.85f));
+        sub.style.marginTop = 12;
+        victoryOverlay.Add(sub);
+
+        if (kills > 0)
+        {
+            var killLbl = Lbl($"Total kills: {kills}", 20, new Color(0.9f, 0.9f, 0.95f));
+            killLbl.style.marginTop = 8;
+            victoryOverlay.Add(killLbl);
+        }
+
+        var hint = Lbl("Press  R  to return to the Sanctum", 20, new Color(0.6f, 0.6f, 0.65f));
+        hint.style.marginTop = 24;
+        victoryOverlay.Add(hint);
     }
 
     public void ShowBossHP(Health bossHP, string bossName)
@@ -1009,8 +1149,68 @@ public class GameHUD : MonoBehaviour
 
     // ── Update (damage numbers, charge bar, cooldowns) ──
 
+    // ── Pause Menu ──
+
+    void CheckPauseInput()
+    {
+        if (UnityEngine.InputSystem.Keyboard.current != null &&
+            UnityEngine.InputSystem.Keyboard.current.escapeKey.wasPressedThisFrame)
+        {
+            if (isPaused)
+                ResumeGame();
+            else
+                PauseGame();
+        }
+    }
+
+    void PauseGame()
+    {
+        if (deathOverlay.style.display == DisplayStyle.Flex) return;
+        if (victoryOverlay.style.display == DisplayStyle.Flex) return;
+        isPaused = true;
+        Time.timeScale = 0;
+        pauseOverlay.style.display = DisplayStyle.Flex;
+    }
+
+    void ResumeGame()
+    {
+        isPaused = false;
+        Time.timeScale = 1;
+        pauseOverlay.style.display = DisplayStyle.None;
+    }
+
+    // ── Tutorial Hints ──
+
+    public void ShowHint(string text, float duration)
+    {
+        hintLabel.text = text;
+        hintBar.style.display = DisplayStyle.Flex;
+        hintBar.style.opacity = 1f;
+        hintTimer = 0f;
+        hintDuration = duration;
+    }
+
+    void UpdateHint()
+    {
+        if (hintBar.style.display == DisplayStyle.None) return;
+        hintTimer += Time.unscaledDeltaTime;
+        if (hintTimer >= hintDuration)
+        {
+            hintBar.style.display = DisplayStyle.None;
+        }
+        else if (hintTimer >= hintDuration - 1f)
+        {
+            // Fade out in the last second
+            float fade = hintDuration - hintTimer;
+            hintBar.style.opacity = fade;
+        }
+    }
+
     void Update()
     {
+        CheckPauseInput();
+        UpdateHint();
+
         // Damage numbers
         for (int i = activeDamageNumbers.Count - 1; i >= 0; i--)
         {

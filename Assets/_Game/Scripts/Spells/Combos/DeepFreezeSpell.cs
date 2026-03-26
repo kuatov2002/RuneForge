@@ -132,6 +132,10 @@ public class IceSpikeProjectile : MonoBehaviour
         if (other.GetComponent<SpellProjectile>() != null) return;
         if (_hit.Contains(other)) return;
 
+        // Check spell zone interactions (Ice + Magma = Obsidian)
+        if (SpellInteractionSystem.TryIceInteraction(other, transform.position, _damage))
+        { Shatter(); return; }
+
         var hp = other.GetComponent<Health>();
         if (hp != null && !hp.IsDead)
         {

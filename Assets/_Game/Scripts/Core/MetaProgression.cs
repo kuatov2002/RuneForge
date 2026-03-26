@@ -109,10 +109,11 @@ public static class MetaProgression
     public static float CritChance => CritChanceLevel * 0.03f;
     public static bool HasStartingRelic => StartingRelicLevel > 0;
 
-    // Element unlocks (player starts with Fire+Ice, can unlock rest)
+    // Element unlocks (player starts with Fire+Water+Earth+Air, can unlock rest)
     public static bool IsElementUnlocked(string elemName)
     {
-        if (elemName == "Fire" || elemName == "Ice") return true; // always available
+        if (elemName == "Fire" || elemName == "Water" || elemName == "Earth" || elemName == "Air")
+            return true; // base elements always available
         return PlayerPrefs.GetInt(KEY_ELEMENT_UNLOCK + elemName, 0) > 0;
     }
 
@@ -259,7 +260,6 @@ public static class MetaProgression
         public string name;
         public string description;
         public string startElement;
-        public string startForm;
         public Color color;
         public int unlockCost;
         public string passiveDesc;
@@ -267,24 +267,24 @@ public static class MetaProgression
 
     public static LoadoutDef[] AllLoadouts => new LoadoutDef[]
     {
-        new() { id = "default", name = "Apprentice", description = "No starting spell. Classic start.",
-            startElement = null, startForm = null, color = new Color(0.6f, 0.6f, 0.65f),
+        new() { id = "default", name = "Apprentice", description = "Fire + Water + Earth + Air. Classic start.",
+            startElement = null, color = new Color(0.6f, 0.6f, 0.65f),
             unlockCost = 0, passiveDesc = "No bonus" },
-        new() { id = "pyromancer", name = "Pyromancer", description = "Start with Fire Bolt. +10% burn damage.",
-            startElement = "Fire", startForm = "Bolt", color = new Color(1f, 0.4f, 0.1f),
-            unlockCost = 100, passiveDesc = "+10% burn damage" },
-        new() { id = "cryomancer", name = "Cryomancer", description = "Start with Ice Cone. Freeze lasts 0.5s longer.",
-            startElement = "Ice", startForm = "Cone", color = new Color(0.3f, 0.7f, 1f),
-            unlockCost = 100, passiveDesc = "+0.5s freeze duration" },
-        new() { id = "stormcaller", name = "Stormcaller", description = "Start with Lightning Beam. +1 chain target.",
-            startElement = "Lightning", startForm = "Beam", color = new Color(1f, 1f, 0.3f),
-            unlockCost = 150, passiveDesc = "+1 chain target" },
-        new() { id = "plaguebringer", name = "Plaguebringer", description = "Start with Poison Trap. +1 starting poison stack.",
-            startElement = "Poison", startForm = "Trap", color = new Color(0.2f, 0.9f, 0.1f),
-            unlockCost = 150, passiveDesc = "+1 starting poison stack" },
-        new() { id = "voidwalker", name = "Voidwalker", description = "Start with Void Orbit. Dash cooldown -20%.",
-            startElement = "Void", startForm = "Orbit", color = new Color(0.6f, 0.1f, 0.9f),
-            unlockCost = 200, passiveDesc = "-20% dash cooldown" },
+        new() { id = "pyromancer", name = "Pyromancer", description = "Fire damage +15%. Master of flames.",
+            startElement = "Fire", color = new Color(1f, 0.4f, 0.1f),
+            unlockCost = 100, passiveDesc = "+15% Fire damage" },
+        new() { id = "cryomancer", name = "Cryomancer", description = "Water effects last +25% longer. Freeze and slow specialist.",
+            startElement = "Water", color = new Color(0.3f, 0.7f, 1f),
+            unlockCost = 100, passiveDesc = "+25% Water effect duration" },
+        new() { id = "geomancer", name = "Geomancer", description = "Earth spells +20% radius. Shaper of stone.",
+            startElement = "Earth", color = new Color(0.6f, 0.4f, 0.2f),
+            unlockCost = 100, passiveDesc = "+20% Earth spell radius" },
+        new() { id = "windwalker", name = "Windwalker", description = "Air dash distance +25%. Swift as the gale.",
+            startElement = "Air", color = new Color(0.7f, 0.9f, 1f),
+            unlockCost = 100, passiveDesc = "+25% Air dash distance" },
+        new() { id = "stormcaller", name = "Stormcaller", description = "Starts with Lightning unlocked (replaces Air). Storm wielder.",
+            startElement = "Lightning", color = new Color(1f, 1f, 0.3f),
+            unlockCost = 150, passiveDesc = "Lightning replaces Air" },
     };
 
     public static bool IsLoadoutUnlocked(string loadoutId)
@@ -331,11 +331,11 @@ public static class MetaProgression
 
     public static readonly (string id, string name, string elem1, string elem2, string desc)[] ComboDefinitions = new[]
     {
-        ("SteamBurst", "Steam Burst", "Fire", "Ice", "AoE damage cloud (3m, 8 dmg)"),
+        ("SteamBurst", "Steam Burst", "Fire", "Water", "AoE damage cloud (3m, 8 dmg)"),
         ("Detonate", "Detonate", "Fire", "Poison", "Consumes poison stacks, 5 dmg each"),
         ("Implode", "Implode", "Fire", "Void", "Pulls enemies in + 10 dmg"),
-        ("Shatter", "Shatter", "Ice", "Lightning", "Frozen target takes 15 burst dmg"),
-        ("ToxicFrost", "Toxic Frost", "Ice", "Poison", "Slow + poison AoE pool (4s)"),
+        ("Shatter", "Shatter", "Water", "Lightning", "Frozen target takes 15 burst dmg"),
+        ("ToxicFrost", "Toxic Frost", "Water", "Poison", "Slow + poison AoE pool (4s)"),
         ("PlagueSpark", "Plague Spark", "Lightning", "Poison", "Chain-detonates poisoned enemies"),
         ("RiftShock", "Rift Shock", "Lightning", "Void", "Stuns all void-marked enemies 2s"),
         ("Corruption", "Corruption", "Poison", "Void", "Spreads 3 poison stacks to nearby"),
