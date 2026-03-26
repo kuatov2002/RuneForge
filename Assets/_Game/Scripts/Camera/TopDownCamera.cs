@@ -15,6 +15,13 @@ public class TopDownCamera : MonoBehaviour
     float shakeMaxOffset = 0.4f;
     float shakeFrequency = 25f;
 
+    // Zoom
+    float zoomTarget;
+    float zoomDuration;
+    float zoomTimer;
+    float zoomFrom;
+    bool isZooming;
+
     public static TopDownCamera Instance { get; private set; }
 
     void Awake() { Instance = this; }
@@ -24,9 +31,26 @@ public class TopDownCamera : MonoBehaviour
         trauma = Mathf.Clamp01(trauma + amount);
     }
 
+    public void ZoomTo(float targetDistance, float duration)
+    {
+        zoomFrom = distance;
+        zoomTarget = targetDistance;
+        zoomDuration = duration;
+        zoomTimer = 0;
+        isZooming = true;
+    }
+
     void LateUpdate()
     {
         if (target == null) return;
+
+        if (isZooming)
+        {
+            zoomTimer += Time.deltaTime;
+            float t = Mathf.Clamp01(zoomTimer / zoomDuration);
+            distance = Mathf.Lerp(zoomFrom, zoomTarget, t);
+            if (t >= 1f) isZooming = false;
+        }
 
         Vector3 targetPos = target.position;
 

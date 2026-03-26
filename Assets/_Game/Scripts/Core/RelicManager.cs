@@ -19,6 +19,13 @@ public class RelicManager : MonoBehaviour
     float synergyVampireThornsHeal;   // VampireAura+Thorns: stored overkill heal
     int synergyDoubleStrikeChaosCounter; // DoubleStrike+Chaos: AoE on proc
 
+    // Element relic state
+    float prismTimer;
+    float prismDamageBuff;
+    ElementType[] prismRecentElements = new ElementType[8];
+    float[] prismRecentTimes = new float[8];
+    int prismIdx;
+
     public List<RelicSO> OwnedRelics => ownedRelics;
 
     public void Init(Health hp, PlayerController ctrl, RelicSO[] allRelics, ElementSO[] allElements = null)
@@ -79,6 +86,9 @@ public class RelicManager : MonoBehaviour
                         playerHealth.currentHP = playerHealth.maxHP;
                 }
                 break;
+            case RelicType.GaleRing:
+                if (playerCtrl != null) playerCtrl.dashDistance *= 1.3f;
+                break;
         }
     }
 
@@ -99,6 +109,14 @@ public class RelicManager : MonoBehaviour
                 playerHealth.Heal(1);
             }
         }
+
+        // PrismShard: track element variety, buff if 3+ unique in 10s
+        if (HasRelic(RelicType.PrismShard))
+        {
+            if (prismDamageBuff > 0) prismDamageBuff -= Time.deltaTime;
+        }
+
+        // StoneSkin visual hint (handled in ModifyIncomingDamage)
     }
 
     // Called by SpellProjectile/attack systems when dealing damage
@@ -134,6 +152,10 @@ public class RelicManager : MonoBehaviour
         // Chaos: +30% damage
         if (HasRelic(RelicType.Chaos))
             dmg *= 1.3f;
+
+        // PrismShard: +25% damage when buff active
+        if (HasRelic(RelicType.PrismShard) && prismDamageBuff > 0)
+            dmg *= 1.25f;
 
         // ─── SYNERGIES ─────────────────────────────────────────
         // Berserker + GlassCannon = "Rage Glass": 10% lifesteal while below 50% HP
@@ -194,6 +216,14 @@ public class RelicManager : MonoBehaviour
             }
 
             return 0;
+        }
+
+        // StoneSkin: -1 damage when player is standing still
+        if (HasRelic(RelicType.StoneSkin) && playerCtrl != null)
+        {
+            var rb = playerCtrl.GetComponent<Rigidbody>();
+            if (rb != null && rb.linearVelocity.sqrMagnitude < 0.1f)
+                damage = Mathf.Max(0, damage - 1);
         }
 
         // Cursed Power: take 1 extra damage per hit
@@ -267,6 +297,48 @@ public class RelicManager : MonoBehaviour
 
     // Extra rune choice from Lucky relic
     public bool HasLucky => HasRelic(RelicType.Lucky) && Random.value < 0.2f;
+
+    /// <summary>Track element usage for PrismShard relic.</summary>
+    public void TrackElementUsed(ElementType elem)
+    {
+        if (!HasRelic(RelicType.PrismShard)) return;
+        prismRecentElements[prismIdx] = elem;
+        prismRecentTimes[prismIdx] = Time.time;
+        prismIdx = (prismIdx + 1) % prismRecentElements.Length;
+
+        // Count unique elements in last 10 seconds
+        var seen = new System.Collections.Generic.HashSet<ElementType>();
+        for (int i = 0; i < prismRecentElements.Length; i++)
+        {
+            if (Time.time - prismRecentTimes[i] < 10f)
+                seen.Add(prismRecentElements[i]);
+        }
+        if (seen.Count >= 3)
+            prismDamageBuff = 5f; // 5 second buff
+    }
+
+    /// <summary>Check if FrostCrown is active (freeze duration x1.5).</summary>
+    public bool HasFrostCrown => HasRelic(RelicType.FrostCrown);
+
+    /// <summary>Check if VenomSac is active (poison ticks x1.5).</summary>
+    public bool HasVenomSac => HasRelic(RelicType.VenomSac);
+
+    /// <summary>Check if VoidLens is active (void pull radius x1.4).</summary>
+    public bool HasVoidLens => HasRelic(RelicType.VoidLens);
+
+    /// <summary>Check if StormConductor is active (+10% crit for lightning).</summary>
+    public bool HasStormConductor => HasRelic(RelicType.StormConductor);
+
+    /// <summary>Check if EmberHeart is active (fire chains to extra target).</summary>
+    public bool HasEmberHeart => HasRelic(RelicType.EmberHeart);
+
+    /// <summary>Remove a relic and undo its passive effects.</summary>
+    public void RemoveRelic(RelicSO relic)
+    {
+        ownedRelics.Remove(relic);
+        // Note: some passives (speed, HP) are hard to undo precisely,
+        // but for cursed relics this is primarily used for curse purification
+    }
 }
 
 // Fire zone from dash relic — damages enemies standing in it

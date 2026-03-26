@@ -19,6 +19,16 @@ public enum RelicType
     CursedGold,       // 3x gold drops, enemies have +30% HP
     BloodPact,        // Spells cost 1 HP to cast, +100% damage
     Chaos,            // Random element on each cast, +30% damage
+
+    // ─── ELEMENT-SPECIFIC RELICS ───
+    EmberHeart,       // Fire spells chain to 1 extra target
+    FrostCrown,       // Freeze duration +50%
+    StoneSkin,        // Take 1 less damage when standing still
+    GaleRing,         // Dash distance +30%, air zone on dash
+    StormConductor,   // +10% crit for lightning spells
+    VenomSac,         // Poison ticks deal 1.5x damage
+    VoidLens,         // Void pull radius +40%
+    PrismShard,       // 3+ elements in 10s = +25% damage for 5s
 }
 
 public class RelicSO : ScriptableObject

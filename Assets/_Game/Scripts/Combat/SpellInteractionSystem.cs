@@ -15,12 +15,14 @@ using UnityEngine;
 /// </summary>
 public static class SpellInteractionSystem
 {
+    public static event System.Action<string, Vector3, Color> OnReaction;
+
     /// <summary>Check if a fire-element projectile should interact with a zone.</summary>
     public static bool TryFireInteraction(Collider zone, Vector3 hitPos, float damage)
     {
         // Fire + Steam → Ignite
         var steam = zone.GetComponent<SteamCloudZone>();
-        if (steam != null) { steam.Ignite(); return true; }
+        if (steam != null) { steam.Ignite(); OnReaction?.Invoke("IGNITE", hitPos, new Color(1f, 0.5f, 0.1f)); return true; }
 
         // Fire + Permafrost → Evaporate
         var frost = zone.GetComponent<PermafrostZone>();
@@ -160,6 +162,7 @@ public static class SpellInteractionSystem
 
         if (TopDownCamera.Instance != null) TopDownCamera.Instance.AddTrauma(0.2f);
         SFXSystem.Play(SFXSystem.SFXType.Explosion, pos);
+        OnReaction?.Invoke("EVAPORATE", pos, new Color(0.9f, 0.9f, 1f));
     }
 
     /// <summary>Ice hits Magma: creates obsidian shards with AoE stun damage.</summary>
@@ -197,6 +200,7 @@ public static class SpellInteractionSystem
         if (TopDownCamera.Instance != null) TopDownCamera.Instance.AddTrauma(0.25f);
         if (GameFeel.Instance != null) GameFeel.Instance.Hitstop(0.05f);
         SFXSystem.Play(SFXSystem.SFXType.Explosion, pos);
+        OnReaction?.Invoke("OBSIDIAN SHARDS", pos, new Color(0.15f, 0.1f, 0.15f));
     }
 
     /// <summary>Fire hits Poison cloud: toxic explosion (3x DPS burst).</summary>
@@ -229,6 +233,7 @@ public static class SpellInteractionSystem
         if (TopDownCamera.Instance != null) TopDownCamera.Instance.AddTrauma(0.35f);
         if (GameFeel.Instance != null) GameFeel.Instance.Hitstop(0.05f);
         SFXSystem.Play(SFXSystem.SFXType.Explosion, pos);
+        OnReaction?.Invoke("TOXIC EXPLOSION", pos, new Color(0.7f, 0.5f, 0.1f));
     }
 
     /// <summary>Lightning hits water zone: electrify — chain damage to all enemies in zone.</summary>
@@ -277,6 +282,7 @@ public static class SpellInteractionSystem
 
         if (TopDownCamera.Instance != null) TopDownCamera.Instance.AddTrauma(0.25f);
         SFXSystem.Play(SFXSystem.SFXType.Explosion, pos);
+        OnReaction?.Invoke("CHAIN LIGHTNING", pos, new Color(1f, 1f, 0.3f));
     }
 
     /// <summary>Lightning hits Magma: superheat → magma explodes for burst damage.</summary>
@@ -308,6 +314,7 @@ public static class SpellInteractionSystem
         if (TopDownCamera.Instance != null) TopDownCamera.Instance.AddTrauma(0.4f);
         if (GameFeel.Instance != null) GameFeel.Instance.Hitstop(0.06f);
         SFXSystem.Play(SFXSystem.SFXType.Explosion, pos);
+        OnReaction?.Invoke("SUPERHEAT", pos, new Color(1f, 0.4f, 0f));
     }
 
     /// <summary>Ice hits Quicksand: enemies take 2x damage while stuck + frozen.</summary>
@@ -333,6 +340,7 @@ public static class SpellInteractionSystem
 
         if (TopDownCamera.Instance != null) TopDownCamera.Instance.AddTrauma(0.2f);
         SFXSystem.Play(SFXSystem.SFXType.Freeze, pos);
+        OnReaction?.Invoke("FROZEN QUICKSAND", pos, new Color(0.3f, 0.4f, 0.6f));
     }
 
     /// <summary>Void hits any zone: implode — instant concentrated damage in smaller radius.</summary>
@@ -377,5 +385,6 @@ public static class SpellInteractionSystem
         if (TopDownCamera.Instance != null) TopDownCamera.Instance.AddTrauma(0.3f);
         if (GameFeel.Instance != null) GameFeel.Instance.Hitstop(0.05f);
         SFXSystem.Play(SFXSystem.SFXType.Explosion, pos);
+        OnReaction?.Invoke("IMPLODE", pos, new Color(0.3f, 0f, 0.5f));
     }
 }

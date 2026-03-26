@@ -163,6 +163,106 @@ public class GameFeel : MonoBehaviour
         ring.GetComponent<Renderer>().material = ShaderCache.NewEmissive(new Color(1f, 1f, 1f, 0.7f), 3f);
         ring.AddComponent<DeathRingEffect>().Init(2.5f, 0.3f);
     }
+
+    // ─── SCREEN FLASH ──────────────────────────────────────────
+
+    /// <summary>Flash a color overlay on screen (used for spell reactions).</summary>
+    public static void ScreenFlash(Color color, float duration = 0.15f)
+    {
+        // Create a temporary screen overlay via a world-space quad near camera
+        if (Camera.main == null) return;
+        var flash = GameObject.CreatePrimitive(PrimitiveType.Quad);
+        Object.Destroy(flash.GetComponent<MeshCollider>());
+        flash.name = "ScreenFlash";
+        flash.transform.SetParent(Camera.main.transform);
+        flash.transform.localPosition = new Vector3(0, 0, 0.5f);
+        flash.transform.localScale = new Vector3(30f, 30f, 1f);
+        flash.transform.localRotation = Quaternion.identity;
+        Color flashCol = color;
+        flashCol.a = 0.25f;
+        flash.GetComponent<Renderer>().material = ShaderCache.NewEmissive(flashCol, 2f);
+        flash.AddComponent<FlashShrink>().Init(duration);
+    }
+
+    // ─── HIT IMPACT PARTICLES ──────────────────────────────────
+
+    /// <summary>Spawn small element-colored sparks on every hit.</summary>
+    public static void SpawnHitParticles(Vector3 position, Color color, float scale = 1f)
+    {
+        int count = Random.Range(4, 8);
+        for (int i = 0; i < count; i++)
+        {
+            var spark = GameObject.CreatePrimitive(PrimitiveType.Cube);
+            Object.Destroy(spark.GetComponent<BoxCollider>());
+            spark.name = "HitSpark";
+            float s = Random.Range(0.03f, 0.07f) * scale;
+            spark.transform.localScale = new Vector3(s, s, s);
+            spark.transform.position = position + Random.insideUnitSphere * 0.2f;
+            spark.transform.rotation = Random.rotation;
+            spark.GetComponent<Renderer>().material = ShaderCache.NewEmissive(color, 3f);
+
+            var rb = spark.AddComponent<Rigidbody>();
+            rb.useGravity = true;
+            rb.mass = 0.02f;
+            Vector3 burst = Random.insideUnitSphere.normalized * Random.Range(2f, 5f);
+            burst.y = Mathf.Abs(burst.y);
+            rb.AddForce(burst, ForceMode.Impulse);
+
+            Object.Destroy(spark, Random.Range(0.2f, 0.4f));
+        }
+    }
+
+    // ─── PICKUP BURST VFX ──────────────────────────────────────
+
+    /// <summary>Brief scale-up burst when picking up items.</summary>
+    public static void SpawnPickupBurst(Vector3 position, Color color)
+    {
+        var ring = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
+        Object.Destroy(ring.GetComponent<CapsuleCollider>());
+        ring.transform.position = position + Vector3.up * 0.1f;
+        ring.transform.localScale = new Vector3(0.2f, 0.02f, 0.2f);
+        ring.GetComponent<Renderer>().material = ShaderCache.NewEmissive(color, 4f);
+        ring.AddComponent<DeathRingEffect>().Init(1.5f, 0.25f);
+    }
+
+    // ─── PLAYER DEATH VFX ──────────────────────────────────────
+
+    /// <summary>Scatter player primitives on death.</summary>
+    public static void PlayerDeathVFX(Transform player)
+    {
+        if (player == null) return;
+
+        var renderers = player.GetComponentsInChildren<Renderer>();
+        foreach (var r in renderers)
+        {
+            if (r == null) continue;
+            var mf = r.GetComponent<MeshFilter>();
+            if (mf == null || mf.sharedMesh == null) continue;
+
+            var frag = new GameObject("DeathFrag");
+            frag.transform.position = r.transform.position;
+            frag.transform.rotation = r.transform.rotation;
+            frag.transform.localScale = r.transform.lossyScale;
+
+            var fragMF = frag.AddComponent<MeshFilter>();
+            fragMF.sharedMesh = mf.sharedMesh;
+            var fragR = frag.AddComponent<MeshRenderer>();
+            fragR.material = r.material;
+
+            var rb = frag.AddComponent<Rigidbody>();
+            rb.mass = 0.2f;
+            Vector3 burst = Random.insideUnitSphere.normalized * Random.Range(3f, 7f);
+            burst.y = Mathf.Abs(burst.y) * 1.5f;
+            rb.AddForce(burst, ForceMode.Impulse);
+            rb.AddTorque(Random.insideUnitSphere * 15f, ForceMode.Impulse);
+
+            Object.Destroy(frag, Random.Range(1.5f, 2.5f));
+        }
+
+        SFXSystem.Play(SFXSystem.SFXType.PlayerDeath, player.position);
+        if (Instance != null) Instance.Hitstop(0.08f);
+        if (TopDownCamera.Instance != null) TopDownCamera.Instance.AddTrauma(0.7f);
+    }
 }
 
 // ─── HELPER COMPONENTS ──────────────────────────────────────────

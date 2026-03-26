@@ -142,6 +142,8 @@ public class PlayerController : MonoBehaviour
 
     public void RefillPotions(int perFloor) => potionsRemaining = Mathf.Min(potionsRemaining + perFloor, 9);
 
+    public void AddPotion(int count) => potionsRemaining = Mathf.Min(potionsRemaining + count, 9);
+
     bool dodgedThroughAttack;
 
     void EndIFrames()

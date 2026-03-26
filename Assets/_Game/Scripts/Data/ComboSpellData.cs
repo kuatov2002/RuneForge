@@ -67,6 +67,9 @@ public static class ComboSpellRegistry
 {
     static Dictionary<(ElementType, ElementType), ComboSpellDef> _registry;
 
+    /// <summary>All registered combo spells.</summary>
+    public static Dictionary<(ElementType, ElementType), ComboSpellDef> AllCombos => _registry;
+
     public static void Init()
     {
         _registry = new Dictionary<(ElementType, ElementType), ComboSpellDef>();

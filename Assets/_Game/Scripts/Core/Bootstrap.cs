@@ -54,9 +54,28 @@ public class Bootstrap : MonoBehaviour
     bool roomCleared;
 
     // Branching path system
-    enum NodeType { Combat, EliteCombat, Shop, Event, Rest, Boss }
+    enum NodeType { Combat, EliteCombat, Shop, Event, Rest, Boss, Treasure, Altar, Challenge }
     struct MapNode { public NodeType type; public int depth; }
     List<MapNode[]> floorMap; // floorMap[depth] = array of 2-3 node choices
+
+    // Encounter system
+    EncounterSystem currentEncounter;
+    float encounterSpawnTimer;
+    bool encounterBonusRerollFlag;
+
+    // Boss intro
+    float bossIntroTimer;
+    bool bossIntroActive;
+
+    // Lore texts per floor
+    static readonly string[][] loreTexts = new[]
+    {
+        new[] { "Ancient runes flicker on the walls...", "The air smells of dust and old magic.", "Footsteps echo in the forgotten halls." },
+        new[] { "Water drips from crystalline stalactites.", "The walls shimmer with frost runes.", "A cold wind whispers through the corridors." },
+        new[] { "Crimson light pulses from deep cracks.", "The stone is warm to the touch here.", "Embers float like fireflies in the dark." },
+        new[] { "Vines twist through corrupted stone.", "Green fog clings to the ground.", "Something grows in the shadows." },
+        new[] { "Reality bends at the edges of vision.", "The air crackles with unstable energy.", "This place should not exist." },
+    };
 
     // Hub
     bool inHub;
@@ -152,6 +171,15 @@ public class Bootstrap : MonoBehaviour
 
         // Start ambient music
         if (SFXSystem.Instance != null) SFXSystem.Instance.StartMusic();
+
+        // Codex: load discovery tracking
+        Codex.Load();
+
+        // Subscribe combo discovery
+        spellCaster.OnComboNameChanged += Codex.DiscoverCombo;
+
+        // Subscribe spell reaction feedback
+        SpellInteractionSystem.OnReaction += OnSpellReaction;
 
         // Tutorial hints (first run only)
         if (PlayerPrefs.GetInt("TutorialShown", 0) == 0)
@@ -283,6 +311,62 @@ public class Bootstrap : MonoBehaviour
                 ReturnToHub();
         }
 
+        // Boss intro sequence
+        if (bossIntroActive)
+        {
+            bossIntroTimer -= Time.deltaTime;
+            if (bossIntroTimer <= 0)
+            {
+                bossIntroActive = false;
+                hud.HideBossIntro();
+                if (cam != null) cam.ZoomTo(14f, 1f);
+                SpawnBossWave(currentFloor);
+            }
+            return; // Don't process anything else during boss intro
+        }
+
+        // Encounter timers (Survival, TimedChallenge)
+        if (currentEncounter != null && !currentEncounter.IsComplete)
+        {
+            if (currentEncounter.Type == EncounterSystem.EncounterType.Survival ||
+                currentEncounter.Type == EncounterSystem.EncounterType.TimedChallenge)
+            {
+                currentEncounter.Timer -= Time.deltaTime;
+                if (hud != null) hud.SetObjective(currentEncounter.GetObjectiveText());
+
+                if (currentEncounter.Type == EncounterSystem.EncounterType.Survival && currentEncounter.Timer <= 0)
+                {
+                    currentEncounter.IsComplete = true;
+                    hud.SetObjective("");
+                    // Survival complete — clear remaining enemies, room done
+                    foreach (var e in enemies) if (e != null) Destroy(e);
+                    enemies.Clear();
+                    enemiesAlive = 0;
+                    if (goldSystem != null) goldSystem.AddGold(currentEncounter.BonusGold);
+                    SpawnRewardPickup();
+                }
+                else if (currentEncounter.Type == EncounterSystem.EncounterType.TimedChallenge && currentEncounter.Timer <= 0)
+                {
+                    // Timer expired — no bonus, but room continues as KillAll
+                    currentEncounter.IsComplete = true;
+                    hud.SetObjective("Time's up! No bonus.");
+                }
+
+                // Survival: continuous spawning
+                if (currentEncounter.Type == EncounterSystem.EncounterType.Survival && !currentEncounter.IsComplete)
+                {
+                    encounterSpawnTimer -= Time.deltaTime;
+                    if (encounterSpawnTimer <= 0 && enemiesAlive < 8)
+                    {
+                        encounterSpawnTimer = 3f;
+                        int type = PickEnemyType(10);
+                        SpawnEnemy(type);
+                        enemiesAlive++;
+                    }
+                }
+            }
+        }
+
         // Reinforcement timer for multi-wave rooms
         if (reinforcementTimer > 0)
         {
@@ -340,6 +424,16 @@ public class Bootstrap : MonoBehaviour
             CreateCursedRelic("Cursed Gold", RelicType.CursedGold, "CURSED: 3x gold drops, enemies +30% HP", new Color(0.6f, 0.5f, 0.1f)),
             CreateCursedRelic("Blood Pact", RelicType.BloodPact, "CURSED: Spells cost 1 HP, +100% damage", new Color(0.6f, 0.05f, 0.05f)),
             CreateCursedRelic("Chaos", RelicType.Chaos, "CURSED: Random element each cast, +30% damage", new Color(0.3f, 0.1f, 0.5f)),
+
+            // Element-specific relics
+            CreateRelic("Ember Heart", RelicType.EmberHeart, "Fire spells chain to 1 extra target", new Color(1f, 0.4f, 0.1f)),
+            CreateRelic("Frost Crown", RelicType.FrostCrown, "Freeze duration +50%", new Color(0.4f, 0.75f, 1f)),
+            CreateRelic("Stone Skin", RelicType.StoneSkin, "Take 1 less damage when standing still", new Color(0.5f, 0.4f, 0.3f)),
+            CreateRelic("Gale Ring", RelicType.GaleRing, "Dash distance +30%, air zone on dash", new Color(0.7f, 0.9f, 1f)),
+            CreateRelic("Storm Conductor", RelicType.StormConductor, "+10% crit for lightning spells", new Color(1f, 1f, 0.3f)),
+            CreateRelic("Venom Sac", RelicType.VenomSac, "Poison ticks deal 1.5x damage", new Color(0.2f, 0.8f, 0.1f)),
+            CreateRelic("Void Lens", RelicType.VoidLens, "Void pull radius +40%", new Color(0.5f, 0.1f, 0.8f)),
+            CreateRelic("Prism Shard", RelicType.PrismShard, "3+ elements in 10s = +25% damage", new Color(0.9f, 0.5f, 0.9f)),
         };
     }
 
@@ -370,55 +464,67 @@ public class Bootstrap : MonoBehaviour
     void GenerateFloorMap()
     {
         floorMap = new List<MapNode[]>();
-        // 10 depths: 0=start combat, 1-3=choices, 4=shop/devilDeal, 5-6=choices, 7=rest, 8=choice, 9=boss
         for (int d = 0; d < roomsPerFloor; d++)
         {
-            if (d == 0) // First room: always combat
+            if (d == 0)
                 floorMap.Add(new[] { new MapNode { type = NodeType.Combat, depth = d } });
-            else if (d == roomsPerFloor - 1) // Last room: always boss
+            else if (d == roomsPerFloor - 1)
                 floorMap.Add(new[] { new MapNode { type = NodeType.Boss, depth = d } });
-            else if (d == 4) // Depth 4: shop or devil deal
+            else if (d == 4) // Shop depth
             {
-                if (currentFloor >= 3 && Random.value < 0.5f)
-                    floorMap.Add(new[] {
-                        new MapNode { type = NodeType.Shop, depth = d },
-                        new MapNode { type = NodeType.Event, depth = d }
-                    });
-                else
-                    floorMap.Add(new[] {
-                        new MapNode { type = NodeType.Shop, depth = d },
-                        new MapNode { type = NodeType.Combat, depth = d }
-                    });
+                var opts = new List<MapNode> { new() { type = NodeType.Shop, depth = d } };
+                opts.Add(new MapNode { type = currentFloor >= 3 ? NodeType.Altar : NodeType.Event, depth = d });
+                floorMap.Add(opts.ToArray());
             }
-            else if (d == 7) // Depth 7: rest or event
-                floorMap.Add(new[] {
-                    new MapNode { type = NodeType.Rest, depth = d },
-                    new MapNode { type = NodeType.Event, depth = d }
-                });
-            else // Choice rooms: 2-3 options
+            else if (d == 7) // Rest depth
             {
-                var options = new List<MapNode>();
-                options.Add(new MapNode { type = NodeType.Combat, depth = d });
-
-                // Second option
-                float roll = Random.value;
-                if (roll < 0.25f)
-                    options.Add(new MapNode { type = NodeType.EliteCombat, depth = d });
-                else if (roll < 0.5f)
-                    options.Add(new MapNode { type = NodeType.Event, depth = d });
-                else
-                    options.Add(new MapNode { type = NodeType.Combat, depth = d });
-
-                // Third option on later floors (50% chance)
-                if (currentFloor >= 2 && Random.value < 0.5f)
+                var opts = new List<MapNode>
                 {
-                    if (Random.value < 0.4f)
-                        options.Add(new MapNode { type = NodeType.EliteCombat, depth = d });
+                    new() { type = NodeType.Rest, depth = d },
+                    new() { type = currentFloor >= 2 ? NodeType.Altar : NodeType.Event, depth = d }
+                };
+                floorMap.Add(opts.ToArray());
+            }
+            else // All other depths: 2-3 branching choices
+            {
+                var opts = new List<MapNode>();
+                opts.Add(new MapNode { type = NodeType.Combat, depth = d });
+
+                if (d >= 5 && d <= 6 && currentFloor >= 2)
+                {
+                    // Mid-floor: offer Treasure or Challenge
+                    float roll = Random.value;
+                    if (roll < 0.3f)
+                        opts.Add(new MapNode { type = NodeType.Treasure, depth = d });
+                    else if (roll < 0.55f)
+                        opts.Add(new MapNode { type = NodeType.Challenge, depth = d });
                     else
-                        options.Add(new MapNode { type = NodeType.Event, depth = d });
+                        opts.Add(new MapNode { type = NodeType.EliteCombat, depth = d });
+                }
+                else
+                {
+                    float roll = Random.value;
+                    if (roll < 0.25f)
+                        opts.Add(new MapNode { type = NodeType.EliteCombat, depth = d });
+                    else if (roll < 0.5f)
+                        opts.Add(new MapNode { type = NodeType.Event, depth = d });
+                    else
+                        opts.Add(new MapNode { type = NodeType.Combat, depth = d });
                 }
 
-                floorMap.Add(options.ToArray());
+                // Third option on later floors
+                if (currentFloor >= 2 && Random.value < 0.5f)
+                {
+                    float roll2 = Random.value;
+                    if (roll2 < 0.3f)
+                        opts.Add(new MapNode { type = NodeType.EliteCombat, depth = d });
+                    else if (roll2 < 0.5f && currentFloor >= 3)
+                        opts.Add(new MapNode { type = NodeType.Treasure, depth = d });
+                    else
+                        opts.Add(new MapNode { type = NodeType.Event, depth = d });
+                }
+
+                floorMap.Add(opts.ToArray());
             }
         }
     }
@@ -462,10 +568,13 @@ public class Bootstrap : MonoBehaviour
     {
         NodeType.Combat => ("COMBAT", "Standard enemies", new Color(0.8f, 0.3f, 0.2f)),
         NodeType.EliteCombat => ("ELITE COMBAT", "Harder enemies, better rewards", new Color(0.9f, 0.6f, 0.1f)),
-        NodeType.Shop => ("SHOP", "Buy relics with gold", new Color(1f, 0.85f, 0.2f)),
+        NodeType.Shop => ("SHOP", "Buy relics and items with gold", new Color(1f, 0.85f, 0.2f)),
         NodeType.Event => ("EVENT", "Risk and reward", new Color(0.3f, 0.7f, 0.9f)),
-        NodeType.Rest => ("REST", "Heal to full HP", new Color(0.3f, 0.9f, 0.5f)),
+        NodeType.Rest => ("REST", "Recover and prepare", new Color(0.3f, 0.9f, 0.5f)),
         NodeType.Boss => ("BOSS", "Floor guardian", new Color(0.8f, 0.1f, 0.1f)),
+        NodeType.Treasure => ("TREASURE", "Hard fight, guaranteed relic", new Color(1f, 0.7f, 0.1f)),
+        NodeType.Altar => ("BLOOD ALTAR", "Sacrifice HP for power", new Color(0.7f, 0.1f, 0.2f)),
+        NodeType.Challenge => ("CHALLENGE", "Timed fight for bonus reward", new Color(0.9f, 0.4f, 0.9f)),
         _ => ("???", "Unknown", Color.gray)
     };
 
@@ -550,6 +659,37 @@ public class Bootstrap : MonoBehaviour
         // Floor-specific mechanics
         if (isCombatRoom && currentFloor >= 2 && player != null)
             FloorMechanics.Apply(currentRoomGO, currentFloor - 1, player.transform);
+
+        // Lore fragment: 20% chance in non-combat rooms
+        if (!isCombatRoom && !isStart && !isBossRoom && Random.value < 0.2f)
+            SpawnLoreStone(w, h);
+    }
+
+    void SpawnLoreStone(int roomW, int roomH)
+    {
+        var stone = new GameObject("LoreStone");
+        stone.transform.parent = currentRoomGO.transform;
+        Vector3 pos = new Vector3(Random.Range(2f, roomW - 2f), 0, Random.Range(2f, roomH - 2f));
+        stone.transform.localPosition = pos;
+
+        // Glowing stone visual
+        var sphere = GameObject.CreatePrimitive(PrimitiveType.Sphere);
+        Destroy(sphere.GetComponent<SphereCollider>());
+        sphere.transform.parent = stone.transform;
+        sphere.transform.localPosition = new Vector3(0, 0.4f, 0);
+        sphere.transform.localScale = Vector3.one * 0.3f;
+        sphere.GetComponent<Renderer>().material = ShaderCache.NewEmissive(new Color(0.3f, 0.6f, 1f), 3f);
+
+        var col = stone.AddComponent<SphereCollider>();
+        col.isTrigger = true;
+        col.radius = 1f;
+        col.center = new Vector3(0, 0.4f, 0);
+
+        int floorIdx = Mathf.Clamp(currentFloor - 1, 0, loreTexts.Length - 1);
+        string text = loreTexts[floorIdx][Random.Range(0, loreTexts[floorIdx].Length)];
+
+        var lore = stone.AddComponent<LoreStonePickup>();
+        lore.loreText = text;
     }
 
     void TransitionToNextRoom()
@@ -801,31 +941,171 @@ public class Bootstrap : MonoBehaviour
         hud.SetWave(wave);
         hud.SetFloorRoom(currentFloor, currentRoom);
         roomCleared = false;
+        currentEncounter = null;
 
         switch (nodeType)
         {
             case NodeType.Boss:
-                SpawnBossWave(currentFloor);
+                StartPreBossSequence();
                 return;
             case NodeType.Shop:
                 if (currentFloor >= 3 && Random.value < 0.5f)
                     StartDevilDealRoom();
                 else
-                    StartShopRoom();
+                    StartShopRoomNew();
                 return;
             case NodeType.Event:
                 StartEventRoom();
                 return;
             case NodeType.Rest:
-                StartRestRoom();
+                StartRestRoomNew();
                 return;
             case NodeType.EliteCombat:
-                SpawnCombatWave(1.5f, true); // 1.5x budget, guaranteed elite
+                SpawnCombatWaveWithEncounter(1.5f, true);
+                return;
+            case NodeType.Treasure:
+                StartTreasureRoom();
+                return;
+            case NodeType.Altar:
+                StartAltarRoom();
+                return;
+            case NodeType.Challenge:
+                StartTimedChallengeRoom();
                 return;
             default: // Combat
-                SpawnCombatWave(1f, false);
+                SpawnCombatWaveWithEncounter(1f, false);
                 return;
         }
+    }
+
+    // ─── NEW ROOM TYPES ────────────────────────────────────────
+
+    void SpawnCombatWaveWithEncounter(float budgetMult, bool forceElite)
+    {
+        // Roll encounter type for variety
+        currentEncounter = new EncounterSystem(EncounterSystem.Roll(currentFloor, currentRoom));
+
+        if (currentEncounter.Type == EncounterSystem.EncounterType.KillAll)
+        {
+            SpawnCombatWave(budgetMult, forceElite);
+            return;
+        }
+
+        SpawnCombatWave(budgetMult, forceElite);
+
+        switch (currentEncounter.Type)
+        {
+            case EncounterSystem.EncounterType.Survival:
+                hud.SetObjective(currentEncounter.GetObjectiveText());
+                break;
+            case EncounterSystem.EncounterType.TimedChallenge:
+                hud.SetObjective(currentEncounter.GetObjectiveText());
+                break;
+            case EncounterSystem.EncounterType.PriorityTarget:
+                // Mark a support enemy as priority
+                foreach (var e in enemies)
+                {
+                    if (e == null) continue;
+                    if (e.GetComponent<HealerAI>() != null || e.GetComponent<BufferAI>() != null)
+                    {
+                        // Add glowing outline
+                        var mark = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
+                        Destroy(mark.GetComponent<CapsuleCollider>());
+                        mark.name = "PriorityMark";
+                        mark.transform.parent = e.transform;
+                        mark.transform.localPosition = new Vector3(0, 0.05f, 0);
+                        mark.transform.localScale = new Vector3(1.2f, 0.02f, 1.2f);
+                        mark.GetComponent<Renderer>().material = ShaderCache.NewEmissive(new Color(1f, 0.2f, 0.2f), 5f);
+                        break;
+                    }
+                }
+                hud.SetObjective(currentEncounter.GetObjectiveText());
+                break;
+            case EncounterSystem.EncounterType.Gauntlet:
+                hud.SetObjective(currentEncounter.GetObjectiveText());
+                break;
+        }
+    }
+
+    void StartTreasureRoom()
+    {
+        SpawnCombatWave(1.8f, true); // Hard fight
+        // Reward override happens in SpawnRewardPickup — treasure rooms always give relic
+    }
+
+    void StartAltarRoom()
+    {
+        roomCleared = true;
+        hud.ShowEventRoom(
+            "BLOOD ALTAR", "Ancient power courses through this altar. What will you sacrifice?",
+            new Color(0.7f, 0.1f, 0.2f),
+            new[] { "SACRIFICE 2 HP", "SACRIFICE 1 HP", "SACRIFICE 3 HP", "LEAVE" },
+            new[] { "Gain a random relic", "Gain a spell mutation", "Heal to full + permanent +1 max HP", "Continue safely" },
+            new[] { new Color(0.8f, 0.1f, 0.15f), new Color(0.6f, 0.3f, 1f), new Color(0.3f, 0.9f, 0.4f), new Color(0.5f, 0.5f, 0.5f) },
+            choice =>
+            {
+                switch (choice)
+                {
+                    case 0:
+                        playerHealth.maxHP = Mathf.Max(1, playerHealth.maxHP - 2);
+                        if (playerHealth.currentHP > playerHealth.maxHP)
+                            playerHealth.currentHP = playerHealth.maxHP;
+                        playerHealth.InvokeHPChanged();
+                        var available = new List<RelicSO>();
+                        foreach (var r in allRelics) if (!relicMgr.HasRelic(r.relicType)) available.Add(r);
+                        if (available.Count > 0)
+                        {
+                            var relic = available[Random.Range(0, available.Count)];
+                            relicMgr.AddRelic(relic);
+                            hud.RefreshRelics(relicMgr.OwnedRelics);
+                            Codex.DiscoverRelic(relic.relicName);
+                        }
+                        break;
+                    case 1:
+                        if (SpellMutationSystem.ActiveMutations.Count < SpellMutationSystem.MaxMutations)
+                        {
+                            playerHealth.maxHP = Mathf.Max(1, playerHealth.maxHP - 1);
+                            if (playerHealth.currentHP > playerHealth.maxHP)
+                                playerHealth.currentHP = playerHealth.maxHP;
+                            playerHealth.InvokeHPChanged();
+                            var mutations = SpellMutationSystem.GenerateChoices(1);
+                            if (mutations.Length > 0) SpellMutationSystem.AddMutation(mutations[0].type);
+                        }
+                        break;
+                    case 2:
+                        playerHealth.maxHP = Mathf.Max(1, playerHealth.maxHP - 3);
+                        if (playerHealth.currentHP > playerHealth.maxHP)
+                            playerHealth.currentHP = playerHealth.maxHP;
+                        playerHealth.maxHP += 1;
+                        playerHealth.Heal(playerHealth.maxHP);
+                        break;
+                }
+                SFXSystem.Play(SFXSystem.SFXType.LevelUp, player.transform.position);
+                hud.Refresh();
+                TransitionToNextRoom();
+            });
+    }
+
+    void StartTimedChallengeRoom()
+    {
+        currentEncounter = new EncounterSystem(EncounterSystem.EncounterType.TimedChallenge);
+        SpawnCombatWave(1f, false);
+        hud.SetObjective(currentEncounter.GetObjectiveText());
+    }
+
+    void StartPreBossSequence()
+    {
+        bossIntroActive = true;
+        bossIntroTimer = 2.5f;
+
+        string bossName = GetBossName(currentFloor);
+        int loreIdx = Mathf.Clamp(currentFloor - 1, 0, loreTexts.Length - 1);
+        string lore = loreTexts[loreIdx][Random.Range(0, loreTexts[loreIdx].Length)];
+
+        hud.ShowBossIntro(bossName, lore);
+        SFXSystem.Play(SFXSystem.SFXType.BossIntro, player.transform.position);
+
+        if (cam != null) cam.ZoomTo(10f, 2f);
     }
 
     // Keep SpawnWave as alias for first room
@@ -962,10 +1242,47 @@ public class Bootstrap : MonoBehaviour
                 {
                     relicMgr.AddRelic(relic);
                     hud.RefreshRelics(relicMgr.OwnedRelics);
+                    Codex.DiscoverRelic(relic.relicName);
                 }
             }
             TransitionToNextRoom();
         });
+    }
+
+    void StartShopRoomNew()
+    {
+        roomCleared = true;
+        var items = ShopSystem.GenerateInventory(currentFloor, allRelics, relicMgr,
+            SpellMutationSystem.ActiveMutations.Count);
+
+        hud.ShowShopRoomNew(items, goldSystem != null ? goldSystem.Gold : 0, (item, idx) =>
+        {
+            if (goldSystem == null || !goldSystem.TrySpend(item.price)) return false;
+
+            switch (item.type)
+            {
+                case ShopSystem.ShopItemType.Relic:
+                case ShopSystem.ShopItemType.CursedRelic:
+                    if (item.relic != null)
+                    {
+                        relicMgr.AddRelic(item.relic);
+                        hud.RefreshRelics(relicMgr.OwnedRelics);
+                        Codex.DiscoverRelic(item.relic.relicName);
+                    }
+                    break;
+                case ShopSystem.ShopItemType.Mutation:
+                    SpellMutationSystem.AddMutation(item.mutation.type);
+                    break;
+                case ShopSystem.ShopItemType.Potion:
+                    if (playerCtrl != null) playerCtrl.AddPotion(1);
+                    break;
+                case ShopSystem.ShopItemType.Reroll:
+                    encounterBonusRerollFlag = true;
+                    break;
+            }
+            SFXSystem.Play(SFXSystem.SFXType.ShopBuy, player.transform.position);
+            return true;
+        }, () => TransitionToNextRoom());
     }
 
     void StartDevilDealRoom()
@@ -1184,6 +1501,55 @@ public class Bootstrap : MonoBehaviour
         if (playerHealth != null)
             playerHealth.Heal(playerHealth.maxHP);
         hud.ShowRestRoom(() => TransitionToNextRoom());
+    }
+
+    void StartRestRoomNew()
+    {
+        roomCleared = true;
+        // Check if player has any cursed relics
+        bool hasCurse = false;
+        if (relicMgr != null)
+            foreach (var r in relicMgr.OwnedRelics)
+                if (r.isCursed) { hasCurse = true; break; }
+
+        string[] labels = hasCurse
+            ? new[] { "REST & HEAL", "UPGRADE POTIONS", "PURIFY CURSE" }
+            : new[] { "REST & HEAL", "UPGRADE POTIONS", "MEDITATE" };
+        string[] descs = hasCurse
+            ? new[] { "Heal to full HP", "+1 potion capacity", "Remove a cursed relic" }
+            : new[] { "Heal to full HP", "+1 potion capacity", "+1 max HP" };
+        Color[] cols = new[] { new Color(0.3f, 0.9f, 0.4f), new Color(0.3f, 0.7f, 1f), new Color(0.8f, 0.6f, 1f) };
+
+        hud.ShowEventRoom("REST SITE", "A safe haven to recover...", new Color(0.3f, 0.9f, 0.5f),
+            labels, descs, cols, choice =>
+            {
+                switch (choice)
+                {
+                    case 0:
+                        if (playerHealth != null) playerHealth.Heal(playerHealth.maxHP);
+                        break;
+                    case 1:
+                        if (playerCtrl != null) playerCtrl.AddPotion(1);
+                        break;
+                    case 2:
+                        if (hasCurse && relicMgr != null)
+                        {
+                            foreach (var r in relicMgr.OwnedRelics)
+                            {
+                                if (r.isCursed) { relicMgr.RemoveRelic(r); break; }
+                            }
+                            hud.RefreshRelics(relicMgr.OwnedRelics);
+                        }
+                        else
+                        {
+                            if (playerHealth != null) { playerHealth.maxHP += 1; playerHealth.Heal(1); }
+                        }
+                        break;
+                }
+                SFXSystem.Play(SFXSystem.SFXType.LevelUp, player.transform.position);
+                hud.Refresh();
+                TransitionToNextRoom();
+            });
     }
 
     // ─── NEW EVENT ROOMS ─────────────────────────────────────────
@@ -1443,7 +1809,29 @@ public class Bootstrap : MonoBehaviour
     void SpawnShambler()
     {
         var e = new GameObject("Shambler"); Color c = new(0.75f, 0.15f, 0.15f);
-        AddCapsuleCol(e, 1.2f, 0.35f, 0.6f); BuildBody(e.transform, c, 1f);
+        AddCapsuleCol(e, 1.2f, 0.35f, 0.6f);
+        // Hunched body - tilted torso
+        var body = GameObject.CreatePrimitive(PrimitiveType.Capsule);
+        body.name = "Body"; Destroy(body.GetComponent<CapsuleCollider>());
+        body.transform.parent = e.transform; body.transform.localPosition = new Vector3(0, 0.4f, 0.1f);
+        body.transform.localScale = new Vector3(0.55f, 0.35f, 0.5f);
+        body.transform.localRotation = Quaternion.Euler(15, 0, 0); // hunched forward
+        body.GetComponent<Renderer>().material = MakeLit(c);
+        // Small head tucked forward
+        var head = GameObject.CreatePrimitive(PrimitiveType.Sphere);
+        head.name = "Head"; Destroy(head.GetComponent<SphereCollider>());
+        head.transform.parent = e.transform; head.transform.localPosition = new Vector3(0, 0.8f, 0.15f);
+        head.transform.localScale = new Vector3(0.3f, 0.28f, 0.3f);
+        head.GetComponent<Renderer>().material = MakeLit(c * 0.8f);
+        CreateEye(e.transform, new Vector3(-0.08f, 0.85f, 0.28f), new Color(1f, 0.3f, 0.1f));
+        CreateEye(e.transform, new Vector3(0.08f, 0.85f, 0.28f), new Color(1f, 0.3f, 0.1f));
+        // Asymmetric arms (one longer)
+        CreateArm(e.transform, new Vector3(-0.32f, 0.35f, 0.15f), c * 0.9f);
+        var longArm = GameObject.CreatePrimitive(PrimitiveType.Cube);
+        longArm.name = "LongArm"; Destroy(longArm.GetComponent<BoxCollider>());
+        longArm.transform.parent = e.transform; longArm.transform.localPosition = new Vector3(0.32f, 0.3f, 0.15f);
+        longArm.transform.localScale = new Vector3(0.12f, 0.45f, 0.12f);
+        longArm.GetComponent<Renderer>().material = MakeLit(c * 0.9f);
         RegisterEnemy(e, 12 + wave * 3);
         var ai = e.AddComponent<ShamblerAI>(); ai.moveSpeed = 2.5f + wave * 0.15f; ai.baseColor = c; ai.floorLevel = currentFloor;
     }
@@ -1465,7 +1853,32 @@ public class Bootstrap : MonoBehaviour
     void SpawnBrute()
     {
         var e = new GameObject("Brute"); Color c = new(0.5f, 0.2f, 0.15f);
-        AddCapsuleCol(e, 1.6f, 0.5f, 0.8f); BuildBody(e.transform, c, 1.4f);
+        AddCapsuleCol(e, 1.6f, 0.5f, 0.8f);
+        // Wide body
+        var body = GameObject.CreatePrimitive(PrimitiveType.Cube);
+        body.name = "Body"; Destroy(body.GetComponent<BoxCollider>());
+        body.transform.parent = e.transform; body.transform.localPosition = new Vector3(0, 0.6f, 0);
+        body.transform.localScale = new Vector3(0.9f, 0.5f, 0.6f);
+        body.GetComponent<Renderer>().material = MakeLit(c);
+        // Helmet
+        var helmet = GameObject.CreatePrimitive(PrimitiveType.Cube);
+        helmet.name = "Helmet"; Destroy(helmet.GetComponent<BoxCollider>());
+        helmet.transform.parent = e.transform; helmet.transform.localPosition = new Vector3(0, 1.15f, 0);
+        helmet.transform.localScale = new Vector3(0.45f, 0.35f, 0.4f);
+        helmet.GetComponent<Renderer>().material = MakeLit(c * 0.7f);
+        // Big arm cubes
+        var armL = GameObject.CreatePrimitive(PrimitiveType.Cube);
+        armL.name = "ArmL"; Destroy(armL.GetComponent<BoxCollider>());
+        armL.transform.parent = e.transform; armL.transform.localPosition = new Vector3(-0.55f, 0.5f, 0.1f);
+        armL.transform.localScale = new Vector3(0.22f, 0.55f, 0.2f);
+        armL.GetComponent<Renderer>().material = MakeLit(c * 0.85f);
+        var armR = GameObject.CreatePrimitive(PrimitiveType.Cube);
+        armR.name = "ArmR"; Destroy(armR.GetComponent<BoxCollider>());
+        armR.transform.parent = e.transform; armR.transform.localPosition = new Vector3(0.55f, 0.5f, 0.1f);
+        armR.transform.localScale = new Vector3(0.22f, 0.55f, 0.2f);
+        armR.GetComponent<Renderer>().material = MakeLit(c * 0.85f);
+        CreateEye(e.transform, new Vector3(-0.12f, 1.2f, 0.18f), new Color(1f, 0.3f, 0.1f));
+        CreateEye(e.transform, new Vector3(0.12f, 1.2f, 0.18f), new Color(1f, 0.3f, 0.1f));
         RegisterEnemy(e, 30 + wave * 8);
         e.AddComponent<BruteAI>().baseColor = c;
     }
@@ -1477,8 +1890,19 @@ public class Bootstrap : MonoBehaviour
         var body = GameObject.CreatePrimitive(PrimitiveType.Sphere);
         body.name = "Body"; Destroy(body.GetComponent<SphereCollider>());
         body.transform.parent = e.transform; body.transform.localPosition = new Vector3(0, 0.2f, 0);
-        body.transform.localScale = Vector3.one * 0.25f;
+        body.transform.localScale = Vector3.one * 0.22f;
         body.GetComponent<Renderer>().material = MakeLit(c);
+        // Orbiting mini-spheres
+        for (int i = 0; i < 3; i++)
+        {
+            var orb = GameObject.CreatePrimitive(PrimitiveType.Sphere);
+            orb.name = "SwarmOrb"; Destroy(orb.GetComponent<SphereCollider>());
+            orb.transform.parent = e.transform;
+            float angle = i * 120f * Mathf.Deg2Rad;
+            orb.transform.localPosition = new Vector3(Mathf.Cos(angle) * 0.18f, 0.2f, Mathf.Sin(angle) * 0.18f);
+            orb.transform.localScale = Vector3.one * 0.07f;
+            orb.GetComponent<Renderer>().material = ShaderCache.NewEmissive(c * 1.5f, 2f);
+        }
         CreateEye(e.transform, new Vector3(0, 0.3f, 0.1f), new Color(1f, 0.8f, 0.1f));
         RegisterEnemy(e, 3 + wave);
         e.AddComponent<SwarmAI>().baseColor = c;
@@ -1487,7 +1911,23 @@ public class Bootstrap : MonoBehaviour
     void SpawnMirror()
     {
         var e = new GameObject("Mirror"); Color c = new(0.7f, 0.7f, 0.75f);
-        AddCapsuleCol(e, 1.2f, 0.35f, 0.6f); BuildBody(e.transform, c, 1f);
+        AddCapsuleCol(e, 1.2f, 0.35f, 0.6f);
+        // Diamond-shaped body (rotated cube)
+        var body = GameObject.CreatePrimitive(PrimitiveType.Cube);
+        body.name = "Body"; Destroy(body.GetComponent<BoxCollider>());
+        body.transform.parent = e.transform; body.transform.localPosition = new Vector3(0, 0.55f, 0);
+        body.transform.localScale = new Vector3(0.45f, 0.45f, 0.45f);
+        body.transform.localRotation = Quaternion.Euler(0, 45, 45); // diamond rotation
+        body.GetComponent<Renderer>().material = ShaderCache.NewMetal(c);
+        // Reflective head prism
+        var head = GameObject.CreatePrimitive(PrimitiveType.Cube);
+        head.name = "Head"; Destroy(head.GetComponent<BoxCollider>());
+        head.transform.parent = e.transform; head.transform.localPosition = new Vector3(0, 0.95f, 0);
+        head.transform.localScale = new Vector3(0.25f, 0.25f, 0.25f);
+        head.transform.localRotation = Quaternion.Euler(0, 45, 0);
+        head.GetComponent<Renderer>().material = ShaderCache.NewMetal(new Color(0.85f, 0.85f, 0.9f));
+        CreateEye(e.transform, new Vector3(-0.08f, 1.0f, 0.12f), new Color(0.8f, 0.8f, 1f));
+        CreateEye(e.transform, new Vector3(0.08f, 1.0f, 0.12f), new Color(0.8f, 0.8f, 1f));
         RegisterEnemy(e, 18 + wave * 3);
         e.AddComponent<MirrorAI>().baseColor = c;
     }
@@ -1508,13 +1948,33 @@ public class Bootstrap : MonoBehaviour
     void SpawnHealer()
     {
         var e = new GameObject("Healer"); Color c = new(0.2f, 0.8f, 0.3f);
-        AddCapsuleCol(e, 1.1f, 0.3f, 0.55f); BuildBody(e.transform, c, 0.85f);
-        // Staff visual
+        AddCapsuleCol(e, 1.1f, 0.3f, 0.55f);
+        // Robed body (cylinder)
+        var robe = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
+        robe.name = "Robe"; Destroy(robe.GetComponent<CapsuleCollider>());
+        robe.transform.parent = e.transform; robe.transform.localPosition = new Vector3(0, 0.35f, 0);
+        robe.transform.localScale = new Vector3(0.4f, 0.35f, 0.4f);
+        robe.GetComponent<Renderer>().material = MakeLit(c * 0.7f);
+        // Hooded head
+        var hood = GameObject.CreatePrimitive(PrimitiveType.Sphere);
+        hood.name = "Hood"; Destroy(hood.GetComponent<SphereCollider>());
+        hood.transform.parent = e.transform; hood.transform.localPosition = new Vector3(0, 0.8f, 0);
+        hood.transform.localScale = new Vector3(0.3f, 0.28f, 0.32f);
+        hood.GetComponent<Renderer>().material = MakeLit(c * 0.5f);
+        // Glowing healing orb above head
+        var orb = GameObject.CreatePrimitive(PrimitiveType.Sphere);
+        orb.name = "HealOrb"; Destroy(orb.GetComponent<SphereCollider>());
+        orb.transform.parent = e.transform; orb.transform.localPosition = new Vector3(0, 1.15f, 0);
+        orb.transform.localScale = Vector3.one * 0.15f;
+        orb.GetComponent<Renderer>().material = ShaderCache.NewEmissive(new Color(0.3f, 1f, 0.4f), 4f);
+        // Staff
         var staff = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
         staff.name = "Staff"; Destroy(staff.GetComponent<CapsuleCollider>());
         staff.transform.parent = e.transform; staff.transform.localPosition = new Vector3(0.25f, 0.5f, 0.1f);
         staff.transform.localScale = new Vector3(0.04f, 0.4f, 0.04f);
         staff.GetComponent<Renderer>().material = ShaderCache.NewEmissive(new Color(0.3f, 1f, 0.4f), 2f);
+        CreateEye(e.transform, new Vector3(-0.06f, 0.83f, 0.14f), new Color(0.3f, 1f, 0.4f));
+        CreateEye(e.transform, new Vector3(0.06f, 0.83f, 0.14f), new Color(0.3f, 1f, 0.4f));
         RegisterEnemy(e, 8 + wave * 2);
         e.AddComponent<HealerAI>().baseColor = c;
     }
@@ -1522,8 +1982,28 @@ public class Bootstrap : MonoBehaviour
     void SpawnBuffer()
     {
         var e = new GameObject("Buffer"); Color c = new(0.9f, 0.55f, 0.1f);
-        AddCapsuleCol(e, 1.3f, 0.38f, 0.63f); BuildBody(e.transform, c, 1.05f);
-        // War horn visual
+        AddCapsuleCol(e, 1.3f, 0.38f, 0.63f);
+        // Drum-shaped body (wide cylinder)
+        var drum = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
+        drum.name = "Drum"; Destroy(drum.GetComponent<CapsuleCollider>());
+        drum.transform.parent = e.transform; drum.transform.localPosition = new Vector3(0, 0.4f, 0);
+        drum.transform.localScale = new Vector3(0.55f, 0.3f, 0.55f);
+        drum.GetComponent<Renderer>().material = MakeLit(c);
+        // Symbol disc on top
+        var disc = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
+        disc.name = "Symbol"; Destroy(disc.GetComponent<CapsuleCollider>());
+        disc.transform.parent = e.transform; disc.transform.localPosition = new Vector3(0, 0.72f, 0);
+        disc.transform.localScale = new Vector3(0.35f, 0.02f, 0.35f);
+        disc.GetComponent<Renderer>().material = ShaderCache.NewEmissive(new Color(1f, 0.8f, 0.1f), 3f);
+        // Head
+        var head = GameObject.CreatePrimitive(PrimitiveType.Sphere);
+        head.name = "Head"; Destroy(head.GetComponent<SphereCollider>());
+        head.transform.parent = e.transform; head.transform.localPosition = new Vector3(0, 0.95f, 0.05f);
+        head.transform.localScale = new Vector3(0.32f, 0.3f, 0.32f);
+        head.GetComponent<Renderer>().material = MakeLit(c * 0.8f);
+        CreateEye(e.transform, new Vector3(-0.08f, 1.0f, 0.15f), new Color(1f, 0.8f, 0.1f));
+        CreateEye(e.transform, new Vector3(0.08f, 1.0f, 0.15f), new Color(1f, 0.8f, 0.1f));
+        // War horn
         var horn = GameObject.CreatePrimitive(PrimitiveType.Capsule);
         horn.name = "Horn"; Destroy(horn.GetComponent<CapsuleCollider>());
         horn.transform.parent = e.transform; horn.transform.localPosition = new Vector3(0.3f, 0.6f, 0.2f);
@@ -1734,6 +2214,11 @@ public class Bootstrap : MonoBehaviour
         if (relicMgr != null && relicMgr.HasRelic(RelicType.CursedGold))
             goldDrop *= 3;
         GoldSystem.SpawnGoldDrop(boss.transform.position, goldDrop);
+
+        // Post-boss victory splash
+        string bossName = GetBossName(currentFloor);
+        hud.ShowBossVictorySplash(bossName, playerHealth.currentHP, playerHealth.maxHP);
+
         // bossActive stays true so ShowRuneSelection knows to advance floor
         SpawnRewardPickup();
     }
@@ -1873,6 +2358,13 @@ public class Bootstrap : MonoBehaviour
     {
         roomCleared = true;
 
+        // Treasure rooms: always offer relic
+        if (currentNodeType == NodeType.Treasure)
+        {
+            ShowRelicSelection();
+            return;
+        }
+
         // Every 3rd room: offer relic choice instead of upgrade
         if (currentRoom % 3 == 0 && !bossActive)
         {
@@ -1880,13 +2372,28 @@ public class Bootstrap : MonoBehaviour
             return;
         }
 
+        // Brief slow-motion when upgrade appears
+        Time.timeScale = 0.15f;
+
         // Dead Cells style: choose one of three stat upgrades
         var choices = RunUpgradeSystem.GenerateChoices(3);
 
         hud.ShowUpgradeSelection(choices, idx =>
         {
+            Time.timeScale = 1f;
             RunUpgradeSystem.ApplyUpgrade(spellCaster, choices[idx]);
             SFXSystem.Play(SFXSystem.SFXType.LevelUp, player.transform.position);
+
+            // Timed challenge: award bonus if completed in time
+            if (currentEncounter != null &&
+                currentEncounter.Type == EncounterSystem.EncounterType.TimedChallenge &&
+                !currentEncounter.BonusAwarded && currentEncounter.Timer > 0)
+            {
+                currentEncounter.BonusAwarded = true;
+                if (goldSystem != null) goldSystem.AddGold(currentEncounter.BonusGold);
+                hud.SetObjective($"BONUS: +{currentEncounter.BonusGold} gold!");
+            }
+
             if (bossActive)
             {
                 // After boss: also offer synergy + element unlock
@@ -1894,6 +2401,7 @@ public class Bootstrap : MonoBehaviour
                 ShowPostBossRewards();
                 return;
             }
+            hud.SetObjective("");
             TransitionToNextRoom();
         });
     }
@@ -2009,17 +2517,49 @@ public class Bootstrap : MonoBehaviour
         isPlayerDead = true;
         MetaProgression.RecordFloor(currentFloor);
         int metaReward = MetaProgression.AwardDeathCurrency(currentFloor, currentRoom, enemiesKilledThisRun);
+
+        // Death VFX: scatter player model + screen effects
+        GameFeel.PlayerDeathVFX(player.transform);
+
+        // Brief slow-mo then show death screen
+        if (GameFeel.Instance != null) GameFeel.Instance.Hitstop(0.1f);
+
         hud.ShowDeath(true, metaReward, currentFloor, currentRoom, enemiesKilledThisRun);
         playerCtrl.enabled = false;
         spellCaster.enabled = false;
+
+        // Hide player renderers
+        foreach (var r in player.GetComponentsInChildren<Renderer>())
+            if (r != null) r.enabled = false;
     }
 
     void ReturnToHub()
     {
         isPlayerDead = false;
         if (SFXSystem.Instance != null) SFXSystem.Instance.StopMusic();
+        SpellInteractionSystem.OnReaction -= OnSpellReaction;
         CleanupRun();
         EnterHub();
+    }
+
+    // ─── SPELL REACTION HANDLER ──────────────────────────────────
+
+    void OnSpellReaction(string name, Vector3 pos, Color color)
+    {
+        // Reaction popup label in HUD
+        if (hud != null) hud.SpawnReactionLabel(name, pos, color);
+
+        // Codex discovery
+        Codex.DiscoverReaction(name, pos, color);
+
+        // Screen flash
+        GameFeel.ScreenFlash(color, 0.12f);
+
+        // Hit particles at reaction point
+        GameFeel.SpawnHitParticles(pos + Vector3.up * 0.3f, color, 1.5f);
+
+        // Sound
+        SFXSystem.Play(SFXSystem.SFXType.Reaction, pos);
     }
 
     // ─── MATERIAL HELPERS ─────────────────────────────────────────

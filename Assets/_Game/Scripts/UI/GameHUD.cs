@@ -1147,6 +1147,311 @@ public class GameHUD : MonoBehaviour
             _ => onContinue());
     }
 
+    // ── NEW: Objective label ──
+    Label objectiveLabel;
+
+    public void SetObjective(string text)
+    {
+        if (objectiveLabel == null)
+        {
+            objectiveLabel = Lbl("", 22, new Color(1f, 0.9f, 0.3f), FontStyle.Bold);
+            objectiveLabel.style.position = Position.Absolute;
+            objectiveLabel.style.top = 60;
+            objectiveLabel.style.left = new StyleLength(Length.Percent(50));
+            objectiveLabel.style.translate = new StyleTranslate(new Translate(Length.Percent(-50), 0));
+            objectiveLabel.pickingMode = PickingMode.Ignore;
+            uiDoc.rootVisualElement.Add(objectiveLabel);
+        }
+        objectiveLabel.text = text;
+        objectiveLabel.style.display = string.IsNullOrEmpty(text) ? DisplayStyle.None : DisplayStyle.Flex;
+    }
+
+    // ── NEW: Reaction popup labels ──
+
+    public void SpawnReactionLabel(string name, Vector3 worldPos, Color color)
+    {
+        if (damageNumberLayer == null || Camera.main == null) return;
+
+        var label = Lbl(name, 26, color, FontStyle.Bold);
+        label.style.position = Position.Absolute;
+        label.pickingMode = PickingMode.Ignore;
+        label.style.textShadow = new TextShadow { offset = new Vector2(1, 1), blurRadius = 2, color = Color.black };
+
+        Vector3 screen = Camera.main.WorldToScreenPoint(worldPos + Vector3.up * 1.5f);
+        if (screen.z > 0)
+        {
+            label.style.left = screen.x - 40;
+            label.style.top = Screen.height - screen.y;
+        }
+        damageNumberLayer.Add(label);
+
+        activeDamageNumbers.Add(new DamageNumberState
+        {
+            label = label,
+            worldPos = worldPos + Vector3.up * 1.5f,
+            elapsed = 0,
+            duration = 1.2f,
+            velocity = new Vector3(0, 1.5f, 0)
+        });
+    }
+
+    // ── NEW: Shop Room (full inventory) ──
+
+    public void ShowShopRoomNew(ShopSystem.ShopItem[] items, int gold, Func<ShopSystem.ShopItem, int, bool> onBuy, Action onLeave)
+    {
+        var overlay = CreateOverlay();
+        var panel = CreatePanel(overlay, "SHOP", new Color(1f, 0.85f, 0.2f));
+
+        var goldRow = new VisualElement();
+        goldRow.style.flexDirection = FlexDirection.Row;
+        goldRow.style.justifyContent = Justify.Center;
+        goldRow.style.marginBottom = 10;
+        var goldLbl = Lbl($"Gold: {gold}", 20, new Color(1f, 0.85f, 0.2f), FontStyle.Bold);
+        goldRow.Add(goldLbl);
+        panel.Add(goldRow);
+
+        var grid = new VisualElement();
+        grid.style.flexDirection = FlexDirection.Row;
+        grid.style.flexWrap = Wrap.Wrap;
+        grid.style.justifyContent = Justify.Center;
+
+        for (int i = 0; i < items.Length; i++)
+        {
+            var item = items[i];
+            int idx = i;
+            var card = CreateCard(item.name, $"{item.description}\n\nPrice: {item.price}g", item.color, () =>
+            {
+                if (onBuy(item, idx))
+                {
+                    gold = GoldSystem.Instance != null ? GoldSystem.Instance.Gold : 0;
+                    goldLbl.text = $"Gold: {gold}";
+                }
+            });
+            card.style.width = 180;
+            card.style.marginLeft = 6;
+            card.style.marginRight = 6;
+            grid.Add(card);
+        }
+        panel.Add(grid);
+
+        var leaveBtn = CreateButton("LEAVE SHOP", new Color(0.5f, 0.5f, 0.5f), () =>
+        {
+            overlay.RemoveFromHierarchy();
+            onLeave();
+        });
+        leaveBtn.style.marginTop = 16;
+        panel.Add(leaveBtn);
+    }
+
+    // ── NEW: Boss Intro ──
+
+    VisualElement bossIntroOverlay;
+
+    public void ShowBossIntro(string bossName, string lore)
+    {
+        bossIntroOverlay = new VisualElement();
+        bossIntroOverlay.style.position = Position.Absolute;
+        bossIntroOverlay.style.top = 0; bossIntroOverlay.style.left = 0;
+        bossIntroOverlay.style.right = 0; bossIntroOverlay.style.bottom = 0;
+        bossIntroOverlay.style.backgroundColor = new Color(0, 0, 0, 0.7f);
+        bossIntroOverlay.style.justifyContent = Justify.Center;
+        bossIntroOverlay.style.alignItems = Align.Center;
+        bossIntroOverlay.pickingMode = PickingMode.Ignore;
+
+        var nameLabel = Lbl(bossName, 48, new Color(0.9f, 0.15f, 0.15f), FontStyle.Bold);
+        nameLabel.style.letterSpacing = 6;
+        bossIntroOverlay.Add(nameLabel);
+
+        var loreLabel = Lbl(lore, 18, new Color(0.7f, 0.7f, 0.75f), FontStyle.Italic);
+        loreLabel.style.marginTop = 12;
+        bossIntroOverlay.Add(loreLabel);
+
+        uiDoc.rootVisualElement.Add(bossIntroOverlay);
+    }
+
+    public void HideBossIntro()
+    {
+        if (bossIntroOverlay != null)
+        {
+            bossIntroOverlay.RemoveFromHierarchy();
+            bossIntroOverlay = null;
+        }
+    }
+
+    // ── NEW: Boss Victory Splash ──
+
+    public void ShowBossVictorySplash(string bossName, int hpRemaining, int maxHP)
+    {
+        var splash = new VisualElement();
+        splash.style.position = Position.Absolute;
+        splash.style.top = 0; splash.style.left = 0;
+        splash.style.right = 0; splash.style.bottom = 0;
+        splash.style.backgroundColor = new Color(0, 0, 0, 0.5f);
+        splash.style.justifyContent = Justify.Center;
+        splash.style.alignItems = Align.Center;
+        splash.pickingMode = PickingMode.Ignore;
+
+        var defeatLabel = Lbl($"{bossName} DEFEATED", 36, new Color(1f, 0.85f, 0.2f), FontStyle.Bold);
+        splash.Add(defeatLabel);
+
+        var statsLabel = Lbl($"HP Remaining: {hpRemaining}/{maxHP}", 18, new Color(0.7f, 0.9f, 0.7f));
+        statsLabel.style.marginTop = 8;
+        splash.Add(statsLabel);
+
+        uiDoc.rootVisualElement.Add(splash);
+
+        // Auto-hide after 2 seconds
+        StartCoroutine(HideAfterDelay(splash, 2f));
+    }
+
+    System.Collections.IEnumerator HideAfterDelay(VisualElement element, float delay)
+    {
+        yield return new WaitForSeconds(delay);
+        if (element != null) element.RemoveFromHierarchy();
+    }
+
+    // ── NEW: Codex overlay ──
+
+    public void ShowCodex()
+    {
+        var overlay = CreateOverlay();
+        var panel = CreatePanel(overlay, "CODEX", new Color(0.3f, 0.7f, 0.9f));
+        panel.style.maxHeight = 500;
+        panel.style.overflow = Overflow.Hidden;
+
+        var scroll = new ScrollView(ScrollViewMode.Vertical);
+        scroll.style.flexGrow = 1;
+
+        // Combos section
+        var comboHeader = Lbl($"COMBOS ({Codex.DiscoveredComboCount}/{Codex.TotalComboCount})", 18, new Color(0.3f, 0.7f, 0.9f), FontStyle.Bold);
+        comboHeader.style.marginBottom = 8;
+        scroll.Add(comboHeader);
+
+        if (ComboSpellRegistry.AllCombos != null)
+        {
+            foreach (var combo in ComboSpellRegistry.AllCombos)
+            {
+                bool discovered = Codex.IsComboDiscovered(combo.Value.comboName);
+                var row = new VisualElement();
+                row.style.flexDirection = FlexDirection.Row;
+                row.style.marginBottom = 4;
+                row.style.paddingLeft = 8;
+
+                string name = discovered ? combo.Value.comboName : "???";
+                Color col = discovered ? new Color(0.9f, 0.9f, 0.95f) : new Color(0.4f, 0.4f, 0.45f);
+                var lbl = Lbl(name, 14, col);
+                row.Add(lbl);
+                scroll.Add(row);
+            }
+        }
+
+        // Reactions section
+        var reactHeader = Lbl($"REACTIONS ({Codex.DiscoveredReactions.Count})", 18, new Color(1f, 0.7f, 0.2f), FontStyle.Bold);
+        reactHeader.style.marginTop = 12;
+        reactHeader.style.marginBottom = 8;
+        scroll.Add(reactHeader);
+
+        foreach (var r in Codex.DiscoveredReactions)
+        {
+            var lbl = Lbl(r, 14, new Color(1f, 0.85f, 0.3f));
+            lbl.style.paddingLeft = 8;
+            lbl.style.marginBottom = 2;
+            scroll.Add(lbl);
+        }
+
+        panel.Add(scroll);
+
+        var closeBtn = CreateButton("CLOSE", new Color(0.5f, 0.5f, 0.5f), () => overlay.RemoveFromHierarchy());
+        closeBtn.style.marginTop = 12;
+        panel.Add(closeBtn);
+    }
+
+    // Helper: create overlay
+    VisualElement CreateOverlay()
+    {
+        var overlay = new VisualElement();
+        overlay.style.position = Position.Absolute;
+        overlay.style.top = 0; overlay.style.left = 0;
+        overlay.style.right = 0; overlay.style.bottom = 0;
+        overlay.style.backgroundColor = new Color(0, 0, 0, 0.75f);
+        overlay.style.justifyContent = Justify.Center;
+        overlay.style.alignItems = Align.Center;
+        uiDoc.rootVisualElement.Add(overlay);
+        return overlay;
+    }
+
+    // Helper: create panel inside overlay
+    VisualElement CreatePanel(VisualElement overlay, string title, Color titleColor)
+    {
+        var panel = new VisualElement();
+        panel.style.backgroundColor = CardBg;
+        panel.style.paddingTop = 20; panel.style.paddingBottom = 20;
+        panel.style.paddingLeft = 24; panel.style.paddingRight = 24;
+        Radius(panel, 12);
+        panel.style.alignItems = Align.Center;
+        panel.style.minWidth = 400;
+
+        var titleLabel = Lbl(title, 28, titleColor, FontStyle.Bold);
+        titleLabel.style.marginBottom = 12;
+        panel.Add(titleLabel);
+
+        overlay.Add(panel);
+        return panel;
+    }
+
+    // Helper: create styled card
+    VisualElement CreateCard(string title, string desc, Color color, Action onClick)
+    {
+        var card = new VisualElement();
+        card.style.backgroundColor = CardBg;
+        card.style.borderTopColor = card.style.borderBottomColor =
+            card.style.borderLeftColor = card.style.borderRightColor = color;
+        card.style.borderTopWidth = card.style.borderBottomWidth =
+            card.style.borderLeftWidth = card.style.borderRightWidth = 2;
+        Radius(card, 8);
+        card.style.paddingTop = 10; card.style.paddingBottom = 10;
+        card.style.paddingLeft = 12; card.style.paddingRight = 12;
+        card.style.marginBottom = 8;
+
+        var titleLbl = Lbl(title, 16, color, FontStyle.Bold);
+        card.Add(titleLbl);
+
+        var descLbl = Lbl(desc, 12, Dim);
+        descLbl.style.marginTop = 4;
+        descLbl.style.whiteSpace = WhiteSpace.Normal;
+        card.Add(descLbl);
+
+        card.RegisterCallback<ClickEvent>(_ => onClick());
+        card.RegisterCallback<MouseEnterEvent>(_ => card.style.backgroundColor = CardBgHover);
+        card.RegisterCallback<MouseLeaveEvent>(_ => card.style.backgroundColor = CardBg);
+
+        return card;
+    }
+
+    // Helper: create styled button
+    VisualElement CreateButton(string text, Color color, Action onClick)
+    {
+        var btn = new VisualElement();
+        btn.style.backgroundColor = new Color(color.r * 0.3f, color.g * 0.3f, color.b * 0.3f, 0.9f);
+        btn.style.borderTopColor = btn.style.borderBottomColor =
+            btn.style.borderLeftColor = btn.style.borderRightColor = color;
+        btn.style.borderTopWidth = btn.style.borderBottomWidth =
+            btn.style.borderLeftWidth = btn.style.borderRightWidth = 2;
+        Radius(btn, 6);
+        btn.style.paddingTop = 8; btn.style.paddingBottom = 8;
+        btn.style.paddingLeft = 20; btn.style.paddingRight = 20;
+        btn.style.alignItems = Align.Center;
+
+        var lbl = Lbl(text, 16, color, FontStyle.Bold);
+        btn.Add(lbl);
+
+        btn.RegisterCallback<ClickEvent>(_ => onClick());
+        btn.RegisterCallback<MouseEnterEvent>(_ => btn.style.backgroundColor = CardBgHover);
+        btn.RegisterCallback<MouseLeaveEvent>(_ => btn.style.backgroundColor = new Color(color.r * 0.3f, color.g * 0.3f, color.b * 0.3f, 0.9f));
+
+        return btn;
+    }
+
     // ── Update (damage numbers, charge bar, cooldowns) ──
 
     // ── Pause Menu ──

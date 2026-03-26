@@ -94,6 +94,13 @@ public class Health : MonoBehaviour
             if (dmg >= 3)
                 GameFeel.Instance.Hitstop(dmg >= 8 ? 0.05f : 0.03f);
             GameFeel.ApplyKnockback(transform, transform.position - transform.forward, dmg * 0.3f);
+
+            // Hit impact particles on every enemy hit
+            Color hitColor = Color.white;
+            var renderers = GetComponentsInChildren<Renderer>();
+            if (renderers.Length > 0 && renderers[0] != null)
+                hitColor = renderers[0].material.color;
+            GameFeel.SpawnHitParticles(transform.position + Vector3.up * 0.5f, hitColor, dmg >= 5 ? 1.3f : 0.8f);
         }
 
         // SFX

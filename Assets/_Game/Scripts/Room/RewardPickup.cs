@@ -1,5 +1,6 @@
 using UnityEngine;
 using System;
+using Object = UnityEngine.Object;
 
 public class RewardPickup : MonoBehaviour
 {
@@ -9,6 +10,28 @@ public class RewardPickup : MonoBehaviour
     {
         if (other.GetComponent<PlayerController>() == null) return;
         onPickedUp?.Invoke();
+    }
+}
+
+/// <summary>Lore stone that shows text when player walks into it.</summary>
+public class LoreStonePickup : MonoBehaviour
+{
+    public string loreText;
+    bool triggered;
+
+    void OnTriggerEnter(Collider other)
+    {
+        if (triggered) return;
+        if (other.GetComponent<PlayerController>() == null) return;
+        triggered = true;
+
+        var hud = Object.FindAnyObjectByType<GameHUD>();
+        if (hud != null) hud.ShowHint(loreText, 4f);
+
+        // Fade out lore stone
+        var renderers = GetComponentsInChildren<Renderer>();
+        foreach (var r in renderers) if (r != null) r.material.color *= 0.3f;
+        Destroy(gameObject, 2f);
     }
 }
 

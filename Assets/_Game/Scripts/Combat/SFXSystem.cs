@@ -23,7 +23,13 @@ public class SFXSystem : MonoBehaviour
         LevelUp,
         Freeze,
         ShieldBlock,
-        MomentumUp
+        MomentumUp,
+        Reaction,
+        BossIntro,
+        PlayerDeath,
+        DoorOpen,
+        ShopBuy,
+        PickupJuice
     }
 
     AudioSource _source;
@@ -143,6 +149,54 @@ public class SFXSystem : MonoBehaviour
         {
             float env = Mathf.Exp(-t * 8f);
             return (Mathf.Sin(t * 330f) + Mathf.Sin(t * 440f) + Mathf.Sin(t * 550f)) / 3f * env * 0.3f;
+        });
+
+        // Reaction: magical burst with harmonic ring
+        _clips[(int)SFXType.Reaction] = MakeClip("Reaction", 0.25f, (t, d) =>
+        {
+            float env = Mathf.Exp(-t * 10f);
+            float ring = Mathf.Sin(t * 1200f) * Mathf.Sin(t * 1800f) * 0.4f;
+            float burst = Noise(t, 5000f) * Mathf.Exp(-t * 30f) * 0.5f;
+            return (ring + burst) * env * 0.35f;
+        });
+
+        // Boss intro: deep ominous drone rising
+        _clips[(int)SFXType.BossIntro] = MakeClip("BossIntro", 0.8f, (t, d) =>
+        {
+            float freq = 80f + (t / d) * 200f;
+            float env = Mathf.Sin(t / d * Mathf.PI);
+            float drone = Mathf.Sin(t * freq) * 0.4f + Mathf.Sin(t * freq * 1.5f) * 0.2f;
+            float rumble = Noise(t, 200f) * 0.15f;
+            return (drone + rumble) * env * 0.4f;
+        });
+
+        // Player death: descending whomp
+        _clips[(int)SFXType.PlayerDeath] = MakeClip("PlayerDeath", 0.5f, (t, d) =>
+        {
+            float freq = 400f - (t / d) * 350f;
+            float env = 1f - t / d;
+            return (Mathf.Sin(t * freq) * 0.5f + Noise(t, 1000f) * 0.3f) * env * 0.4f;
+        });
+
+        // Door open: stone sliding
+        _clips[(int)SFXType.DoorOpen] = MakeClip("DoorOpen", 0.3f, (t, d) =>
+        {
+            float env = Mathf.Sin(t / d * Mathf.PI);
+            return Noise(t, 800f) * env * 0.25f + Mathf.Sin(t * 200f) * env * 0.1f;
+        });
+
+        // Shop buy: coin register cha-ching
+        _clips[(int)SFXType.ShopBuy] = MakeClip("ShopBuy", 0.15f, (t, d) =>
+        {
+            float env = Mathf.Exp(-t * 15f);
+            return (Mathf.Sin(t * 2000f) + Mathf.Sin(t * 3000f) * 0.5f + Mathf.Sin(t * 4000f) * 0.25f) * env * 0.2f;
+        });
+
+        // Pickup juice: bright chime
+        _clips[(int)SFXType.PickupJuice] = MakeClip("PickupJuice", 0.12f, (t, d) =>
+        {
+            float env = Mathf.Exp(-t * 20f);
+            return (Mathf.Sin(t * 1800f) + Mathf.Sin(t * 2700f) * 0.6f) * env * 0.2f;
         });
     }
 
