@@ -117,6 +117,7 @@ public class Bootstrap : MonoBehaviour
         roomCleared = false;
         bossActive = false;
         enemiesKilledThisRun = 0;
+        SpellMutationSystem.Reset();
 
         floorGen = new FloorGenerator();
         floorGen.Generate(roomsPerFloor, currentFloor - 1);
@@ -833,6 +834,56 @@ public class Bootstrap : MonoBehaviour
         SpawnWaveForNodeType(currentRoom == roomsPerFloor ? NodeType.Boss : NodeType.Combat);
     }
 
+    // ─── ENCOUNTER TEMPLATES ─────────────────────────────────────
+
+    struct EncounterTemplate
+    {
+        public string name;
+        public int[] enemies; // enemy type IDs
+        public int cost;
+        public int minFloor;
+    }
+
+    static readonly EncounterTemplate[] encounterTemplates = new[]
+    {
+        new EncounterTemplate { name = "Shield Wall",    enemies = new[]{5,1,1},     cost = 11, minFloor = 1 },
+        new EncounterTemplate { name = "Ambush",         enemies = new[]{2,0,0,0,0}, cost = 14, minFloor = 1 },
+        new EncounterTemplate { name = "Chaos Pack",     enemies = new[]{4,0,1},      cost = 12, minFloor = 2 },
+        new EncounterTemplate { name = "Swarm Tide",     enemies = new[]{3,6},        cost = 11, minFloor = 2 },
+        new EncounterTemplate { name = "Artillery Line", enemies = new[]{1,1,1,7},    cost = 14, minFloor = 2 },
+        new EncounterTemplate { name = "Juggernaut",     enemies = new[]{2,6},        cost = 12, minFloor = 2 },
+        new EncounterTemplate { name = "Mirror Match",   enemies = new[]{4,4,5},      cost = 19, minFloor = 3 },
+        new EncounterTemplate { name = "Twin Brutes",    enemies = new[]{2,2},        cost = 12, minFloor = 3 },
+        new EncounterTemplate { name = "Shield Brothers",enemies = new[]{5,5,7},      cost = 15, minFloor = 3 },
+        new EncounterTemplate { name = "Death Squad",    enemies = new[]{2,4,4,6},    cost = 26, minFloor = 4 },
+        new EncounterTemplate { name = "Fortress",       enemies = new[]{5,5,1,1,1},  cost = 19, minFloor = 4 },
+        new EncounterTemplate { name = "Apocalypse",     enemies = new[]{3,2,2,7},    cost = 22, minFloor = 5 },
+    };
+
+    bool TrySpawnEncounter(int budget)
+    {
+        // Collect valid templates
+        var valid = new List<EncounterTemplate>();
+        foreach (var t in encounterTemplates)
+            if (t.minFloor <= currentFloor && t.cost <= budget) valid.Add(t);
+
+        if (valid.Count == 0) return false;
+
+        var template = valid[Random.Range(0, valid.Count)];
+        foreach (int type in template.enemies)
+        {
+            if (type == 3) // Swarm spawns pack
+            {
+                int sc = Random.Range(8, 13);
+                for (int s = 0; s < sc; s++) { SpawnEnemy(type); enemiesAlive++; }
+            }
+            else { SpawnEnemy(type); enemiesAlive++; }
+        }
+        return true;
+    }
+
+    // ─── WAVE SPAWNING ───────────────────────────────────────────
+
     void SpawnCombatWave(float budgetMult, bool forceElite)
     {
         int baseBudget = currentFloor switch { 1 => 10, 2 => 18, 3 => 28, 4 => 40, _ => 55 };
@@ -851,21 +902,30 @@ public class Bootstrap : MonoBehaviour
     {
         subWave++;
 
-        while (budget > 0)
-        {
-            int type = PickEnemyType(budget);
-            int cost = type switch { 0=>2, 1=>3, 2=>6, 3=>5, 4=>7, 5=>5, _=>2 };
-            if (cost > budget) { type = 0; cost = 2; }
-            if (cost > budget) break;
-            budget -= cost;
+        // 60% chance to use encounter template, 40% random
+        bool usedTemplate = false;
+        if (Random.value < 0.6f && budget >= 10)
+            usedTemplate = TrySpawnEncounter(budget);
 
-            if (type == 3)
+        if (!usedTemplate)
+        {
+            while (budget > 0)
             {
-                int sc = Random.Range(8, 13);
-                for (int s = 0; s < sc; s++) { SpawnEnemy(type); enemiesAlive++; }
+                int type = PickEnemyType(budget);
+                int cost = type switch { 0=>2, 1=>3, 2=>6, 3=>5, 4=>7, 5=>5, 6=>6, 7=>5, _=>2 };
+                if (cost > budget) { type = 0; cost = 2; }
+                if (cost > budget) break;
+                budget -= cost;
+
+                if (type == 3)
+                {
+                    int sc = Random.Range(8, 13);
+                    for (int s = 0; s < sc; s++) { SpawnEnemy(type); enemiesAlive++; }
+                }
+                else { SpawnEnemy(type); enemiesAlive++; }
             }
-            else { SpawnEnemy(type); enemiesAlive++; }
         }
+
         if (enemiesAlive == 0) { SpawnEnemy(0); enemiesAlive = 1; }
 
         if (forceElite)
@@ -942,21 +1002,16 @@ public class Bootstrap : MonoBehaviour
     {
         roomCleared = true; // Allow door transition after event
 
-        int eventType = Random.Range(0, 4);
+        int eventType = Random.Range(0, 7);
         switch (eventType)
         {
-            case 0: // Sacrifice: trade HP for a relic
-                StartSacrificeEvent();
-                break;
-            case 1: // Curse choice: pick a curse, gain gold
-                StartCurseChoiceEvent();
-                break;
-            case 2: // Gamble: risk gold for reward
-                StartGambleEvent();
-                break;
-            default: // Mystery: random positive/negative
-                StartMysteryEvent();
-                break;
+            case 0: StartSacrificeEvent(); break;
+            case 1: StartCurseChoiceEvent(); break;
+            case 2: StartGambleEvent(); break;
+            case 3: StartMysteryEvent(); break;
+            case 4: StartChallengeEvent(); break;
+            case 5: StartSpellForgeEvent(); break;
+            default: StartMerchantEvent(); break;
         }
     }
 
@@ -1131,6 +1186,163 @@ public class Bootstrap : MonoBehaviour
         hud.ShowRestRoom(() => TransitionToNextRoom());
     }
 
+    // ─── NEW EVENT ROOMS ─────────────────────────────────────────
+
+    void StartChallengeEvent()
+    {
+        hud.ShowEventRoom(
+            "ARENA CHALLENGE", "A spectral arena beckons. Survive 3 rapid waves for a reward!",
+            new Color(0.9f, 0.2f, 0.2f),
+            new[] { "ACCEPT CHALLENGE", "WALK AWAY" },
+            new[] { "Survive 3 fast waves → earn a relic", "Continue safely" },
+            new[] { new Color(0.9f, 0.2f, 0.2f), new Color(0.5f, 0.5f, 0.5f) },
+            choice =>
+            {
+                if (choice == 0)
+                {
+                    roomCleared = false;
+                    challengeWavesLeft = 3;
+                    isChallenge = true;
+                    SpawnCombatWave(0.6f, false);
+                }
+                else
+                {
+                    TransitionToNextRoom();
+                }
+            });
+    }
+
+    int challengeWavesLeft;
+    bool isChallenge;
+
+    void OnChallengeWaveComplete()
+    {
+        challengeWavesLeft--;
+        if (challengeWavesLeft > 0)
+        {
+            // Spawn next wave after brief delay
+            reinforcementTimer = 1f;
+            totalSubWaves = 1;
+            subWave = 0;
+        }
+        else
+        {
+            // Challenge complete! Award relic
+            isChallenge = false;
+            roomCleared = true;
+            var available = new System.Collections.Generic.List<RelicSO>();
+            foreach (var r in allRelics) if (!relicMgr.HasRelic(r.relicType)) available.Add(r);
+            if (available.Count > 0)
+            {
+                var relic = available[Random.Range(0, available.Count)];
+                relicMgr.AddRelic(relic);
+                hud.RefreshRelics(relicMgr.OwnedRelics);
+            }
+            SFXSystem.Play(SFXSystem.SFXType.LevelUp, player.transform.position);
+            hud.Refresh();
+            TransitionToNextRoom();
+        }
+    }
+
+    void StartSpellForgeEvent()
+    {
+        if (SpellMutationSystem.ActiveMutations.Count >= SpellMutationSystem.MaxMutations)
+        {
+            // Already at max mutations, fall back to mystery
+            StartMysteryEvent();
+            return;
+        }
+
+        var choices = SpellMutationSystem.GenerateChoices(3);
+        if (choices.Length == 0) { StartMysteryEvent(); return; }
+
+        string[] labels = new string[choices.Length];
+        string[] descs = new string[choices.Length];
+        Color[] colors = new Color[choices.Length];
+        for (int i = 0; i < choices.Length; i++)
+        {
+            labels[i] = choices[i].name;
+            descs[i] = choices[i].description;
+            colors[i] = choices[i].color;
+        }
+
+        hud.ShowEventRoom(
+            "SPELL FORGE", "Ancient runes shimmer with power. Choose a mutation for your spells.",
+            new Color(0.6f, 0.3f, 1f), labels, descs, colors,
+            choice =>
+            {
+                if (choice >= 0 && choice < choices.Length)
+                {
+                    SpellMutationSystem.AddMutation(choices[choice].type);
+                    SFXSystem.Play(SFXSystem.SFXType.LevelUp, player.transform.position);
+                }
+                hud.Refresh();
+                TransitionToNextRoom();
+            });
+    }
+
+    void StartMerchantEvent()
+    {
+        int gold = goldSystem != null ? goldSystem.Gold : 0;
+        int hpPrice = 40;
+        int dashPrice = 60;
+        int rerollPrice = 30;
+
+        hud.ShowEventRoom(
+            "WANDERING MERCHANT", "A hooded figure spreads wares on a tattered cloth.",
+            new Color(0.8f, 0.7f, 0.2f),
+            new[] {
+                gold >= hpPrice ? $"BUY +1 MAX HP ({hpPrice}g)" : $"NOT ENOUGH ({hpPrice}g)",
+                gold >= dashPrice ? $"BUY +1 DASH ({dashPrice}g)" : $"NOT ENOUGH ({dashPrice}g)",
+                gold >= rerollPrice ? $"REROLL ELEMENT ({rerollPrice}g)" : $"NOT ENOUGH ({rerollPrice}g)"
+            },
+            new[] { "+1 max HP and heal 1", "+1 dash charge", "Replace a random equipped element" },
+            new[] { new Color(0.3f, 0.9f, 0.4f), new Color(0.3f, 0.7f, 1f), new Color(0.9f, 0.5f, 0.2f) },
+            choice =>
+            {
+                switch (choice)
+                {
+                    case 0:
+                        if (gold >= hpPrice && goldSystem != null)
+                        {
+                            goldSystem.TrySpend(hpPrice);
+                            playerHealth.maxHP += 1;
+                            playerHealth.Heal(1);
+                            SFXSystem.Play(SFXSystem.SFXType.LevelUp, player.transform.position);
+                        }
+                        break;
+                    case 1:
+                        if (gold >= dashPrice && goldSystem != null)
+                        {
+                            goldSystem.TrySpend(dashPrice);
+                            if (playerCtrl != null) playerCtrl.SetExtraDashCharges(playerCtrl.MaxDashCharges);
+                            SFXSystem.Play(SFXSystem.SFXType.LevelUp, player.transform.position);
+                        }
+                        break;
+                    case 2:
+                        if (gold >= rerollPrice && goldSystem != null && spellCaster != null)
+                        {
+                            goldSystem.TrySpend(rerollPrice);
+                            // Replace random equipped element with random unlocked one
+                            int slot = Random.Range(0, 4);
+                            var current = spellCaster.equippedElements[slot];
+                            var candidates = new System.Collections.Generic.List<ElementSO>();
+                            foreach (var el in allElements)
+                                if (el != current && System.Array.IndexOf(spellCaster.equippedElements, el) < 0)
+                                    candidates.Add(el);
+                            if (candidates.Count > 0)
+                            {
+                                spellCaster.equippedElements[slot] = candidates[Random.Range(0, candidates.Count)];
+                                SFXSystem.Play(SFXSystem.SFXType.LevelUp, player.transform.position);
+                            }
+                        }
+                        break;
+                }
+                hud.Refresh();
+                TransitionToNextRoom();
+            });
+    }
+
     int PickEnemyType(int budget)
     {
         if (wave <= 2) return Random.value < 0.7f ? 0 : 1;
@@ -1140,7 +1352,8 @@ public class Bootstrap : MonoBehaviour
             if (r < 0.3f) return 0; if (r < 0.5f) return 1;
             if (r < 0.7f) return 2; return 3;
         }
-        return Random.Range(0, 6);
+        // Wave 5+: all types including Healer(6) and Buffer(7)
+        return Random.Range(0, 8);
     }
 
     void SpawnEnemy(int type)
@@ -1153,6 +1366,8 @@ public class Bootstrap : MonoBehaviour
             case 3: SpawnSwarmUnit(); break;
             case 4: SpawnMirror(); break;
             case 5: SpawnShieldBearer(); break;
+            case 6: SpawnHealer(); break;
+            case 7: SpawnBuffer(); break;
         }
     }
 
@@ -1288,6 +1503,35 @@ public class Bootstrap : MonoBehaviour
         shield.GetComponent<Renderer>().material = ShaderCache.NewMetal(new Color(0.5f, 0.5f, 0.6f));
         RegisterEnemy(e, 22 + wave * 3);
         e.AddComponent<ShieldBearerAI>().baseColor = c;
+    }
+
+    void SpawnHealer()
+    {
+        var e = new GameObject("Healer"); Color c = new(0.2f, 0.8f, 0.3f);
+        AddCapsuleCol(e, 1.1f, 0.3f, 0.55f); BuildBody(e.transform, c, 0.85f);
+        // Staff visual
+        var staff = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
+        staff.name = "Staff"; Destroy(staff.GetComponent<CapsuleCollider>());
+        staff.transform.parent = e.transform; staff.transform.localPosition = new Vector3(0.25f, 0.5f, 0.1f);
+        staff.transform.localScale = new Vector3(0.04f, 0.4f, 0.04f);
+        staff.GetComponent<Renderer>().material = ShaderCache.NewEmissive(new Color(0.3f, 1f, 0.4f), 2f);
+        RegisterEnemy(e, 8 + wave * 2);
+        e.AddComponent<HealerAI>().baseColor = c;
+    }
+
+    void SpawnBuffer()
+    {
+        var e = new GameObject("Buffer"); Color c = new(0.9f, 0.55f, 0.1f);
+        AddCapsuleCol(e, 1.3f, 0.38f, 0.63f); BuildBody(e.transform, c, 1.05f);
+        // War horn visual
+        var horn = GameObject.CreatePrimitive(PrimitiveType.Capsule);
+        horn.name = "Horn"; Destroy(horn.GetComponent<CapsuleCollider>());
+        horn.transform.parent = e.transform; horn.transform.localPosition = new Vector3(0.3f, 0.6f, 0.2f);
+        horn.transform.localScale = new Vector3(0.06f, 0.15f, 0.06f);
+        horn.transform.localRotation = Quaternion.Euler(0, 0, -45);
+        horn.GetComponent<Renderer>().material = MakeLit(new Color(0.7f, 0.5f, 0.1f));
+        RegisterEnemy(e, 15 + wave * 2);
+        e.AddComponent<BufferAI>().baseColor = c;
     }
 
     static void CreateEye(Transform parent, Vector3 localPos, Color color)
@@ -1594,8 +1838,22 @@ public class Bootstrap : MonoBehaviour
         enemiesAlive--;
         enemiesKilledThisRun++;
 
+        // Spell mutation: Vampiric heal + Volatile explosion
+        if (SpellMutationSystem.OnSpellKill(enemy.transform.position))
+        {
+            if (playerHealth != null && !playerHealth.IsDead)
+                playerHealth.Heal(1);
+        }
+
         if (enemiesAlive <= 0)
         {
+            // Challenge room: wave-by-wave
+            if (isChallenge)
+            {
+                OnChallengeWaveComplete();
+                return;
+            }
+
             // Check for more sub-waves
             if (subWave < totalSubWaves && !bossActive)
             {

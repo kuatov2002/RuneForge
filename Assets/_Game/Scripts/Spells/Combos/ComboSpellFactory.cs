@@ -13,9 +13,14 @@ public static class ComboSpellFactory
 
         if (charged)
         {
-            dmg *= def.chargedDamageMultiplier;
+            dmg *= SpellMutationSystem.ModifyChargedMultiplier(def.chargedDamageMultiplier);
             radius *= def.chargedRadiusMultiplier;
         }
+
+        // Apply spell mutations
+        dmg = SpellMutationSystem.ModifyDamage(dmg);
+        radius = SpellMutationSystem.ModifyRadius(radius);
+        float duration = SpellMutationSystem.ModifyDuration(def.duration);
 
         Vector3 dir = (targetPos - origin);
         dir.y = 0;
@@ -29,10 +34,10 @@ public static class ComboSpellFactory
                 InfernoSpell.Cast(targetPos, dmg, radius, charged);
                 break;
             case ComboType.DeepFreeze:
-                DeepFreezeSpell.Cast(targetPos, dmg, radius, def.duration, charged);
+                DeepFreezeSpell.Cast(targetPos, dmg, radius, duration, charged);
                 break;
             case ComboType.Bulwark:
-                BulwarkSpell.Cast(origin, dir, def.duration, charged);
+                BulwarkSpell.Cast(origin, dir, duration, charged);
                 break;
             case ComboType.Ascend:
                 AscendSpell.Cast(origin, dir, charged);
@@ -40,22 +45,22 @@ public static class ComboSpellFactory
 
             // ── Cross element combos ──
             case ComboType.Steam:
-                SteamSpell.Cast(targetPos, dmg, radius, def.duration, charged);
+                SteamSpell.Cast(targetPos, dmg, radius, duration, charged);
                 break;
             case ComboType.Magma:
-                MagmaSpell.Cast(targetPos, dmg, radius, def.duration, charged);
+                MagmaSpell.Cast(targetPos, dmg, radius, duration, charged);
                 break;
             case ComboType.Wildfire:
                 WildfireSpell.Cast(targetPos, dmg, radius, charged);
                 break;
             case ComboType.Permafrost:
-                PermafrostSpell.Cast(targetPos, dmg, radius, def.duration, charged);
+                PermafrostSpell.Cast(targetPos, dmg, radius, duration, charged);
                 break;
             case ComboType.Geyser:
                 GeyserSpell.Cast(targetPos, dmg, radius, charged);
                 break;
             case ComboType.Rubble:
-                RubbleSpell.Cast(targetPos, dmg, radius, def.duration, charged);
+                RubbleSpell.Cast(targetPos, dmg, radius, duration, charged);
                 break;
 
             // ── Lightning combos ──
@@ -63,33 +68,33 @@ public static class ComboSpellFactory
                 LightningStrikeSpell.Cast(targetPos, dmg, radius, charged);
                 break;
             case ComboType.Thunderstorm:
-                ThunderstormSpell.Cast(targetPos, dmg, radius, def.duration, charged);
+                ThunderstormSpell.Cast(targetPos, dmg, radius, duration, charged);
                 break;
             case ComboType.FrostShock:
-                FrostShockSpell.Cast(targetPos, dmg, radius, def.duration, charged);
+                FrostShockSpell.Cast(targetPos, dmg, radius, duration, charged);
                 break;
             case ComboType.Earthquake:
-                EarthquakeSpell.Cast(targetPos, dmg, radius, def.duration, charged);
+                EarthquakeSpell.Cast(targetPos, dmg, radius, duration, charged);
                 break;
             case ComboType.Cyclone:
-                CycloneSpell.Cast(targetPos, dmg, radius, def.duration, charged);
+                CycloneSpell.Cast(targetPos, dmg, radius, duration, charged);
                 break;
 
             // ── Poison combos ──
             case ComboType.Plague:
-                PlagueSpell.Cast(targetPos, dmg, radius, def.duration, charged);
+                PlagueSpell.Cast(targetPos, dmg, radius, duration, charged);
                 break;
             case ComboType.Detonate:
                 DetonateSpell.Cast(targetPos, dmg, radius, charged);
                 break;
             case ComboType.ToxicFrost:
-                ToxicFrostSpell.Cast(targetPos, dmg, radius, def.duration, charged);
+                ToxicFrostSpell.Cast(targetPos, dmg, radius, duration, charged);
                 break;
             case ComboType.Quicksand:
-                QuicksandSpell.Cast(targetPos, dmg, radius, def.duration, charged);
+                QuicksandSpell.Cast(targetPos, dmg, radius, duration, charged);
                 break;
             case ComboType.Miasma:
-                MiasmaSpell.Cast(targetPos, dmg, radius, def.duration, charged);
+                MiasmaSpell.Cast(targetPos, dmg, radius, duration, charged);
                 break;
             case ComboType.PlagueSpark:
                 PlagueSparkSpell.Cast(targetPos, dmg, radius, charged);
@@ -103,19 +108,19 @@ public static class ComboSpellFactory
                 ImplodeSpell.Cast(targetPos, dmg, radius, charged);
                 break;
             case ComboType.Rift:
-                RiftSpell.Cast(targetPos, dmg, radius, def.duration, charged);
+                RiftSpell.Cast(targetPos, dmg, radius, duration, charged);
                 break;
             case ComboType.Gravity:
                 GravitySpell.Cast(targetPos, dmg, radius, charged);
                 break;
             case ComboType.Vacuum:
-                VacuumSpell.Cast(targetPos, dmg, radius, def.duration, charged);
+                VacuumSpell.Cast(targetPos, dmg, radius, duration, charged);
                 break;
             case ComboType.RiftShock:
                 RiftShockSpell.Cast(targetPos, dmg, radius, charged);
                 break;
             case ComboType.Corruption:
-                CorruptionSpell.Cast(targetPos, dmg, radius, def.duration, charged);
+                CorruptionSpell.Cast(targetPos, dmg, radius, duration, charged);
                 break;
 
             // Fallback

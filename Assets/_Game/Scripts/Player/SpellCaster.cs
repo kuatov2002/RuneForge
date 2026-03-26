@@ -217,8 +217,8 @@ public class SpellCaster : MonoBehaviour
         var def = CurrentComboDef;
         if (def == null) return;
 
-        // Consume charges
-        int chargeCost = charged ? 2 : 1;
+        // Consume charges (Overcharge mutation: 3 charges when charged)
+        int chargeCost = charged ? SpellMutationSystem.ModifyChargedCost(2) : 1;
         ConsumeCharges(leftOrb, chargeCost);
         ConsumeCharges(rightOrb, chargeCost);
 
@@ -256,6 +256,13 @@ public class SpellCaster : MonoBehaviour
 
         // Fire the combo spell
         ComboSpellFactory.Cast(def, transform.position, targetPos, dmgMult, charged);
+
+        // Chain Cast mutation: 20% chance to auto-cast again for free
+        if (SpellMutationSystem.HasMutation(SpellMutationSystem.MutationType.ChainCast)
+            && UnityEngine.Random.value < 0.2f)
+        {
+            ComboSpellFactory.Cast(def, transform.position, targetPos, dmgMult * 0.7f, false);
+        }
 
         // Track element variety
         TrackElementUsage(leftOrb.elementType);

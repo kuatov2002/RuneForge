@@ -80,6 +80,8 @@ public static class RoomHazards
         col.center = Vector3.up * 0.3f;
 
         trap.AddComponent<SpikeTrapBehavior>();
+        var hi = trap.AddComponent<HazardInteraction>();
+        hi.hazardType = HazardInteraction.HazardType.SpikeTrap;
     }
 
     // ─── EXPLOSIVE BARREL ───────────────────────────────────────
@@ -116,6 +118,9 @@ public static class RoomHazards
             ExplodeBarrel(barrel.transform.position);
             Object.Destroy(barrel);
         };
+
+        var hi = barrel.AddComponent<HazardInteraction>();
+        hi.hazardType = HazardInteraction.HazardType.Barrel;
     }
 
     static void ExplodeBarrel(Vector3 pos)
@@ -167,6 +172,8 @@ public static class RoomHazards
         col.radius = 0.5f;
 
         pool.AddComponent<LightningPoolBehavior>();
+        var hi = pool.AddComponent<HazardInteraction>();
+        hi.hazardType = HazardInteraction.HazardType.LightningPool;
     }
 
     // ─── FIRE VENT ──────────────────────────────────────────────
@@ -193,10 +200,176 @@ public static class RoomHazards
         col.center = Vector3.up * 0.8f;
 
         vent.AddComponent<FireVentBehavior>();
+        var hi = vent.AddComponent<HazardInteraction>();
+        hi.hazardType = HazardInteraction.HazardType.FireVent;
     }
 }
 
 // ─── HAZARD BEHAVIORS ───────────────────────────────────────────
+
+// ─── HAZARD ELEMENT INTERACTIONS ─────────────────────────────────
+
+/// <summary>
+/// Handles spell-hazard interactions based on element type.
+/// Attach to any hazard to enable element reactions.
+/// </summary>
+public class HazardInteraction : MonoBehaviour
+{
+    public enum HazardType { SpikeTrap, Barrel, LightningPool, FireVent }
+    public HazardType hazardType;
+    bool _reacted;
+
+    void OnTriggerEnter(Collider other)
+    {
+        if (_reacted) return;
+
+        // Detect spell element from various projectile types
+        ElementType? element = null;
+
+        var sp = other.GetComponent<SpellProjectile>();
+        // Check tag-based identification for combo spell projectiles
+        string tag = other.gameObject.name.ToLower();
+
+        if (tag.Contains("fire") || tag.Contains("inferno") || tag.Contains("magma"))
+            element = ElementType.Fire;
+        else if (tag.Contains("ice") || tag.Contains("freeze") || tag.Contains("frost") || tag.Contains("water") || tag.Contains("deep"))
+            element = ElementType.Water;
+        else if (tag.Contains("earth") || tag.Contains("rubble") || tag.Contains("bulwark") || tag.Contains("quake"))
+            element = ElementType.Earth;
+        else if (tag.Contains("lightning") || tag.Contains("thunder") || tag.Contains("shock"))
+            element = ElementType.Lightning;
+        else if (tag.Contains("wind") || tag.Contains("cyclone") || tag.Contains("geyser"))
+            element = ElementType.Air;
+
+        if (element == null) return;
+
+        switch (hazardType)
+        {
+            case HazardType.Barrel:
+                HandleBarrelInteraction(element.Value);
+                break;
+            case HazardType.LightningPool:
+                HandlePoolInteraction(element.Value);
+                break;
+            case HazardType.FireVent:
+                HandleVentInteraction(element.Value);
+                break;
+            case HazardType.SpikeTrap:
+                HandleSpikeInteraction(element.Value);
+                break;
+        }
+    }
+
+    void HandleBarrelInteraction(ElementType elem)
+    {
+        if (elem == ElementType.Fire)
+        {
+            // Fire + Barrel = instant detonation with 2x blast
+            _reacted = true;
+            var hp = GetComponent<Health>();
+            if (hp != null && !hp.IsDead) hp.TakeDamage(hp.maxHP);
+        }
+        else if (elem == ElementType.Water)
+        {
+            // Ice + Barrel = freeze barrel, create ice patch
+            _reacted = true;
+            var renderers = GetComponentsInChildren<Renderer>();
+            foreach (var r in renderers) r.material = ShaderCache.NewIce(new Color(0.6f, 0.9f, 1f), 0.8f);
+
+            // Disable barrel explosion by removing Health
+            var hp = GetComponent<Health>();
+            if (hp != null) Object.Destroy(hp);
+
+            // Create ice patch that slows enemies
+            var patch = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
+            Object.Destroy(patch.GetComponent<CapsuleCollider>());
+            patch.transform.position = transform.position - Vector3.up * 0.3f;
+            patch.transform.localScale = new Vector3(2f, 0.02f, 2f);
+            patch.GetComponent<Renderer>().material = ShaderCache.NewIce(new Color(0.6f, 0.85f, 1f), 0.6f);
+            var col = patch.AddComponent<SphereCollider>();
+            col.isTrigger = true; col.radius = 0.5f;
+            patch.AddComponent<IcePatchBehavior>();
+            Object.Destroy(patch, 8f);
+        }
+    }
+
+    void HandlePoolInteraction(ElementType elem)
+    {
+        if (elem == ElementType.Fire)
+        {
+            // Fire + Pool = evaporate into steam cloud
+            _reacted = true;
+            var steam = new GameObject("SteamCloud");
+            steam.transform.position = transform.position + Vector3.up * 0.5f;
+            var ps = steam.AddComponent<ParticleSystem>();
+            ps.Stop(true, ParticleSystemStopBehavior.StopEmittingAndClear);
+            var main = ps.main;
+            main.startLifetime = 2f; main.startSpeed = 0.5f;
+            main.startSize = new ParticleSystem.MinMaxCurve(0.3f, 0.6f);
+            main.startColor = new Color(0.9f, 0.9f, 0.95f, 0.3f);
+            main.simulationSpace = ParticleSystemSimulationSpace.World;
+            main.loop = false; main.duration = 0.5f;
+            var em = ps.emission; em.rateOverTime = 0;
+            em.SetBursts(new[] { new ParticleSystem.Burst(0f, 15) });
+            var sh = ps.shape; sh.shapeType = ParticleSystemShapeType.Sphere; sh.radius = 0.5f;
+            var mat = new Material(ShaderCache.ParticleShader);
+            mat.SetColor("_Color", new Color(0.9f, 0.9f, 0.95f));
+            steam.GetComponent<ParticleSystemRenderer>().material = mat;
+            ps.Play();
+            Object.Destroy(steam, 3f);
+            Object.Destroy(gameObject, 0.1f);
+        }
+        else if (elem == ElementType.Water)
+        {
+            // Ice + Pool = freeze pool, create ice patch
+            _reacted = true;
+            GetComponent<Renderer>().material = ShaderCache.NewIce(new Color(0.7f, 0.9f, 1f), 0.8f);
+            var poolB = GetComponent<LightningPoolBehavior>();
+            if (poolB != null) Object.Destroy(poolB);
+            gameObject.AddComponent<IcePatchBehavior>();
+            Object.Destroy(gameObject, 8f);
+        }
+    }
+
+    void HandleVentInteraction(ElementType elem)
+    {
+        if (elem == ElementType.Water)
+        {
+            // Water + Vent = disable permanently
+            _reacted = true;
+            var ventB = GetComponentInParent<FireVentBehavior>();
+            if (ventB != null) Object.Destroy(ventB);
+            var flame = transform.parent != null ? transform.parent.Find("Flame") : null;
+            if (flame != null) flame.gameObject.SetActive(false);
+            // Steam burst
+            GameFeel.SpawnDeathVFX(transform.position, new Color(0.8f, 0.8f, 0.9f));
+            SFXSystem.Play(SFXSystem.SFXType.Hit, transform.position, 0.3f);
+        }
+    }
+
+    void HandleSpikeInteraction(ElementType elem)
+    {
+        if (elem == ElementType.Earth)
+        {
+            // Earth + Spikes = destroy trap
+            _reacted = true;
+            GameFeel.SpawnDeathVFX(transform.position, new Color(0.5f, 0.4f, 0.3f));
+            Object.Destroy(gameObject);
+        }
+    }
+}
+
+/// <summary>Ice patch that slows enemies walking over it.</summary>
+public class IcePatchBehavior : MonoBehaviour
+{
+    void OnTriggerStay(Collider other)
+    {
+        if (other.GetComponent<PlayerController>() != null) return;
+        var hp = other.GetComponent<Health>();
+        if (hp != null && !hp.IsDead)
+            hp.ApplyStun(0.1f); // brief micro-stun = effective slow
+    }
+}
 
 /// <summary>Periodic spike trap — activates every few seconds.</summary>
 public class SpikeTrapBehavior : MonoBehaviour
