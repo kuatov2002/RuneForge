@@ -128,7 +128,7 @@ public static class PlagueSpell
         noise.scrollSpeed = 0.5f;
         noise.octaveCount = 2;
 
-        var psMat = new Material(Shader.Find("Particles/Standard Unlit"));
+        var psMat = new Material(ShaderCache.ParticleShader);
         psMat.SetColor("_Color", new Color(0.2f, 0.8f, 0.1f, 0.5f));
         particleGO.GetComponent<ParticleSystemRenderer>().material = psMat;
         ps.Play();

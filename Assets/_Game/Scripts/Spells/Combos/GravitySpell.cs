@@ -60,7 +60,7 @@ public static class GravitySpell
         ts.shapeType = ParticleSystemShapeType.Sphere;
         ts.radius = 0.08f;
 
-        var tMat = new Material(Shader.Find("Particles/Standard Unlit"));
+        var tMat = new Material(ShaderCache.ParticleShader);
         tMat.SetColor("_Color", new Color(0.35f, 0.1f, 0.5f));
         trailGO.GetComponent<ParticleSystemRenderer>().material = tMat;
         trailPS.Play();
@@ -154,7 +154,7 @@ public static class GravitySpell
             });
         dustColorOL.color = dGrad;
 
-        var dustMat = new Material(Shader.Find("Particles/Standard Unlit"));
+        var dustMat = new Material(ShaderCache.ParticleShader);
         dustMat.SetColor("_Color", new Color(0.4f, 0.3f, 0.25f));
         dustGO.GetComponent<ParticleSystemRenderer>().material = dustMat;
         dustPS.Play();
@@ -194,7 +194,7 @@ public static class GravitySpell
         eSizeOL.enabled = true;
         eSizeOL.size = new ParticleSystem.MinMaxCurve(1f, AnimationCurve.Linear(0f, 1f, 1f, 0.3f));
 
-        var eMat = new Material(Shader.Find("Particles/Standard Unlit"));
+        var eMat = new Material(ShaderCache.ParticleShader);
         eMat.SetColor("_Color", new Color(0.5f, 0.1f, 0.8f));
         energyGO.GetComponent<ParticleSystemRenderer>().material = eMat;
         energyPS.Play();

@@ -74,7 +74,7 @@ public static class DeepFreezeSpell
         ts.shapeType = ParticleSystemShapeType.Sphere;
         ts.radius = 0.08f;
 
-        var tMat = new Material(Shader.Find("Particles/Standard Unlit"));
+        var tMat = new Material(ShaderCache.ParticleShader);
         tMat.SetColor("_Color", new Color(0.6f, 0.9f, 1f, 0.7f));
         trailGO.GetComponent<ParticleSystemRenderer>().material = tMat;
         trailPS.Play();

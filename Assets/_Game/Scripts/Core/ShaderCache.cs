@@ -5,6 +5,7 @@ public static class ShaderCache
     public static Shader Lit { get; private set; }
     static Material _litTemplate;
     static Material _emissiveTemplate;
+    static Shader _particleShader;
 
     // Cached custom shaders
     static Shader _iceShader;
@@ -31,19 +32,32 @@ public static class ShaderCache
         else
             Lit = Shader.Find("Universal Render Pipeline/Lit");
 
-        // Load custom shaders
-        _iceShader = Shader.Find("RuneForge/ProceduralIce");
-        _lavaShader = Shader.Find("RuneForge/ProceduralLava");
-        _waterShader = Shader.Find("RuneForge/ProceduralWater");
-        _stoneShader = Shader.Find("RuneForge/ProceduralStone");
-        _magicShader = Shader.Find("RuneForge/ProceduralMagic");
-        _skinShader = Shader.Find("RuneForge/ProceduralSkin");
-        _metalShader = Shader.Find("RuneForge/ProceduralMetal");
-        _floorShader = Shader.Find("RuneForge/ProceduralFloor");
-        _goldShader = Shader.Find("RuneForge/ProceduralGold");
-        _poisonShader = Shader.Find("RuneForge/ProceduralPoison");
-        _voidShader = Shader.Find("RuneForge/ProceduralVoid");
-        _fireShader = Shader.Find("RuneForge/ProceduralFire");
+        // Particle shader — try URP first, then legacy
+        _particleShader = Shader.Find("Universal Render Pipeline/Particles/Unlit");
+        if (_particleShader == null)
+            _particleShader = Shader.Find("Particles/Standard Unlit");
+
+        // Load custom shaders via Resources so they are included in builds
+        _iceShader = LoadShader("ProceduralIce");
+        _lavaShader = LoadShader("ProceduralLava");
+        _waterShader = LoadShader("ProceduralWater");
+        _stoneShader = LoadShader("ProceduralStone");
+        _magicShader = LoadShader("ProceduralMagic");
+        _skinShader = LoadShader("ProceduralSkin");
+        _metalShader = LoadShader("ProceduralMetal");
+        _floorShader = LoadShader("ProceduralFloor");
+        _goldShader = LoadShader("ProceduralGold");
+        _poisonShader = LoadShader("ProceduralPoison");
+        _voidShader = LoadShader("ProceduralVoid");
+        _fireShader = LoadShader("ProceduralFire");
+    }
+
+    static Shader LoadShader(string name)
+    {
+        var shader = Resources.Load<Shader>("Shaders/" + name);
+        if (shader != null) return shader;
+        // Fallback to Shader.Find for editor compatibility
+        return Shader.Find("RuneForge/" + name);
     }
 
     // Helper: create material from custom shader, fallback to Lit if shader not found
@@ -57,6 +71,9 @@ public static class ShaderCache
         }
         return NewEmissive(color, 2f);
     }
+
+    /// Cached particle shader — use instead of Shader.Find("Particles/Standard Unlit")
+    public static Shader ParticleShader => _particleShader != null ? _particleShader : Lit;
 
     // ─── Original methods ───
 

@@ -97,7 +97,7 @@ public static class ThunderstormSpell
         cloudNoise.strength = 0.3f;
         cloudNoise.frequency = 0.8f;
 
-        var cloudMat = new Material(Shader.Find("Particles/Standard Unlit"));
+        var cloudMat = new Material(ShaderCache.ParticleShader);
         cloudMat.SetColor("_Color", new Color(0.25f, 0.25f, 0.3f, 0.2f));
         cloudParticlesGO.GetComponent<ParticleSystemRenderer>().material = cloudMat;
         cloudPS.Play();
@@ -190,7 +190,7 @@ public class ThunderstormZone : MonoBehaviour
         sizeOL.enabled = true;
         sizeOL.size = new ParticleSystem.MinMaxCurve(1f, AnimationCurve.Linear(0f, 1f, 1f, 0f));
 
-        var sparkMat = new Material(Shader.Find("Particles/Standard Unlit"));
+        var sparkMat = new Material(ShaderCache.ParticleShader);
         sparkMat.SetColor("_Color", new Color(1f, 1f, 0.3f));
         sparkGO.GetComponent<ParticleSystemRenderer>().material = sparkMat;
         ps.Play();

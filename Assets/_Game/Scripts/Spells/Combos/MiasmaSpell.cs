@@ -123,7 +123,7 @@ public static class MiasmaSpell
         fNoise.scrollSpeed = 0.6f;
         fNoise.octaveCount = 2;
 
-        var fMat = new Material(Shader.Find("Particles/Standard Unlit"));
+        var fMat = new Material(ShaderCache.ParticleShader);
         fMat.SetColor("_Color", new Color(0.2f, 0.7f, 0.1f, 0.2f));
         fogGO.GetComponent<ParticleSystemRenderer>().material = fMat;
         fogPS.Play();
@@ -160,7 +160,7 @@ public static class MiasmaSpell
         wSizeOL.size = new ParticleSystem.MinMaxCurve(1f,
             AnimationCurve.Linear(0f, 1f, 1f, 0f));
 
-        var wMat = new Material(Shader.Find("Particles/Standard Unlit"));
+        var wMat = new Material(ShaderCache.ParticleShader);
         wMat.SetColor("_Color", new Color(0.4f, 0.9f, 0.3f, 0.4f));
         wispGO.GetComponent<ParticleSystemRenderer>().material = wMat;
         wispPS.Play();

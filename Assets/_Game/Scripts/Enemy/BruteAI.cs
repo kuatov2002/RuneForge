@@ -268,7 +268,7 @@ public class BruteAI : MonoBehaviour
         var em = ps.emission; em.rateOverTime = 0;
         em.SetBursts(new[] { new ParticleSystem.Burst(0f, 20) });
         var sh = ps.shape; sh.shapeType = ParticleSystemShapeType.Circle; sh.radius = 0.5f;
-        var mat = new Material(Shader.Find("Particles/Standard Unlit"));
+        var mat = new Material(ShaderCache.ParticleShader);
         mat.SetColor("_Color", new Color(0.5f, 0.4f, 0.3f));
         dustGO.GetComponent<ParticleSystemRenderer>().material = mat;
         ps.Play();

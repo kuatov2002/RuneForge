@@ -111,7 +111,7 @@ public static class QuicksandSpell
             });
         sColorOL.color = sGrad;
 
-        var sMat = new Material(Shader.Find("Particles/Standard Unlit"));
+        var sMat = new Material(ShaderCache.ParticleShader);
         sMat.SetColor("_Color", new Color(0.4f, 0.3f, 0.1f, 0.6f));
         sinkGO.GetComponent<ParticleSystemRenderer>().material = sMat;
         sinkPS.Play();
@@ -143,7 +143,7 @@ public static class QuicksandSpell
         pShape.shapeType = ParticleSystemShapeType.Circle;
         pShape.radius = radius * 0.5f;
 
-        var pMat = new Material(Shader.Find("Particles/Standard Unlit"));
+        var pMat = new Material(ShaderCache.ParticleShader);
         pMat.SetColor("_Color", new Color(0.2f, 0.6f, 0.1f, 0.4f));
         poisonGO.GetComponent<ParticleSystemRenderer>().material = pMat;
         poisonPS.Play();

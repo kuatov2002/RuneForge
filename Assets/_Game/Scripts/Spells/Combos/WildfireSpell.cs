@@ -74,7 +74,7 @@ public static class WildfireSpell
         sOL.enabled = true;
         sOL.size = new ParticleSystem.MinMaxCurve(1f, AnimationCurve.Linear(0f, 1f, 1f, 0f));
 
-        var mat = new Material(Shader.Find("Particles/Standard Unlit"));
+        var mat = new Material(ShaderCache.ParticleShader);
         mat.SetColor("_Color", new Color(1f, 0.5f, 0.1f));
         trailGO.GetComponent<ParticleSystemRenderer>().material = mat;
         ps.Play();
@@ -286,7 +286,7 @@ public class WildfireBoltBehavior : MonoBehaviour
         sizeOL.enabled = true;
         sizeOL.size = new ParticleSystem.MinMaxCurve(1f, AnimationCurve.Linear(0f, 1f, 1f, 0f));
 
-        var mat = new Material(Shader.Find("Particles/Standard Unlit"));
+        var mat = new Material(ShaderCache.ParticleShader);
         mat.SetColor("_Color", new Color(1f, 0.5f, 0.1f));
         burstGO.GetComponent<ParticleSystemRenderer>().material = mat;
         ps.Play();

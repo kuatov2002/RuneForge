@@ -69,7 +69,7 @@ public static class RiftShockSpell
         obSizeOL.enabled = true;
         obSizeOL.size = new ParticleSystem.MinMaxCurve(1f, AnimationCurve.Linear(0f, 1f, 1f, 0f));
 
-        var obMat = new Material(Shader.Find("Particles/Standard Unlit"));
+        var obMat = new Material(ShaderCache.ParticleShader);
         obMat.SetColor("_Color", new Color(0.5f, 0.1f, 0.9f));
         originBurstGO.GetComponent<ParticleSystemRenderer>().material = obMat;
         originPS.Play();
@@ -160,7 +160,7 @@ public static class RiftShockSpell
             });
         abColorOL.color = abGrad;
 
-        var abMat = new Material(Shader.Find("Particles/Standard Unlit"));
+        var abMat = new Material(ShaderCache.ParticleShader);
         abMat.SetColor("_Color", new Color(0.6f, 0.2f, 1f));
         arrivalBurstGO.GetComponent<ParticleSystemRenderer>().material = abMat;
         arrPS.Play();
@@ -215,7 +215,7 @@ public static class RiftShockSpell
         sSizeOL.enabled = true;
         sSizeOL.size = new ParticleSystem.MinMaxCurve(1f, AnimationCurve.Linear(0f, 1f, 1f, 0f));
 
-        var sparksMat = new Material(Shader.Find("Particles/Standard Unlit"));
+        var sparksMat = new Material(ShaderCache.ParticleShader);
         sparksMat.SetColor("_Color", new Color(0.8f, 0.6f, 1f));
         sparksGO.GetComponent<ParticleSystemRenderer>().material = sparksMat;
         sparksPS.Play();

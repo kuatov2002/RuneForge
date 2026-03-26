@@ -67,7 +67,7 @@ public static class PlagueSparkSpell
         tSizeOL.enabled = true;
         tSizeOL.size = new ParticleSystem.MinMaxCurve(1f, AnimationCurve.Linear(0f, 1f, 1f, 0f));
 
-        var tMat = new Material(Shader.Find("Particles/Standard Unlit"));
+        var tMat = new Material(ShaderCache.ParticleShader);
         tMat.SetColor("_Color", new Color(0.7f, 1f, 0.3f));
         trailGO.GetComponent<ParticleSystemRenderer>().material = tMat;
         trailPS.Play();
@@ -133,7 +133,7 @@ public static class PlagueSparkSpell
         sShape.shapeType = ParticleSystemShapeType.Sphere;
         sShape.radius = 0.1f;
 
-        var sMat = new Material(Shader.Find("Particles/Standard Unlit"));
+        var sMat = new Material(ShaderCache.ParticleShader);
         sMat.SetColor("_Color", new Color(0.6f, 1f, 0.3f));
         sparkGO.GetComponent<ParticleSystemRenderer>().material = sMat;
         sparkPS.Play();
@@ -315,7 +315,7 @@ public class PlagueSparkProjectile : MonoBehaviour
         sOL.enabled = true;
         sOL.size = new ParticleSystem.MinMaxCurve(1f, AnimationCurve.Linear(0f, 1f, 1f, 0f));
 
-        var mat = new Material(Shader.Find("Particles/Standard Unlit"));
+        var mat = new Material(ShaderCache.ParticleShader);
         mat.SetColor("_Color", new Color(0.6f, 1f, 0.3f));
         burstGO.GetComponent<ParticleSystemRenderer>().material = mat;
         ps.Play();

@@ -66,7 +66,7 @@ public static class InfernoSpell
         tSize.enabled = true;
         tSize.size = new ParticleSystem.MinMaxCurve(1f, AnimationCurve.Linear(0f, 1f, 1f, 0f));
 
-        var tMat = new Material(Shader.Find("Particles/Standard Unlit"));
+        var tMat = new Material(ShaderCache.ParticleShader);
         tMat.SetColor("_Color", new Color(1f, 0.5f, 0.1f));
         trailGO.GetComponent<ParticleSystemRenderer>().material = tMat;
         trailPS.Play();
@@ -186,7 +186,7 @@ public class FireballProjectile : MonoBehaviour
         sOL.enabled = true;
         sOL.size = new ParticleSystem.MinMaxCurve(1f, AnimationCurve.Linear(0f, 1f, 1f, 0f));
 
-        var mat = new Material(Shader.Find("Particles/Standard Unlit"));
+        var mat = new Material(ShaderCache.ParticleShader);
         mat.SetColor("_Color", new Color(1f, 0.5f, 0.1f));
         burstGO.GetComponent<ParticleSystemRenderer>().material = mat;
         ps.Play();

@@ -96,7 +96,7 @@ public class SwarmAI : MonoBehaviour
         var em = ps.emission; em.rateOverTime = 0;
         em.SetBursts(new[] { new ParticleSystem.Burst(0f, 8) });
         var sh = ps.shape; sh.shapeType = ParticleSystemShapeType.Sphere; sh.radius = 0.15f;
-        var mat = new Material(Shader.Find("Particles/Standard Unlit"));
+        var mat = new Material(ShaderCache.ParticleShader);
         mat.SetColor("_Color", new Color(1f, 0.7f, 0.1f));
         burstGO.GetComponent<ParticleSystemRenderer>().material = mat;
         ps.Play();

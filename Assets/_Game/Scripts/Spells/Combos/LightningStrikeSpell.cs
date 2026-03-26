@@ -181,7 +181,7 @@ public static class LightningStrikeSpell
         sizeOL.enabled = true;
         sizeOL.size = new ParticleSystem.MinMaxCurve(1f, AnimationCurve.Linear(0f, 1f, 1f, 0f));
 
-        var mat = new Material(Shader.Find("Particles/Standard Unlit"));
+        var mat = new Material(ShaderCache.ParticleShader);
         mat.SetColor("_Color", new Color(1f, 1f, 0.3f));
         sparkGO.GetComponent<ParticleSystemRenderer>().material = mat;
         ps.Play();

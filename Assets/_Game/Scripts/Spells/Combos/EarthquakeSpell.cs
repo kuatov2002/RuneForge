@@ -87,7 +87,7 @@ public static class EarthquakeSpell
             });
         dustColorOL.color = dGrad;
 
-        var dustMat = new Material(Shader.Find("Particles/Standard Unlit"));
+        var dustMat = new Material(ShaderCache.ParticleShader);
         dustMat.SetColor("_Color", new Color(0.5f, 0.4f, 0.25f));
         dustGO.GetComponent<ParticleSystemRenderer>().material = dustMat;
         dustPS.Play();
@@ -269,7 +269,7 @@ public class EarthquakeDelayedRing : MonoBehaviour
         shape.shapeType = ParticleSystemShapeType.Circle;
         shape.radius = 0.3f;
 
-        var mat = new Material(Shader.Find("Particles/Standard Unlit"));
+        var mat = new Material(ShaderCache.ParticleShader);
         mat.SetColor("_Color", new Color(0.5f, 0.4f, 0.25f));
         dustGO.GetComponent<ParticleSystemRenderer>().material = mat;
         ps.Play();

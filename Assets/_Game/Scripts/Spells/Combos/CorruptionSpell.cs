@@ -65,7 +65,7 @@ public static class CorruptionSpell
         tSizeOL.enabled = true;
         tSizeOL.size = new ParticleSystem.MinMaxCurve(1f, AnimationCurve.Linear(0f, 1f, 1f, 0f));
 
-        var tMat = new Material(Shader.Find("Particles/Standard Unlit"));
+        var tMat = new Material(ShaderCache.ParticleShader);
         tMat.SetColor("_Color", new Color(0.4f, 0.2f, 0.6f));
         trailGO.GetComponent<ParticleSystemRenderer>().material = tMat;
         trailPS.Play();
@@ -158,7 +158,7 @@ public static class CorruptionSpell
         rNoise.frequency = 1.2f;
         rNoise.scrollSpeed = 0.5f;
 
-        var rMat = new Material(Shader.Find("Particles/Standard Unlit"));
+        var rMat = new Material(ShaderCache.ParticleShader);
         rMat.SetColor("_Color", new Color(0.4f, 0.2f, 0.6f));
         risingGO.GetComponent<ParticleSystemRenderer>().material = rMat;
         risingPS.Play();
@@ -208,7 +208,7 @@ public static class CorruptionSpell
             });
         mColorOL.color = mGrad;
 
-        var mMat = new Material(Shader.Find("Particles/Standard Unlit"));
+        var mMat = new Material(ShaderCache.ParticleShader);
         mMat.SetColor("_Color", new Color(0.2f, 0.4f, 0.1f, 0.1f));
         mistGO.GetComponent<ParticleSystemRenderer>().material = mMat;
         mistPS.Play();

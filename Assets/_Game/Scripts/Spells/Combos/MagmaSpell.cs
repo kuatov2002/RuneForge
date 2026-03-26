@@ -104,7 +104,7 @@ public static class MagmaSpell
             });
         bubbleColorOL.color = bGrad;
 
-        var bubbleMat = new Material(Shader.Find("Particles/Standard Unlit"));
+        var bubbleMat = new Material(ShaderCache.ParticleShader);
         bubbleMat.SetColor("_Color", new Color(1f, 0.5f, 0.1f));
         bubbleMat.SetFloat("_Mode", 1); // Additive
         bubbleGO.GetComponent<ParticleSystemRenderer>().material = bubbleMat;
@@ -134,7 +134,7 @@ public static class MagmaSpell
         shimmerShape.shapeType = ParticleSystemShapeType.Circle;
         shimmerShape.radius = radius * 0.6f;
 
-        var shimmerMat = new Material(Shader.Find("Particles/Standard Unlit"));
+        var shimmerMat = new Material(ShaderCache.ParticleShader);
         shimmerMat.SetColor("_Color", new Color(1f, 0.7f, 0.3f, 0.1f));
         shimmerGO.GetComponent<ParticleSystemRenderer>().material = shimmerMat;
         shimmerPS.Play();

@@ -114,7 +114,7 @@ public static class SteamSpell
         noise.scrollSpeed = 0.5f;
         noise.octaveCount = 2;
 
-        var psMat = new Material(Shader.Find("Particles/Standard Unlit"));
+        var psMat = new Material(ShaderCache.ParticleShader);
         psMat.SetColor("_Color", new Color(0.9f, 0.9f, 0.95f, 0.3f));
         steamVFXGO.GetComponent<ParticleSystemRenderer>().material = psMat;
         ps.Play();
@@ -219,7 +219,7 @@ public class SteamCloudZone : MonoBehaviour
             });
         colorOL.color = grad;
 
-        var explodeMat = new Material(Shader.Find("Particles/Standard Unlit"));
+        var explodeMat = new Material(ShaderCache.ParticleShader);
         explodeMat.SetColor("_Color", new Color(1f, 0.5f, 0.1f));
         explodeMat.SetFloat("_Mode", 1);
         explodeGO.GetComponent<ParticleSystemRenderer>().material = explodeMat;

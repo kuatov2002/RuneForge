@@ -64,7 +64,7 @@ public static class ImplodeSpell
         tSizeOL.enabled = true;
         tSizeOL.size = new ParticleSystem.MinMaxCurve(1f, AnimationCurve.Linear(0f, 1f, 1f, 0f));
 
-        var tMat = new Material(Shader.Find("Particles/Standard Unlit"));
+        var tMat = new Material(ShaderCache.ParticleShader);
         tMat.SetColor("_Color", new Color(0.6f, 0f, 0.4f));
         trailGO.GetComponent<ParticleSystemRenderer>().material = tMat;
         trailPS.Play();
@@ -164,7 +164,7 @@ public class ImplodeVortex : MonoBehaviour
             });
         sColorOL.color = sGrad;
 
-        var sMat = new Material(Shader.Find("Particles/Standard Unlit"));
+        var sMat = new Material(ShaderCache.ParticleShader);
         sMat.SetColor("_Color", new Color(0.5f, 0f, 0.3f));
         swirlGO.GetComponent<ParticleSystemRenderer>().material = sMat;
         _swirlPS.Play();
@@ -272,7 +272,7 @@ public class ImplodeVortex : MonoBehaviour
             });
         bColorOL.color = bGrad;
 
-        var bMat = new Material(Shader.Find("Particles/Standard Unlit"));
+        var bMat = new Material(ShaderCache.ParticleShader);
         bMat.SetColor("_Color", new Color(0.7f, 0.1f, 0.4f));
         burstGO.GetComponent<ParticleSystemRenderer>().material = bMat;
         burstPS.Play();

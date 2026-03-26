@@ -121,7 +121,7 @@ public static class GeyserSpell
             });
         colColorOL.color = cGrad;
 
-        var colMat = new Material(Shader.Find("Particles/Standard Unlit"));
+        var colMat = new Material(ShaderCache.ParticleShader);
         colMat.SetColor("_Color", new Color(0.3f, 0.6f, 1f));
         columnGO.GetComponent<ParticleSystemRenderer>().material = colMat;
         columnPS.Play();
@@ -197,7 +197,7 @@ public static class GeyserSpell
             new[] { new GradientAlphaKey(0.15f, 0f), new GradientAlphaKey(0.08f, 0.5f), new GradientAlphaKey(0f, 1f) });
         mistColorOL.color = mGrad;
 
-        var mistMat = new Material(Shader.Find("Particles/Standard Unlit"));
+        var mistMat = new Material(ShaderCache.ParticleShader);
         mistMat.SetColor("_Color", new Color(0.7f, 0.85f, 1f, 0.15f));
         mistGO.GetComponent<ParticleSystemRenderer>().material = mistMat;
         mistPS.Play();

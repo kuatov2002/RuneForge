@@ -218,7 +218,7 @@ public static class BulwarkSpell
             });
         dustColor.color = dGrad;
 
-        var mat = new Material(Shader.Find("Particles/Standard Unlit"));
+        var mat = new Material(ShaderCache.ParticleShader);
         mat.SetColor("_Color", new Color(0.55f, 0.45f, 0.3f));
         dustGO.GetComponent<ParticleSystemRenderer>().material = mat;
         dustPS.Play();

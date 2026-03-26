@@ -96,7 +96,7 @@ public class ShamblerAI : MonoBehaviour
         var em = ps.emission; em.rateOverTime = 0;
         em.SetBursts(new[] { new ParticleSystem.Burst(0f, 12) });
         var sh = ps.shape; sh.shapeType = ParticleSystemShapeType.Sphere; sh.radius = 0.2f;
-        var mat = new Material(Shader.Find("Particles/Standard Unlit"));
+        var mat = new Material(ShaderCache.ParticleShader);
         mat.SetColor("_Color", baseColor);
         burstGO.GetComponent<ParticleSystemRenderer>().material = mat;
         ps.Play();

@@ -74,7 +74,7 @@ public static class GenericComboSpell
             });
         colorOL.color = grad;
 
-        var burstMat = new Material(Shader.Find("Particles/Standard Unlit"));
+        var burstMat = new Material(ShaderCache.ParticleShader);
         burstMat.SetColor("_Color", def.color);
         burstMat.SetFloat("_Mode", 1); // Additive
         burstGO.GetComponent<ParticleSystemRenderer>().material = burstMat;

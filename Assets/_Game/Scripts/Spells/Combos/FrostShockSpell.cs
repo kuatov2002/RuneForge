@@ -98,7 +98,7 @@ public static class FrostShockSpell
         sparkSizeOL.enabled = true;
         sparkSizeOL.size = new ParticleSystem.MinMaxCurve(1f, AnimationCurve.Linear(0f, 1f, 1f, 0f));
 
-        var sparkMat = new Material(Shader.Find("Particles/Standard Unlit"));
+        var sparkMat = new Material(ShaderCache.ParticleShader);
         sparkMat.SetColor("_Color", new Color(1f, 1f, 0.3f));
         sparkGO.GetComponent<ParticleSystemRenderer>().material = sparkMat;
         sparkPS.Play();
@@ -135,7 +135,7 @@ public static class FrostShockSpell
             new[] { new GradientAlphaKey(0f, 0f), new GradientAlphaKey(0.1f, 0.3f), new GradientAlphaKey(0.06f, 0.7f), new GradientAlphaKey(0f, 1f) });
         mistColorOL.color = mGrad;
 
-        var mistMat = new Material(Shader.Find("Particles/Standard Unlit"));
+        var mistMat = new Material(ShaderCache.ParticleShader);
         mistMat.SetColor("_Color", new Color(0.5f, 0.8f, 1f, 0.1f));
         mistGO.GetComponent<ParticleSystemRenderer>().material = mistMat;
         mistPS.Play();

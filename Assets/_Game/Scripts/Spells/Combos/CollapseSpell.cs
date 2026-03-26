@@ -113,7 +113,7 @@ public class CollapseEffect : MonoBehaviour
             });
         tColorOL.color = tGrad;
 
-        var tMat = new Material(Shader.Find("Particles/Standard Unlit"));
+        var tMat = new Material(ShaderCache.ParticleShader);
         tMat.SetColor("_Color", new Color(0.5f, 0f, 0.8f));
         telegraphParticleGO.GetComponent<ParticleSystemRenderer>().material = tMat;
         _telegraphPS.Play();
@@ -259,7 +259,7 @@ public class CollapseEffect : MonoBehaviour
             });
         bColorOL.color = bGrad;
 
-        var bMat = new Material(Shader.Find("Particles/Standard Unlit"));
+        var bMat = new Material(ShaderCache.ParticleShader);
         bMat.SetColor("_Color", new Color(0.6f, 0f, 1f));
         burstGO.GetComponent<ParticleSystemRenderer>().material = bMat;
         burstPS.Play();

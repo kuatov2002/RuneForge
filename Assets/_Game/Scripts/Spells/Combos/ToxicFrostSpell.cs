@@ -111,7 +111,7 @@ public static class ToxicFrostSpell
             });
         bColorOL.color = bGrad;
 
-        var bMat = new Material(Shader.Find("Particles/Standard Unlit"));
+        var bMat = new Material(ShaderCache.ParticleShader);
         bMat.SetColor("_Color", new Color(0.15f, 0.7f, 0.4f, 0.5f));
         bubbleGO.GetComponent<ParticleSystemRenderer>().material = bMat;
         bubblePS.Play();
@@ -147,7 +147,7 @@ public static class ToxicFrostSpell
         mNoise.frequency = 1f;
         mNoise.scrollSpeed = 0.3f;
 
-        var mMat = new Material(Shader.Find("Particles/Standard Unlit"));
+        var mMat = new Material(ShaderCache.ParticleShader);
         mMat.SetColor("_Color", new Color(0.2f, 0.7f, 0.6f, 0.12f));
         mistGO.GetComponent<ParticleSystemRenderer>().material = mMat;
         mistPS.Play();

@@ -68,7 +68,7 @@ public static class DetonateSpell
         tSizeOL.enabled = true;
         tSizeOL.size = new ParticleSystem.MinMaxCurve(1f, AnimationCurve.Linear(0f, 1f, 1f, 0f));
 
-        var tMat = new Material(Shader.Find("Particles/Standard Unlit"));
+        var tMat = new Material(ShaderCache.ParticleShader);
         tMat.SetColor("_Color", new Color(0.8f, 0.6f, 0.1f));
         trailGO.GetComponent<ParticleSystemRenderer>().material = tMat;
         trailPS.Play();
@@ -150,7 +150,7 @@ public static class DetonateSpell
             });
         colorOL.color = grad;
 
-        var mat = new Material(Shader.Find("Particles/Standard Unlit"));
+        var mat = new Material(ShaderCache.ParticleShader);
         mat.SetColor("_Color", new Color(0.8f, 0.6f, 0.1f));
         mat.SetFloat("_Mode", 1);
         burstGO.GetComponent<ParticleSystemRenderer>().material = mat;
@@ -226,7 +226,7 @@ public static class DetonateSpell
         bSizeOL.size = new ParticleSystem.MinMaxCurve(1f,
             AnimationCurve.EaseInOut(0f, 0.5f, 1f, 0f));
 
-        var bMat = new Material(Shader.Find("Particles/Standard Unlit"));
+        var bMat = new Material(ShaderCache.ParticleShader);
         bMat.SetColor("_Color", new Color(0.2f, 0.7f, 0.1f, 0.6f));
         bubbleGO.GetComponent<ParticleSystemRenderer>().material = bMat;
         bubblePS.Play();

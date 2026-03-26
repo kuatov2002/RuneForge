@@ -150,7 +150,7 @@ public static class SpellInteractionSystem
         var em = ps.emission; em.rateOverTime = 0;
         em.SetBursts(new[] { new ParticleSystem.Burst(0f, 20) });
         var sh = ps.shape; sh.shapeType = ParticleSystemShapeType.Sphere; sh.radius = 0.3f;
-        var mat = new Material(Shader.Find("Particles/Standard Unlit"));
+        var mat = new Material(ShaderCache.ParticleShader);
         mat.SetColor("_Color", new Color(0.9f, 0.9f, 1f, 0.5f));
         burstGO.GetComponent<ParticleSystemRenderer>().material = mat;
         ps.Play();
@@ -261,7 +261,7 @@ public static class SpellInteractionSystem
         var em = ps.emission; em.rateOverTime = 0;
         em.SetBursts(new[] { new ParticleSystem.Burst(0f, 25) });
         var sh = ps.shape; sh.shapeType = ParticleSystemShapeType.Sphere; sh.radius = radius * 0.5f;
-        var mat = new Material(Shader.Find("Particles/Standard Unlit"));
+        var mat = new Material(ShaderCache.ParticleShader);
         mat.SetColor("_Color", new Color(1f, 1f, 0.3f));
         sparkGO.GetComponent<ParticleSystemRenderer>().material = mat;
         ps.Play();

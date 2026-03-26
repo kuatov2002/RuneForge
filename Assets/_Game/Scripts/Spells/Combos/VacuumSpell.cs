@@ -60,7 +60,7 @@ public static class VacuumSpell
         ts.shapeType = ParticleSystemShapeType.Sphere;
         ts.radius = 0.08f;
 
-        var tMat = new Material(Shader.Find("Particles/Standard Unlit"));
+        var tMat = new Material(ShaderCache.ParticleShader);
         tMat.SetColor("_Color", new Color(0.7f, 0.4f, 1f));
         trailGO.GetComponent<ParticleSystemRenderer>().material = tMat;
         trailPS.Play();
@@ -142,7 +142,7 @@ public static class VacuumSpell
         sNoise.frequency = 2f;
         sNoise.scrollSpeed = 1f;
 
-        var sMat = new Material(Shader.Find("Particles/Standard Unlit"));
+        var sMat = new Material(ShaderCache.ParticleShader);
         sMat.SetColor("_Color", new Color(0.6f, 0.3f, 1f));
         swirlGO.GetComponent<ParticleSystemRenderer>().material = sMat;
         swirlPS.Play();

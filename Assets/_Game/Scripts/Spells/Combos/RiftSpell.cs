@@ -60,7 +60,7 @@ public static class RiftSpell
         ts.shapeType = ParticleSystemShapeType.Sphere;
         ts.radius = 0.08f;
 
-        var tMat = new Material(Shader.Find("Particles/Standard Unlit"));
+        var tMat = new Material(ShaderCache.ParticleShader);
         tMat.SetColor("_Color", new Color(0.3f, 0.1f, 0.9f));
         trailGO.GetComponent<ParticleSystemRenderer>().material = tMat;
         trailPS.Play();
@@ -157,7 +157,7 @@ public static class RiftSpell
         noise.frequency = 1f;
         noise.scrollSpeed = 0.5f;
 
-        var psMat = new Material(Shader.Find("Particles/Standard Unlit"));
+        var psMat = new Material(ShaderCache.ParticleShader);
         psMat.SetColor("_Color", new Color(0.3f, 0.1f, 0.8f));
         particleGO.GetComponent<ParticleSystemRenderer>().material = psMat;
         ps.Play();

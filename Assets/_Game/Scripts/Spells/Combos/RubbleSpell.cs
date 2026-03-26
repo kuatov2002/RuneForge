@@ -172,7 +172,7 @@ public class RubbleStorm : MonoBehaviour
             });
         dustColorOL.color = dGrad;
 
-        var dustMat = new Material(Shader.Find("Particles/Standard Unlit"));
+        var dustMat = new Material(ShaderCache.ParticleShader);
         dustMat.SetColor("_Color", new Color(0.5f, 0.4f, 0.3f));
         dustGO.GetComponent<ParticleSystemRenderer>().material = dustMat;
         dustPS.Play();

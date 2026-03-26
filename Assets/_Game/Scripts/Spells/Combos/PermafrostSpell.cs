@@ -110,7 +110,7 @@ public static class PermafrostSpell
             });
         sparkleColorOL.color = sGrad;
 
-        var sparkleMat = new Material(Shader.Find("Particles/Standard Unlit"));
+        var sparkleMat = new Material(ShaderCache.ParticleShader);
         sparkleMat.SetColor("_Color", new Color(0.9f, 0.95f, 1f));
         sparkleGO.GetComponent<ParticleSystemRenderer>().material = sparkleMat;
         sparklePS.Play();
@@ -152,7 +152,7 @@ public static class PermafrostSpell
             new[] { new GradientAlphaKey(0f, 0f), new GradientAlphaKey(0.12f, 0.3f), new GradientAlphaKey(0.08f, 0.7f), new GradientAlphaKey(0f, 1f) });
         mistColorOL.color = mGrad;
 
-        var mistMat = new Material(Shader.Find("Particles/Standard Unlit"));
+        var mistMat = new Material(ShaderCache.ParticleShader);
         mistMat.SetColor("_Color", new Color(0.7f, 0.85f, 1f, 0.1f));
         mistGO.GetComponent<ParticleSystemRenderer>().material = mistMat;
         mistPS.Play();

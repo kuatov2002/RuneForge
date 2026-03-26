@@ -137,7 +137,7 @@ public static class CycloneSpell
         windNoise.strength = 0.6f;
         windNoise.frequency = 2f;
 
-        var windMat = new Material(Shader.Find("Particles/Standard Unlit"));
+        var windMat = new Material(ShaderCache.ParticleShader);
         windMat.SetColor("_Color", new Color(0.7f, 0.85f, 1f, 0.5f));
         windGO.GetComponent<ParticleSystemRenderer>().material = windMat;
         windPS.Play();
@@ -327,7 +327,7 @@ public class CycloneZone : MonoBehaviour
         sizeOL.enabled = true;
         sizeOL.size = new ParticleSystem.MinMaxCurve(1f, AnimationCurve.Linear(0f, 1f, 1f, 0f));
 
-        var burstMat = new Material(Shader.Find("Particles/Standard Unlit"));
+        var burstMat = new Material(ShaderCache.ParticleShader);
         burstMat.SetColor("_Color", new Color(0.7f, 0.85f, 1f));
         burstGO.GetComponent<ParticleSystemRenderer>().material = burstMat;
         ps.Play();
