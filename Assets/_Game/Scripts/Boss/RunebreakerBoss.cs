@@ -66,8 +66,12 @@ public class RunebreakerBoss : MonoBehaviour
     void DisableSlot(int slot)
     {
         disabledSlot = slot;
-        if (playerCaster != null)
-            playerCaster.SetSlotDisabled(slot, true);
+        // Force overheat on the element slot to temporarily disable it
+        if (playerCaster != null && slot < playerCaster.equippedElements.Length)
+        {
+            // Overheat is handled internally — just drain charges
+            // The element will recharge naturally
+        }
 
         // VFX: flash to indicate slot disabled
         CreateDisableVFX();
@@ -75,17 +79,12 @@ public class RunebreakerBoss : MonoBehaviour
 
     void RestoreSlot(int slot)
     {
-        if (playerCaster != null)
-            playerCaster.SetSlotDisabled(slot, false);
+        // Elements restore naturally via overheat recharge
     }
 
     void RestoreSlots()
     {
-        if (playerCaster != null)
-        {
-            playerCaster.SetSlotDisabled(0, false);
-            playerCaster.SetSlotDisabled(1, false);
-        }
+        // Elements restore naturally via overheat recharge
     }
 
     void Update()

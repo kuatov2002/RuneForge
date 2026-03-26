@@ -125,10 +125,6 @@ public class PlayerController : MonoBehaviour
             Invoke(nameof(EndIFrames), IFrameDuration);
             SFXSystem.Play(SFXSystem.SFXType.Dash, transform.position);
 
-            // Reactive dual-cast on dash
-            var dualCast = GetComponent<DualCast>();
-            if (dualCast != null) dualCast.OnDash(transform.forward);
-
             // Dash fire relic
             var relicMgr = GetComponent<RelicManager>();
             if (relicMgr != null)

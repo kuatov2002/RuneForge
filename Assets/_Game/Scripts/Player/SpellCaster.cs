@@ -4,36 +4,122 @@ using System;
 
 public class SpellCaster : MonoBehaviour
 {
-    public SpellData[] spellSlots = new SpellData[2];
-    public int activeSlot;
+    // ── Element slots (keys 1-4) ──
+    public ElementSO[] equippedElements = new ElementSO[4];
 
-    public event Action OnSpellChanged;
-    public event Action<ElementSO> OnSpellFired; // For Mirror enemy
+    // ── Active orbs ──
+    public ElementSO leftOrb;
+    public ElementSO rightOrb;
 
+    // ── Overheat system ──
+    int[] charges;        // current charges per element slot
+    float[] overheatTimers; // >0 means overheated, counting down
+    const float OverheatRechargeDefault = 5f;
+
+    // ── Charge shot ──
+    float chargeHoldTime;
+    bool isCharging;
+    const float ChargeThreshold = 0.4f;  // hold time to count as charged
+    const float MaxChargeTime = 1.5f;
+
+    // ── Combo bonus (variety tracking) ──
+    ElementType[] recentElements = new ElementType[6];
+    int recentIndex;
+    float comboMultiplier = 1f;
+
+    // ── Cooldown ──
     float cooldownTimer;
-    AuraForm activeAura;
-    OrbitForm activeOrbit;
-    bool[] slotDisabled = new bool[2];
 
-    public void SetSlotDisabled(int slot, bool disabled)
+    // ── Events ──
+    public event Action OnOrbsChanged;
+    public event Action<string> OnComboNameChanged; // fires combo name for HUD display
+
+    // ── Run stat upgrades ──
+    public float damageBonusMult = 1f;
+    public float cooldownBonusMult = 1f;
+    public float durationBonusMult = 1f;
+    public float radiusBonusMult = 1f;
+
+    OrbDisplay orbDisplay;
+
+    void Awake()
     {
-        if (slot < 0 || slot >= 2) return;
-        slotDisabled[slot] = disabled;
-        OnSpellChanged?.Invoke();
+        charges = new int[4];
+        overheatTimers = new float[4];
     }
 
-    public bool IsSlotDisabled(int slot) => slot >= 0 && slot < 2 && slotDisabled[slot];
+    /// <summary>Initialize with starting elements.</summary>
+    public void Init(ElementSO[] startingElements)
+    {
+        for (int i = 0; i < 4 && i < startingElements.Length; i++)
+            equippedElements[i] = startingElements[i];
 
-    public SpellData ActiveSpell => spellSlots[activeSlot];
+        for (int i = 0; i < 4; i++)
+            charges[i] = equippedElements[i] != null ? equippedElements[i].maxCharges : 4;
 
-    /// <summary>Spell cooldown progress: 0 = ready, 1 = full CD.</summary>
+        // Start with first two elements as orbs
+        if (equippedElements[0] != null) rightOrb = equippedElements[0];
+        if (equippedElements[1] != null) leftOrb = equippedElements[1];
+
+        // Create orb display
+        orbDisplay = gameObject.AddComponent<OrbDisplay>();
+        orbDisplay.Init(this);
+
+        UpdateComboName();
+    }
+
+    /// <summary>Replace an equipped element slot with a new element.</summary>
+    public void ReplaceElement(int slotIndex, ElementSO newElement)
+    {
+        if (slotIndex < 0 || slotIndex >= 4) return;
+        equippedElements[slotIndex] = newElement;
+        charges[slotIndex] = newElement.maxCharges;
+        overheatTimers[slotIndex] = 0;
+
+        // If replaced element was an active orb, update it
+        if (leftOrb != null && leftOrb == equippedElements[slotIndex])
+            leftOrb = newElement;
+        if (rightOrb != null && rightOrb == equippedElements[slotIndex])
+            rightOrb = newElement;
+
+        OnOrbsChanged?.Invoke();
+    }
+
+    /// <summary>Get current charges for element slot.</summary>
+    public int GetCharges(int slot) => slot >= 0 && slot < 4 ? charges[slot] : 0;
+
+    /// <summary>Is element slot overheated?</summary>
+    public bool IsOverheated(int slot) => slot >= 0 && slot < 4 && overheatTimers[slot] > 0;
+
+    /// <summary>Get overheat recharge progress (0 = overheated, 1 = ready).</summary>
+    public float GetOverheatProgress(int slot)
+    {
+        if (slot < 0 || slot >= 4 || overheatTimers[slot] <= 0) return 1f;
+        float maxTime = equippedElements[slot] != null ? equippedElements[slot].overheatRechargeTime : OverheatRechargeDefault;
+        return 1f - (overheatTimers[slot] / maxTime);
+    }
+
+    /// <summary>Is the player currently charging a shot?</summary>
+    public bool IsCharging => isCharging;
+    public float ChargeProgress => Mathf.Clamp01(chargeHoldTime / MaxChargeTime);
     public float CooldownNormalized
     {
         get
         {
-            var spell = ActiveSpell;
-            if (spell == null || spell.form == null || spell.form.cooldown <= 0) return 0f;
-            return Mathf.Clamp01(cooldownTimer / (spell.form.cooldown * spell.CooldownTierMult));
+            var def = CurrentComboDef;
+            if (def == null) return 0f;
+            float cd = def.cooldown * cooldownBonusMult;
+            return cd > 0 ? Mathf.Clamp01(cooldownTimer / cd) : 0f;
+        }
+    }
+
+    /// <summary>Current combo spell definition.</summary>
+    public ComboSpellDef CurrentComboDef
+    {
+        get
+        {
+            if (leftOrb == null || rightOrb == null) return null;
+            return ComboSpellRegistry.GetCombo(leftOrb.elementType, rightOrb.elementType);
         }
     }
 
@@ -43,71 +129,92 @@ public class SpellCaster : MonoBehaviour
         var mouse = Mouse.current;
         if (kb == null || mouse == null) return;
 
-        if (kb.qKey.wasPressedThisFrame)
+        // ── Element switching (keys 1-4) ──
+        if (kb.digit1Key.wasPressedThisFrame) PushElement(0);
+        if (kb.digit2Key.wasPressedThisFrame) PushElement(1);
+        if (kb.digit3Key.wasPressedThisFrame) PushElement(2);
+        if (kb.digit4Key.wasPressedThisFrame) PushElement(3);
+
+        // ── Overheat recharge ──
+        for (int i = 0; i < 4; i++)
         {
-            DeactivatePassiveForms();
-            activeSlot = (activeSlot + 1) % 2;
-            ActivatePassiveForms();
-            OnSpellChanged?.Invoke();
+            if (overheatTimers[i] > 0)
+            {
+                overheatTimers[i] -= Time.deltaTime;
+                if (overheatTimers[i] <= 0)
+                {
+                    // Fully recharge
+                    charges[i] = equippedElements[i] != null ? equippedElements[i].maxCharges : 4;
+                    overheatTimers[i] = 0;
+                    OnOrbsChanged?.Invoke();
+                }
+            }
         }
 
-        cooldownTimer -= Time.deltaTime;
+        // ── Cooldown ──
+        if (cooldownTimer > 0) cooldownTimer -= Time.deltaTime;
 
-        var spell = ActiveSpell;
-        if (spell == null || !spell.IsComplete) return;
-        if (slotDisabled[activeSlot]) return;
+        // ── Casting (LMB) ──
+        if (leftOrb == null || rightOrb == null) return;
 
-        // Aura is passive
-        if (spell.form.formType == FormType.Aura && activeAura == null)
-            ActivatePassiveForms();
-
-        if (spell.form.formType != FormType.Aura)
+        if (mouse.leftButton.wasPressedThisFrame && cooldownTimer <= 0)
         {
-            if (mouse.leftButton.wasPressedThisFrame && cooldownTimer <= 0)
+            isCharging = true;
+            chargeHoldTime = 0;
+        }
+
+        if (isCharging)
+        {
+            chargeHoldTime += Time.deltaTime;
+
+            if (mouse.leftButton.wasReleasedThisFrame || chargeHoldTime >= MaxChargeTime)
             {
-                Cast(spell);
-                cooldownTimer = spell.form.cooldown * spell.CooldownTierMult;
-
-                // Dual-cast tracking
-                var dualCast = GetComponent<DualCast>();
-                if (dualCast != null) dualCast.OnCast(activeSlot);
-
-                SFXSystem.Play(SFXSystem.SFXType.Cast, transform.position);
+                bool charged = chargeHoldTime >= ChargeThreshold;
+                Fire(charged);
+                isCharging = false;
+                chargeHoldTime = 0;
             }
         }
     }
 
-    void ActivatePassiveForms()
+    void PushElement(int slotIndex)
     {
-        var spell = ActiveSpell;
-        if (spell == null || !spell.IsComplete) return;
+        if (slotIndex < 0 || slotIndex >= 4) return;
+        var elem = equippedElements[slotIndex];
+        if (elem == null) return;
+        if (IsOverheated(slotIndex)) return; // Can't select overheated element
 
-        if (spell.form.formType == FormType.Aura && activeAura == null)
-        {
-            float dmg = CalculateDamage(spell);
-            float rad = spell.form.auraRadius;
-            var mod = GetActiveModifier(spell);
+        // Push: new element appears on right, old right goes to left, old left disappears
+        leftOrb = rightOrb;
+        rightOrb = elem;
 
-            if (mod != null && mod.modifierType == ModifierType.Oversize)
-                rad *= mod.sizeMultiplier;
-
-            activeAura = gameObject.AddComponent<AuraForm>();
-            activeAura.Init(rad, dmg, spell.element, spell.form.cooldown,
-                GetLeechPercent(spell), GetComponent<Health>(), IsVolatile(spell), GetVolatileMiss(spell));
-        }
+        UpdateComboName();
+        OnOrbsChanged?.Invoke();
+        SFXSystem.Play(SFXSystem.SFXType.MenuClick, transform.position, 0.3f);
     }
 
-    void DeactivatePassiveForms()
+    void Fire(bool charged)
     {
-        if (activeAura != null) { activeAura.Deactivate(); activeAura = null; }
-        if (activeOrbit != null) { activeOrbit.Cleanup(); activeOrbit = null; }
-    }
+        var def = CurrentComboDef;
+        if (def == null) return;
 
-    void Cast(SpellData spell)
-    {
+        // Consume charges
+        int chargeCost = charged ? 2 : 1;
+        ConsumeCharges(leftOrb, chargeCost);
+        ConsumeCharges(rightOrb, chargeCost);
+
+        // Calculate damage with bonuses
+        UpdateComboMultiplier();
+        float dmgMult = damageBonusMult * comboMultiplier * MetaProgression.DamageMultiplier;
+
+        // Crit chance
+        if (UnityEngine.Random.value < MetaProgression.CritChance)
+            dmgMult *= 2f;
+
+        // Relic modifiers
         var relicMgr = GetComponent<RelicManager>();
 
-        // BloodPact: spells cost 1 HP to cast
+        // BloodPact cost
         if (relicMgr != null && relicMgr.HasRelic(RelicType.BloodPact))
         {
             var hp = GetComponent<Health>();
@@ -118,204 +225,99 @@ public class SpellCaster : MonoBehaviour
             }
         }
 
-        // Chaos: randomize element on this cast
-        if (relicMgr != null && relicMgr.HasRelic(RelicType.Chaos))
+        // Get target position
+        Vector3 targetPos = GetCursorWorldPosition();
+
+        // Set cooldown
+        cooldownTimer = def.cooldown * cooldownBonusMult;
+
+        // Fire the combo spell
+        ComboSpellFactory.Cast(def, transform.position, targetPos, dmgMult, charged);
+
+        // Track element variety
+        TrackElementUsage(leftOrb.elementType);
+        TrackElementUsage(rightOrb.elementType);
+
+        SFXSystem.Play(SFXSystem.SFXType.Cast, transform.position);
+    }
+
+    void ConsumeCharges(ElementSO elem, int cost)
+    {
+        if (elem == null) return;
+        int slot = GetElementSlot(elem);
+        if (slot < 0) return;
+
+        charges[slot] = Mathf.Max(0, charges[slot] - cost);
+
+        if (charges[slot] <= 0)
         {
-            var randomElem = relicMgr.GetRandomElement();
-            if (randomElem != null) spell = new SpellData { element = randomElem, form = spell.form, modifier = spell.modifier };
-        }
-
-        OnSpellFired?.Invoke(spell.element);
-
-        var mod = GetActiveModifier(spell);
-        ModifierType modType = mod != null ? mod.modifierType : ModifierType.None;
-
-        int count = 1;
-        float spreadAngle = 0;
-        float damageMult = spell.modifier != null ? spell.modifier.damageMultiplier : 1f;
-        float damage = spell.element.baseDamage * spell.DamageTierMult * damageMult * MetaProgression.DamageMultiplier;
-
-        // Dual-cast bonus
-        var dualCast = GetComponent<DualCast>();
-        if (dualCast != null) damage *= dualCast.BonusMultiplier;
-
-        // Crit chance from meta-progression
-        if (UnityEngine.Random.value < MetaProgression.CritChance)
-            damage *= 2f;
-
-        // Volatile: 1.5x damage
-        if (modType == ModifierType.Volatile)
-            damage *= 1.5f;
-
-        // Split: multiple projectiles
-        if (modType == ModifierType.Split)
-        {
-            count = mod.splitCount;
-            spreadAngle = mod.splitSpreadAngle;
-        }
-
-        // Form-specific oversize params
-        float sizeScale = (modType == ModifierType.Oversize) ? mod.sizeMultiplier : 1f;
-
-        switch (spell.form.formType)
-        {
-            case FormType.Bolt:
-                FireDirectional(spell, count, spreadAngle, damage, (dir, dmg) =>
-                {
-                    CreateBolt(dir, spell, dmg, mod);
-                });
-                break;
-
-            case FormType.Cone:
-                FireDirectional(spell, count, spreadAngle, damage, (dir, dmg) =>
-                {
-                    float coneAngle = spell.form.coneAngle * sizeScale;
-                    float coneRange = spell.form.coneRange * sizeScale;
-                    ConeAttack.Fire(transform.position, dir, coneAngle, coneRange, dmg, spell.element,
-                        GetLeechPercent(spell), GetComponent<Health>(), IsVolatile(spell), GetVolatileMiss(spell));
-                });
-                break;
-
-            case FormType.Beam:
-                FireDirectional(spell, count, spreadAngle, damage, (dir, dmg) =>
-                {
-                    float beamWidth = spell.form.beamWidth * sizeScale;
-                    float beamRange = spell.form.beamRange;
-                    int pierce = (modType == ModifierType.Pierce) ? mod.pierceCount : 0;
-                    BeamAttack.Fire(transform.position, dir, beamRange, beamWidth, dmg, spell.element,
-                        GetLeechPercent(spell), GetComponent<Health>(), IsVolatile(spell), GetVolatileMiss(spell));
-                });
-                break;
-
-            case FormType.Orbit:
-                if (activeOrbit != null) break;
-                int orbCount = spell.form.orbitCount;
-                if (modType == ModifierType.Split) orbCount += mod.splitCount;
-                float orbRadius = spell.form.orbitRadius * sizeScale;
-                float orbSize = sizeScale;
-                activeOrbit = gameObject.AddComponent<OrbitForm>();
-                activeOrbit.Init(orbRadius, spell.form.orbitSpeed, orbCount, damage, spell.element,
-                    spell.form.orbitDuration, orbSize, modType == ModifierType.Bounce ? mod.bounceCount : 0,
-                    modType == ModifierType.Homing, GetLeechPercent(spell), GetComponent<Health>(),
-                    IsVolatile(spell), GetVolatileMiss(spell));
-                break;
-
-            case FormType.Trap:
-                float trapRadius = spell.form.trapRadius * sizeScale;
-                PlaceTraps(spell, count, damage, trapRadius,
-                    GetLeechPercent(spell), GetComponent<Health>(), IsVolatile(spell), GetVolatileMiss(spell));
-                break;
+            // Overheat!
+            float rechargeTime = elem.overheatRechargeTime;
+            overheatTimers[slot] = rechargeTime;
+            OnOrbsChanged?.Invoke();
         }
     }
 
-    ModifierSO GetActiveModifier(SpellData spell)
+    int GetElementSlot(ElementSO elem)
     {
-        if (spell.modifier == null || spell.modifier.modifierType == ModifierType.None) return null;
-        if (!ModifierSO.IsCompatible(spell.modifier.modifierType, spell.form.formType)) return null;
-        return spell.modifier;
+        for (int i = 0; i < 4; i++)
+            if (equippedElements[i] == elem) return i;
+        return -1;
     }
 
-    float GetLeechPercent(SpellData spell)
-    {
-        var mod = GetActiveModifier(spell);
-        return (mod != null && mod.modifierType == ModifierType.Leech) ? mod.leechPercent : 0f;
-    }
-
-    bool IsVolatile(SpellData spell)
-    {
-        var mod = GetActiveModifier(spell);
-        return mod != null && mod.modifierType == ModifierType.Volatile;
-    }
-
-    float GetVolatileMiss(SpellData spell)
-    {
-        var mod = GetActiveModifier(spell);
-        return (mod != null && mod.modifierType == ModifierType.Volatile) ? mod.volatileMissChance : 0f;
-    }
-
-    void FireDirectional(SpellData spell, int count, float spreadAngle, float damage, Action<Vector3, float> fireAction)
-    {
-        Vector3 baseDir = transform.forward;
-        float startAngle = -(count - 1) * spreadAngle * 0.5f;
-
-        for (int i = 0; i < count; i++)
-        {
-            float angle = startAngle + i * spreadAngle;
-            Vector3 dir = Quaternion.Euler(0, angle, 0) * baseDir;
-            fireAction(dir, damage);
-        }
-    }
-
-    void CreateBolt(Vector3 dir, SpellData spell, float damage, ModifierSO mod)
-    {
-        var go = GameObject.CreatePrimitive(PrimitiveType.Sphere);
-        go.name = "Bolt";
-        go.transform.position = transform.position + dir * 0.6f + Vector3.up * 0.5f;
-
-        float scale = 0.25f;
-        float spd = spell.form.projectileSpeed;
-
-        if (mod != null && mod.modifierType == ModifierType.Oversize)
-        {
-            scale *= mod.sizeMultiplier;
-            spd *= mod.speedPenalty;
-        }
-        if (mod != null && mod.modifierType == ModifierType.Homing)
-            spd *= mod.homingSpeedMult;
-
-        go.transform.localScale = Vector3.one * scale;
-
-        var col = go.GetComponent<SphereCollider>();
-        col.isTrigger = true;
-        col.radius = 1.8f;
-
-        var rb = go.AddComponent<Rigidbody>();
-        rb.useGravity = false;
-        rb.isKinematic = true;
-
-        var mat = ShaderCache.NewEmissive(spell.element.color);
-        go.GetComponent<Renderer>().material = mat;
-
-        var proj = go.AddComponent<SpellProjectile>();
-        proj.Setup(dir, spd, damage, spell.element, spell.form.range);
-        proj.ApplyModifier(mod, GetComponent<Health>());
-    }
-
-    void PlaceTraps(SpellData spell, int count, float damage, float radius,
-        float leech, Health playerHp, bool isVolatile, float missCh)
+    Vector3 GetCursorWorldPosition()
     {
         var mouse = Mouse.current;
-        if (mouse == null || Camera.main == null) return;
+        if (mouse == null || Camera.main == null) return transform.position + transform.forward * 5f;
 
         Ray ray = Camera.main.ScreenPointToRay(mouse.position.ReadValue());
         Plane ground = new Plane(Vector3.up, 0);
-        if (!ground.Raycast(ray, out float d)) return;
-
-        Vector3 basePos = ray.GetPoint(d);
-
-        for (int i = 0; i < count; i++)
-        {
-            Vector3 offset = count > 1 ? UnityEngine.Random.insideUnitSphere * 1.5f : Vector3.zero;
-            offset.y = 0;
-            TrapForm.Create(basePos + offset, damage, spell.element, radius, spell.form.trapArmTime,
-                leech, playerHp, isVolatile, missCh);
-        }
+        if (ground.Raycast(ray, out float d))
+            return ray.GetPoint(d);
+        return transform.position + transform.forward * 5f;
     }
 
-    float CalculateDamage(SpellData spell)
+    void TrackElementUsage(ElementType type)
     {
-        float dmg = spell.element.baseDamage * MetaProgression.DamageMultiplier;
-        if (spell.modifier != null) dmg *= spell.modifier.damageMultiplier;
-        var mod = GetActiveModifier(spell);
-        if (mod != null && mod.modifierType == ModifierType.Volatile)
-            dmg *= 1.5f;
-        if (UnityEngine.Random.value < MetaProgression.CritChance)
-            dmg *= 2f;
-        return dmg;
+        recentElements[recentIndex % recentElements.Length] = type;
+        recentIndex++;
+    }
+
+    void UpdateComboMultiplier()
+    {
+        // Count unique elements in recent history
+        int filled = Mathf.Min(recentIndex, recentElements.Length);
+        if (filled < 2)
+        {
+            comboMultiplier = 1f;
+            return;
+        }
+
+        var seen = new System.Collections.Generic.HashSet<ElementType>();
+        for (int i = 0; i < filled; i++)
+            seen.Add(recentElements[i]);
+
+        int uniqueCount = seen.Count;
+
+        if (uniqueCount <= 1)
+            comboMultiplier = 0.7f; // Spam penalty
+        else if (uniqueCount == 2)
+            comboMultiplier = 1.0f; // Normal
+        else if (uniqueCount == 3)
+            comboMultiplier = 1.15f; // Good variety
+        else
+            comboMultiplier = 1.3f; // Excellent variety
+    }
+
+    void UpdateComboName()
+    {
+        var def = CurrentComboDef;
+        if (def != null)
+            OnComboNameChanged?.Invoke(def.comboName);
     }
 
     void OnDisable()
     {
-        DeactivatePassiveForms();
+        if (orbDisplay != null) { Destroy(orbDisplay); orbDisplay = null; }
     }
 }

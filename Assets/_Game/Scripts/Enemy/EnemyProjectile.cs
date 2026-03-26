@@ -43,7 +43,6 @@ public class EnemyProjectile : MonoBehaviour
         if (health != null && !health.IsDead)
         {
             health.TakeDamage(damage);
-            if (element != null) health.ApplyStatusEffect(element);
         }
         Destroy(gameObject);
     }

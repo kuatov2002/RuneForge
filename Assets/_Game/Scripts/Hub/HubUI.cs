@@ -420,13 +420,15 @@ public class HubUI : MonoBehaviour
 
         body.Add(Lbl($"DMG: {elem.baseDamage}", 14, new Color(0.8f, 0.8f, 0.85f)));
 
-        string effectDesc = elem.statusEffect switch
+        string effectDesc = elem.elementType switch
         {
-            StatusEffectType.Burn => "Burns over time",
-            StatusEffectType.Slow => "Slows, 2x = Freeze",
-            StatusEffectType.Chain => "Chains to nearby",
-            StatusEffectType.Poison => "Stacking poison",
-            StatusEffectType.VoidMark => "Void pull on kill",
+            ElementType.Fire => "Burst damage, burning",
+            ElementType.Water => "Freezing, control",
+            ElementType.Earth => "Defense, walls",
+            ElementType.Air => "Mobility, knockback",
+            ElementType.Lightning => "Chain damage, stun",
+            ElementType.Poison => "DoT, spreading",
+            ElementType.Void => "Gravity, implosion",
             _ => ""
         };
         body.Add(Lbl(effectDesc, 13, Dim));

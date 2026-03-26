@@ -7,16 +7,13 @@ using Random = UnityEngine.Random;
 public class Bootstrap : MonoBehaviour
 {
     // Elements
-    ElementSO fireElem, iceElem, lightningElem, poisonElem, voidElem;
-    ElementSO[] allElements;
+    ElementSO fireElem, waterElem, earthElem, airElem;
+    ElementSO lightningElem, poisonElem, voidElem;
+    ElementSO[] baseElements;   // Fire, Water, Earth, Air
+    ElementSO[] allElements;    // All 7
 
-    // Forms
-    FormSO boltForm, coneForm, beamForm, auraForm, orbitForm, trapForm;
-    FormSO[] allForms;
-
-    // Modifiers
-    ModifierSO noneMod, splitMod, pierceMod, bounceMod, leechMod, oversizeMod, volatileMod, homingMod;
-    ModifierSO[] allModifiers;
+    // Synergy system
+    SynergySystem synergySystem;
 
     // Relics
     RelicSO[] allRelics;
@@ -169,38 +166,9 @@ public class Bootstrap : MonoBehaviour
 
     void ApplyStartingLoadout()
     {
-        var loadout = MetaProgression.GetSelectedLoadoutDef();
-        if (loadout.startElement == null || loadout.startForm == null) return;
-
-        // Find matching element and form
-        ElementSO elem = null;
-        foreach (var e in allElements) if (e.elementName == loadout.startElement) { elem = e; break; }
-        FormSO form = null;
-        foreach (var f in allForms) if (f.formName == loadout.startForm) { form = f; break; }
-        if (elem == null || form == null) return;
-
-        // Equip to slot 0
-        spellCaster.spellSlots[0] = new SpellData { element = elem, form = form };
-
-        // Apply passive bonus based on aspect
-        switch (loadout.id)
-        {
-            case "pyromancer": // +10% burn damage handled via burn DPS scaling
-                fireElem.statusDPS *= 1.1f;
-                break;
-            case "cryomancer": // +0.5s freeze duration
-                iceElem.statusDuration += 0.5f;
-                break;
-            case "stormcaller": // +1 chain target
-                lightningElem.chainCount += 1;
-                break;
-            case "plaguebringer": // +1 starting poison stack (enemies start with 1)
-                poisonElem.baseDamage += 1;
-                break;
-            case "voidwalker": // -20% dash cooldown
-                playerCtrl.dashCooldown *= 0.8f;
-                break;
-        }
+        // New system: player always starts with base 4 elements
+        // SpellCaster.Init already sets up Fire, Water, Earth, Air
+        // No loadout customization needed — elements are always the same at start
     }
 
     void CleanupRun()
@@ -246,72 +214,22 @@ public class Bootstrap : MonoBehaviour
 
     void CreateSpellData()
     {
-        // Elements
-        fireElem = CreateElement("Fire", 10, StatusEffectType.Burn, 3f, 3f, new Color(1f, 0.4f, 0.1f));
-        iceElem = CreateElement("Ice", 7, StatusEffectType.Slow, 0, 2f, new Color(0.3f, 0.7f, 1f));
-        lightningElem = CreateElement("Lightning", 6, StatusEffectType.Chain, 0, 0.5f, new Color(1f, 1f, 0.3f));
-        lightningElem.chainCount = 2;
-        lightningElem.chainRadius = 4f;
-        poisonElem = CreateElement("Poison", 4, StatusEffectType.Poison, 0, 0, new Color(0.2f, 0.9f, 0.1f));
-        voidElem = CreateElement("Void", 8, StatusEffectType.VoidMark, 0, 2f, new Color(0.6f, 0.1f, 0.9f));
-        allElements = new[] { fireElem, iceElem, lightningElem, poisonElem, voidElem };
+        // Base elements (unlocked from start)
+        fireElem = CreateElement("Fire", ElementType.Fire, 10, new Color(1f, 0.4f, 0.1f));
+        waterElem = CreateElement("Water", ElementType.Water, 7, new Color(0.3f, 0.7f, 1f));
+        earthElem = CreateElement("Earth", ElementType.Earth, 8, new Color(0.6f, 0.4f, 0.2f));
+        airElem = CreateElement("Air", ElementType.Air, 6, new Color(0.8f, 0.9f, 1f));
+        baseElements = new[] { fireElem, waterElem, earthElem, airElem };
 
-        // Forms
-        boltForm = CreateForm("Bolt", FormType.Bolt);
-        boltForm.range = 15f; boltForm.projectileSpeed = 14f; boltForm.cooldown = 0.3f;
+        // Advanced elements (unlockable mid-run)
+        lightningElem = CreateElement("Lightning", ElementType.Lightning, 9, new Color(1f, 1f, 0.3f));
+        poisonElem = CreateElement("Poison", ElementType.Poison, 5, new Color(0.2f, 0.9f, 0.1f));
+        voidElem = CreateElement("Void", ElementType.Void, 10, new Color(0.6f, 0.1f, 0.9f));
 
-        coneForm = CreateForm("Cone", FormType.Cone);
-        coneForm.coneAngle = 45f; coneForm.coneRange = 3f; coneForm.cooldown = 0.5f;
+        allElements = new[] { fireElem, waterElem, earthElem, airElem, lightningElem, poisonElem, voidElem };
 
-        beamForm = CreateForm("Beam", FormType.Beam);
-        beamForm.beamRange = 20f; beamForm.beamWidth = 0.3f; beamForm.cooldown = 0.6f;
-
-        auraForm = CreateForm("Aura", FormType.Aura);
-        auraForm.auraRadius = 2.5f; auraForm.cooldown = 1f;
-
-        orbitForm = CreateForm("Orbit", FormType.Orbit);
-        orbitForm.orbitRadius = 1.8f; orbitForm.orbitSpeed = 250f;
-        orbitForm.orbitCount = 3; orbitForm.orbitDuration = 4f; orbitForm.cooldown = 5f;
-
-        trapForm = CreateForm("Trap", FormType.Trap);
-        trapForm.trapRadius = 1.5f; trapForm.trapArmTime = 0.5f; trapForm.cooldown = 0.8f;
-
-        allForms = new[] { boltForm, coneForm, beamForm, auraForm, orbitForm, trapForm };
-
-        // Modifiers
-        noneMod = ScriptableObject.CreateInstance<ModifierSO>();
-        noneMod.modifierName = "None"; noneMod.modifierType = ModifierType.None; noneMod.damageMultiplier = 1f;
-
-        splitMod = ScriptableObject.CreateInstance<ModifierSO>();
-        splitMod.modifierName = "Split"; splitMod.modifierType = ModifierType.Split;
-        splitMod.damageMultiplier = 0.6f; splitMod.splitCount = 3; splitMod.splitSpreadAngle = 15f;
-
-        pierceMod = ScriptableObject.CreateInstance<ModifierSO>();
-        pierceMod.modifierName = "Pierce"; pierceMod.modifierType = ModifierType.Pierce;
-        pierceMod.damageMultiplier = 1f; pierceMod.pierceCount = 5;
-
-        bounceMod = ScriptableObject.CreateInstance<ModifierSO>();
-        bounceMod.modifierName = "Bounce"; bounceMod.modifierType = ModifierType.Bounce;
-        bounceMod.damageMultiplier = 1f; bounceMod.bounceCount = 3;
-
-        leechMod = ScriptableObject.CreateInstance<ModifierSO>();
-        leechMod.modifierName = "Leech"; leechMod.modifierType = ModifierType.Leech;
-        leechMod.damageMultiplier = 1f; leechMod.leechPercent = 0.15f;
-
-        oversizeMod = ScriptableObject.CreateInstance<ModifierSO>();
-        oversizeMod.modifierName = "Oversize"; oversizeMod.modifierType = ModifierType.Oversize;
-        oversizeMod.damageMultiplier = 1f; oversizeMod.sizeMultiplier = 2f; oversizeMod.speedPenalty = 0.8f;
-
-        volatileMod = ScriptableObject.CreateInstance<ModifierSO>();
-        volatileMod.modifierName = "Volatile"; volatileMod.modifierType = ModifierType.Volatile;
-        volatileMod.damageMultiplier = 1.5f; volatileMod.volatileMissChance = 0.1f;
-
-        homingMod = ScriptableObject.CreateInstance<ModifierSO>();
-        homingMod.modifierName = "Homing"; homingMod.modifierType = ModifierType.Homing;
-        homingMod.damageMultiplier = 1f; homingMod.homingTurnSpeed = 180f;
-        homingMod.homingDetectRange = 10f; homingMod.homingSpeedMult = 0.7f;
-
-        allModifiers = new[] { noneMod, splitMod, pierceMod, bounceMod, leechMod, oversizeMod, volatileMod, homingMod };
+        // Init combo spell registry
+        ComboSpellRegistry.Init();
 
         // Relics
         allRelics = new RelicSO[]
@@ -351,19 +269,11 @@ public class Bootstrap : MonoBehaviour
         return r;
     }
 
-    static ElementSO CreateElement(string name, int dmg, StatusEffectType effect, float dps, float dur, Color col)
+    static ElementSO CreateElement(string name, ElementType type, int dmg, Color col)
     {
         var e = ScriptableObject.CreateInstance<ElementSO>();
-        e.elementName = name; e.baseDamage = dmg; e.statusEffect = effect;
-        e.statusDPS = dps; e.statusDuration = dur; e.color = col;
+        e.elementName = name; e.elementType = type; e.baseDamage = dmg; e.color = col;
         return e;
-    }
-
-    static FormSO CreateForm(string name, FormType type)
-    {
-        var f = ScriptableObject.CreateInstance<FormSO>();
-        f.formName = name; f.formType = type;
-        return f;
     }
 
     // ─── FLOOR MAP ──────────────────────────────────────────────
@@ -630,7 +540,7 @@ public class Bootstrap : MonoBehaviour
         staffTip.transform.parent = staff.transform;
         staffTip.transform.localPosition = new Vector3(0, 1.1f, 0);
         staffTip.transform.localScale = new Vector3(2.5f, 0.4f, 2.5f);
-        staffTip.GetComponent<Renderer>().material = MakeEmissive(fireElem.color);
+        staffTip.GetComponent<Renderer>().material = MakeEmissive(fireElem != null ? fireElem.color : Color.white);
 
         // Components
         playerCtrl = player.AddComponent<PlayerController>();
@@ -643,23 +553,21 @@ public class Bootstrap : MonoBehaviour
         relicMgr = player.AddComponent<RelicManager>();
         relicMgr.Init(playerHealth, playerCtrl, allRelics, allElements);
 
-        var dualCast = player.AddComponent<DualCast>();
-        dualCast.Init(spellCaster);
+        // Synergy system
+        synergySystem = player.AddComponent<SynergySystem>();
 
         if (!inHub)
         {
-            // Starting spells: Fire Bolt, Ice Cone + Split
-            spellCaster.spellSlots[0] = new SpellData { element = fireElem, form = boltForm, modifier = noneMod };
-            spellCaster.spellSlots[1] = new SpellData { element = iceElem, form = coneForm, modifier = splitMod };
+            // Initialize with base elements
+            spellCaster.Init(baseElements);
 
             playerHealth.OnDeath += OnPlayerDeath;
 
-            // Update staff tip color when spell changes
-            spellCaster.OnSpellChanged += () =>
+            // Update staff tip color when orbs change
+            spellCaster.OnOrbsChanged += () =>
             {
-                var spell = spellCaster.ActiveSpell;
-                if (spell?.element != null && staffTip != null)
-                    staffTip.GetComponent<Renderer>().material = MakeEmissive(spell.element.color);
+                if (spellCaster.rightOrb != null && staffTip != null)
+                    staffTip.GetComponent<Renderer>().material = MakeEmissive(spellCaster.rightOrb.color);
             };
         }
         else
@@ -1163,6 +1071,10 @@ public class Bootstrap : MonoBehaviour
             affixComp.Init(affix);
         }
 
+        // Element weakness system
+        var elemData = enemy.AddComponent<EnemyElementData>();
+        elemData.AssignRandomWeakness(baseElements);
+
         // Track damage numbers
         if (hud != null) hud.TrackEnemyDamage(health);
     }
@@ -1543,32 +1455,13 @@ public class Bootstrap : MonoBehaviour
             goldDrop *= 3;
         GoldSystem.SpawnGoldDrop(enemy.transform.position, goldDrop);
 
-        // Void pull effect
-        var health = enemy.GetComponent<Health>();
-        if (health != null && health.voidMarked)
+        // Synergy effects on enemy death
+        if (synergySystem != null && spellCaster != null)
         {
             Vector3 deathPos = enemy.transform.position;
-            Collider[] nearby = Physics.OverlapSphere(deathPos, 4f);
-            foreach (var col in nearby)
-            {
-                if (col.gameObject == enemy) continue;
-                var ai = col.GetComponent<ShamblerAI>();
-                if (ai != null) { ai.ApplyPull(deathPos, 1.5f); continue; }
-                // Other enemy types: push via rigidbody
-                var erb = col.GetComponent<Rigidbody>();
-                if (erb != null && col.GetComponent<Health>() != null)
-                {
-                    Vector3 pullDir = (deathPos - col.transform.position).normalized;
-                    erb.MovePosition(col.transform.position + pullDir * 3f * Time.deltaTime);
-                }
-            }
-            // Pull visual (expanding void sphere)
-            var vfx = GameObject.CreatePrimitive(PrimitiveType.Sphere);
-            Destroy(vfx.GetComponent<SphereCollider>());
-            vfx.transform.position = deathPos + Vector3.up * 0.5f;
-            vfx.transform.localScale = Vector3.one * 0.5f;
-            vfx.GetComponent<Renderer>().material = MakeEmissive(voidElem.color);
-            Destroy(vfx, 0.4f);
+            // Determine killing element from current orbs (best approximation)
+            var killElem = spellCaster.rightOrb != null ? spellCaster.rightOrb.elementType : ElementType.Fire;
+            synergySystem.OnEnemyKilled(deathPos, killElem);
         }
 
         enemies.Remove(enemy);
@@ -1596,56 +1489,92 @@ public class Bootstrap : MonoBehaviour
     {
         roomCleared = true;
 
-        // Every 3rd room: offer relic choice instead of rune
+        // Every 3rd room: offer relic choice instead of upgrade
         if (currentRoom % 3 == 0 && !bossActive)
         {
             ShowRelicSelection();
             return;
         }
 
-        int count = 3;
-        // Lucky relic: 20% chance for 4th choice
-        if (relicMgr != null && relicMgr.HasLucky) count = 4;
+        // Dead Cells style: choose one of three stat upgrades
+        var choices = RunUpgradeSystem.GenerateChoices(3);
 
-        var options = new ScriptableObject[count];
-
-        // Weighted rune pools by floor
-        float elemW, formW;
-        if (currentFloor <= 2) { elemW = 0.6f; formW = 0.3f; }
-        else if (currentFloor <= 3) { elemW = 0.3f; formW = 0.5f; }
-        else { elemW = 0.1f; formW = 0.3f; }
-
-        // Build unlocked element pool
-        var unlockedElements = new List<ElementSO>();
-        foreach (var e in allElements)
-            if (MetaProgression.IsElementUnlocked(e.elementName)) unlockedElements.Add(e);
-
-        for (int i = 0; i < count; i++)
+        hud.ShowUpgradeSelection(choices, idx =>
         {
-            options[i] = RollWeightedRune(elemW, formW, unlockedElements);
-        }
-
-        // Guarantee one option matches current build element (build direction)
-        if (count >= 3 && unlockedElements.Count > 0)
-        {
-            var currentElem = spellCaster.ActiveSpell?.element;
-            if (currentElem != null && Random.value < 0.4f)
-                options[0] = currentElem; // 40% chance to offer current element as first option
-        }
-
-        int rerolls = MetaProgression.Rerolls;
-        hud.ShowRuneSelection(options, rerolls, idx =>
-        {
-            ApplyRune(options[idx]);
+            RunUpgradeSystem.ApplyUpgrade(spellCaster, choices[idx]);
+            SFXSystem.Play(SFXSystem.SFXType.LevelUp, player.transform.position);
             if (bossActive)
+            {
+                // After boss: also offer synergy + element unlock
                 bossActive = false;
+                ShowPostBossRewards();
+                return;
+            }
             TransitionToNextRoom();
-        }, () =>
-        {
-            // Reroll callback: regenerate options with weighting
-            for (int i = 0; i < count; i++)
-                options[i] = RollWeightedRune(elemW, formW, unlockedElements);
         });
+    }
+
+    void ShowPostBossRewards()
+    {
+        // Offer synergy choice
+        var allSyn = SynergySystem.AllSynergies;
+        var available = new List<SynergyDef>();
+        foreach (var s in allSyn)
+            if (!synergySystem.HasSynergy(s.type)) available.Add(s);
+
+        if (available.Count > 0)
+        {
+            int count = Mathf.Min(3, available.Count);
+            var synChoices = new SynergyDef[count];
+            for (int i = 0; i < count; i++)
+            {
+                int idx = Random.Range(0, available.Count);
+                synChoices[i] = available[idx];
+                available.RemoveAt(idx);
+            }
+
+            hud.ShowSynergySelection(synChoices, idx =>
+            {
+                synergySystem.AddSynergy(synChoices[idx].type);
+                SFXSystem.Play(SFXSystem.SFXType.LevelUp, player.transform.position);
+
+                // Then offer element unlock if advanced elements available
+                ShowElementUnlockIfAvailable();
+            });
+        }
+        else
+        {
+            ShowElementUnlockIfAvailable();
+        }
+    }
+
+    void ShowElementUnlockIfAvailable()
+    {
+        // Check if there are unlockable elements not yet equipped
+        ElementSO[] unlockable = { lightningElem, poisonElem, voidElem };
+        ElementSO toUnlock = null;
+
+        foreach (var elem in unlockable)
+        {
+            bool alreadyEquipped = false;
+            for (int i = 0; i < 4; i++)
+                if (spellCaster.equippedElements[i] == elem) { alreadyEquipped = true; break; }
+            if (!alreadyEquipped) { toUnlock = elem; break; }
+        }
+
+        if (toUnlock != null)
+        {
+            hud.ShowElementUnlock(toUnlock, spellCaster.equippedElements, slotIdx =>
+            {
+                spellCaster.ReplaceElement(slotIdx, toUnlock);
+                SFXSystem.Play(SFXSystem.SFXType.LevelUp, player.transform.position);
+                TransitionToNextRoom();
+            });
+        }
+        else
+        {
+            TransitionToNextRoom();
+        }
     }
 
     void ShowRelicSelection()
@@ -1679,78 +1608,16 @@ public class Bootstrap : MonoBehaviour
         });
     }
 
-    // Fallback when all relics are owned
+    // Fallback when all relics are owned — offer stat upgrades instead
     void ShowRuneSelectionForce()
     {
-        var options = new ScriptableObject[3];
-        float elemW = 0.3f, formW = 0.3f;
-        var unlockedElements = new List<ElementSO>();
-        foreach (var e in allElements)
-            if (MetaProgression.IsElementUnlocked(e.elementName)) unlockedElements.Add(e);
-
-        for (int i = 0; i < 3; i++)
+        var choices = RunUpgradeSystem.GenerateChoices(3);
+        hud.ShowUpgradeSelection(choices, idx =>
         {
-            float r = Random.value;
-            if (r < elemW && unlockedElements.Count > 0) options[i] = unlockedElements[Random.Range(0, unlockedElements.Count)];
-            else if (r < elemW + formW) options[i] = allForms[Random.Range(0, allForms.Length)];
-            else options[i] = allModifiers[Random.Range(0, allModifiers.Length)];
-        }
-        hud.ShowRuneSelection(options, 0, idx =>
-        {
-            ApplyRune(options[idx]);
+            RunUpgradeSystem.ApplyUpgrade(spellCaster, choices[idx]);
+            SFXSystem.Play(SFXSystem.SFXType.LevelUp, player.transform.position);
             TransitionToNextRoom();
-        }, null);
-    }
-
-    ScriptableObject RollWeightedRune(float elemW, float formW, List<ElementSO> unlockedElements)
-    {
-        float r = Random.value;
-        if (r < elemW && unlockedElements.Count > 0)
-        {
-            // Weight toward current build's element (2x chance)
-            var currentElem = spellCaster.ActiveSpell?.element;
-            if (currentElem != null && unlockedElements.Contains(currentElem) && Random.value < 0.35f)
-                return currentElem;
-            return unlockedElements[Random.Range(0, unlockedElements.Count)];
-        }
-        if (r < elemW + formW)
-            return allForms[Random.Range(0, allForms.Length)];
-        return allModifiers[Random.Range(0, allModifiers.Length)];
-    }
-
-    void ApplyRune(ScriptableObject rune)
-    {
-        var spell = spellCaster.spellSlots[spellCaster.activeSlot];
-        if (spell == null)
-        {
-            spell = new SpellData();
-            spellCaster.spellSlots[spellCaster.activeSlot] = spell;
-        }
-
-        if (rune is ElementSO elem)
-        {
-            if (spell.element == elem)
-                spell.elementTier++; // Same element = upgrade tier
-            else
-                { spell.element = elem; spell.elementTier = 0; }
-        }
-        else if (rune is FormSO form)
-        {
-            if (spell.form == form)
-                spell.formTier++; // Same form = cooldown reduction
-            else
-                { spell.form = form; spell.formTier = 0; }
-        }
-        else if (rune is ModifierSO mod)
-        {
-            if (spell.modifier == mod)
-                spell.modifierTier++; // Same modifier = stronger effect
-            else
-                { spell.modifier = mod; spell.modifierTier = 0; }
-        }
-
-        SFXSystem.Play(SFXSystem.SFXType.LevelUp, player.transform.position);
-        hud.Refresh();
+        });
     }
 
     void OnPlayerDeath()

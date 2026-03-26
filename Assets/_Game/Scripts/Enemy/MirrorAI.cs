@@ -27,7 +27,7 @@ public class MirrorAI : MonoBehaviour
             target = player.transform;
             var caster = player.GetComponent<SpellCaster>();
             if (caster != null)
-                caster.OnSpellFired += OnPlayerCast;
+                caster.OnOrbsChanged += OnPlayerOrbsChanged;
         }
         health = GetComponent<Health>();
         rb = GetComponent<Rigidbody>();
@@ -36,11 +36,13 @@ public class MirrorAI : MonoBehaviour
         copiedColor = baseColor;
     }
 
-    void OnPlayerCast(ElementSO elem)
+    void OnPlayerOrbsChanged()
     {
-        if (isDead || elem == null) return;
-        copiedElement = elem;
-        copiedColor = Color.Lerp(baseColor, elem.color, 0.6f);
+        if (isDead || target == null) return;
+        var caster = target.GetComponent<SpellCaster>();
+        if (caster == null || caster.rightOrb == null) return;
+        copiedElement = caster.rightOrb;
+        copiedColor = Color.Lerp(baseColor, copiedElement.color, 0.6f);
     }
 
     void OnDie()
@@ -87,9 +89,7 @@ public class MirrorAI : MonoBehaviour
         if (renderers == null) return;
         Color col = copiedColor;
         if (health.IsStunned) col = health.IsFrozen ? new Color(0.6f, 0.9f, 1f) : new Color(1f, 1f, 0.3f);
-        else if (health.IsSlowed) col = new Color(0.4f, 0.6f, 1f);
-        else if (health.PoisonStacks > 0)
-            col = Color.Lerp(copiedColor, new Color(0.2f, 0.9f, 0.1f), health.PoisonStacks / 5f);
+        // Removed old status effect visuals (Slow, Poison no longer tracked on Health)
         foreach (var r in renderers)
             if (r != null && r.gameObject.name != "Eye") r.material.color = col;
     }
@@ -100,7 +100,7 @@ public class MirrorAI : MonoBehaviour
         if (target != null)
         {
             var caster = target.GetComponent<SpellCaster>();
-            if (caster != null) caster.OnSpellFired -= OnPlayerCast;
+            if (caster != null) caster.OnOrbsChanged -= OnPlayerOrbsChanged;
         }
     }
 }

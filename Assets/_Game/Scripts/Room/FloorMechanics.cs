@@ -159,7 +159,7 @@ public class CorruptionFogBehavior : MonoBehaviour
             if (player == null) return;
             var hp = player.GetComponent<Health>();
             if (hp != null && !hp.IsDead)
-                hp.AddPoisonStack();
+                hp.TakeDamage(1); // was AddPoisonStack, removed with status effects
         }
     }
 }

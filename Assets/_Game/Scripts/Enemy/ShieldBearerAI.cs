@@ -175,9 +175,6 @@ public class ShieldBearerAI : MonoBehaviour
         if (renderers == null) return;
         Color col = baseColor;
         if (health.IsStunned) col = health.IsFrozen ? new Color(0.6f, 0.9f, 1f) : new Color(1f, 1f, 0.3f);
-        else if (health.IsSlowed) col = new Color(0.4f, 0.6f, 1f);
-        else if (health.PoisonStacks > 0)
-            col = Color.Lerp(baseColor, new Color(0.2f, 0.9f, 0.1f), health.PoisonStacks / 5f);
         foreach (var r in renderers)
             if (r != null && r.gameObject.name != "Eye" && r.gameObject.name != "Shield")
                 r.material.color = col;

@@ -14,26 +14,35 @@ public class GameHUD : MonoBehaviour
     VisualElement hpBar;
     Label waveLabel;
     Label floorRoomLabel;
-    VisualElement spell1Card, spell2Card;
-    VisualElement spell1CDFill, spell2CDFill;
-    VisualElement dashCDContainer;
-    VisualElement dashCDFill;
-    VisualElement runeOverlay;
-    VisualElement runePanel;
-    VisualElement currentSpellPreview;
-    Label slotHintLabel;
     VisualElement deathOverlay;
     Label deathWaveLabel;
     VisualElement victoryOverlay;
+
+    // New combo system UI
+    VisualElement elementHotbar;
+    VisualElement[] elementSlots = new VisualElement[4];
+    VisualElement[] chargeIndicators = new VisualElement[4];
+    Label comboNameLabel;
+    VisualElement orbLeftIndicator, orbRightIndicator;
+    VisualElement chargeBar; // shows charge progress when holding LMB
+
+    // Upgrade selection overlay
+    VisualElement upgradeOverlay;
+    VisualElement upgradePanel;
+
+    // Element unlock overlay
+    VisualElement elementUnlockOverlay;
+    VisualElement elementUnlockPanel;
+
+    // Synergy selection overlay
+    VisualElement synergyOverlay;
+    VisualElement synergyPanel;
 
     // Relics
     VisualElement relicBar;
 
     // Gold
     Label goldLabel;
-
-    // Status effects
-    VisualElement statusBar;
 
     // Potions
     Label potionLabel;
@@ -43,6 +52,10 @@ public class GameHUD : MonoBehaviour
     VisualElement bossHPFill;
     Label bossNameLabel;
     Health trackedBossHP;
+
+    // Dash
+    VisualElement dashCDContainer;
+    VisualElement dashCDFill;
 
     // Floating damage numbers
     VisualElement damageNumberLayer;
@@ -61,8 +74,6 @@ public class GameHUD : MonoBehaviour
     static readonly Color CardBgHover = new(0.12f, 0.12f, 0.18f, 0.95f);
     static readonly Color ActiveBorder = new(1f, 0.85f, 0.2f);
     static readonly Color InactiveBorder = new(0.3f, 0.3f, 0.35f);
-    static readonly Color FormColor = new(0.4f, 0.55f, 0.75f);
-    static readonly Color ModColor = new(0.25f, 0.7f, 0.6f);
     static readonly Color Dim = new(0.5f, 0.5f, 0.55f);
 
     public void Init(SpellCaster sc, Health hp)
@@ -75,23 +86,22 @@ public class GameHUD : MonoBehaviour
         var ps = ScriptableObject.CreateInstance<PanelSettings>();
         ps.scaleMode = PanelScaleMode.ScaleWithScreenSize;
         ps.referenceResolution = new Vector2Int(1920, 1080);
-        ps.themeStyleSheet = UnityEngine.UIElements.ThemeStyleSheet.CreateInstance<ThemeStyleSheet>();
+        ps.themeStyleSheet = ThemeStyleSheet.CreateInstance<ThemeStyleSheet>();
         uiDoc.panelSettings = ps;
 
         BuildUI();
 
-        // Set a system font on root so all labels render text
         var font = Font.CreateDynamicFontFromOSFont("Arial", 14);
         uiDoc.rootVisualElement.style.unityFontDefinition = FontDefinition.FromFont(font);
 
         playerHealth.OnHPChanged += (_, _) => RefreshHP();
         playerHealth.OnDamaged += OnPlayerOrEnemyDamaged;
-        caster.OnSpellChanged += RefreshSpells;
+        caster.OnOrbsChanged += RefreshComboDisplay;
+        caster.OnComboNameChanged += OnComboNameChanged;
         RefreshHP();
-        RefreshSpells();
+        RefreshComboDisplay();
     }
 
-    /// <summary>Register an enemy's Health for floating damage numbers.</summary>
     public void TrackEnemyDamage(Health enemyHP)
     {
         enemyHP.OnDamaged += OnPlayerOrEnemyDamaged;
@@ -148,8 +158,7 @@ public class GameHUD : MonoBehaviour
         topBar.Add(rightCol);
         root.Add(topBar);
 
-        // ── Relic bar (under top bar, left side) ──
-        // ── Gold display (under HP) ──
+        // ── Gold display ──
         var goldRow = new VisualElement();
         goldRow.pickingMode = PickingMode.Ignore;
         goldRow.style.flexDirection = FlexDirection.Row;
@@ -169,21 +178,13 @@ public class GameHUD : MonoBehaviour
         goldRow.Add(goldLabel);
         root.Add(goldRow);
 
+        // ── Relic bar ──
         relicBar = new VisualElement();
         relicBar.pickingMode = PickingMode.Ignore;
         relicBar.style.flexDirection = FlexDirection.Row;
         relicBar.style.paddingLeft = 20;
         relicBar.style.paddingTop = 4;
         root.Add(relicBar);
-
-        // ── Status effects bar ──
-        statusBar = new VisualElement();
-        statusBar.pickingMode = PickingMode.Ignore;
-        statusBar.style.flexDirection = FlexDirection.Row;
-        statusBar.style.paddingLeft = 20;
-        statusBar.style.paddingTop = 4;
-        statusBar.style.alignItems = Align.Center;
-        root.Add(statusBar);
 
         // ── Boss HP bar ──
         bossHPContainer = new VisualElement();
@@ -238,35 +239,52 @@ public class GameHUD : MonoBehaviour
         victoryOverlay.Add(vicHint);
         root.Add(victoryOverlay);
 
-        // ── Rune selection overlay ──
-        runeOverlay = MakeOverlay(new Color(0, 0, 0, 0.65f));
+        // ── Upgrade selection overlay ──
+        upgradeOverlay = MakeOverlay(new Color(0, 0, 0, 0.65f));
+        var upgradeContainer = new VisualElement();
+        upgradeContainer.style.alignItems = Align.Center;
+        var upgradeTitle = Lbl("CHOOSE AN UPGRADE", 36, Color.white, FontStyle.Bold);
+        upgradeTitle.style.marginBottom = 24;
+        upgradeContainer.Add(upgradeTitle);
+        upgradePanel = new VisualElement();
+        upgradePanel.style.flexDirection = FlexDirection.Row;
+        upgradePanel.style.justifyContent = Justify.Center;
+        upgradeContainer.Add(upgradePanel);
+        upgradeOverlay.Add(upgradeContainer);
+        root.Add(upgradeOverlay);
 
-        var runeContainer = new VisualElement();
-        runeContainer.style.alignItems = Align.Center;
+        // ── Element unlock overlay ──
+        elementUnlockOverlay = MakeOverlay(new Color(0, 0, 0, 0.7f));
+        var unlockContainer = new VisualElement();
+        unlockContainer.style.alignItems = Align.Center;
+        var unlockTitle = Lbl("NEW ELEMENT UNLOCKED!", 36, new Color(1f, 0.85f, 0.2f), FontStyle.Bold);
+        unlockTitle.style.marginBottom = 12;
+        unlockContainer.Add(unlockTitle);
+        var unlockSub = Lbl("Choose which slot to replace", 20, Dim);
+        unlockSub.style.marginBottom = 24;
+        unlockContainer.Add(unlockSub);
+        elementUnlockPanel = new VisualElement();
+        elementUnlockPanel.style.flexDirection = FlexDirection.Row;
+        elementUnlockPanel.style.justifyContent = Justify.Center;
+        unlockContainer.Add(elementUnlockPanel);
+        elementUnlockOverlay.Add(unlockContainer);
+        root.Add(elementUnlockOverlay);
 
-        var runeTitle = Lbl("CHOOSE A RUNE", 36, Color.white, FontStyle.Bold);
-        runeTitle.style.marginBottom = 12;
-        runeContainer.Add(runeTitle);
+        // ── Synergy selection overlay ──
+        synergyOverlay = MakeOverlay(new Color(0, 0, 0, 0.7f));
+        var synContainer = new VisualElement();
+        synContainer.style.alignItems = Align.Center;
+        var synTitle = Lbl("CHOOSE A SYNERGY", 36, new Color(0.8f, 0.6f, 1f), FontStyle.Bold);
+        synTitle.style.marginBottom = 24;
+        synContainer.Add(synTitle);
+        synergyPanel = new VisualElement();
+        synergyPanel.style.flexDirection = FlexDirection.Row;
+        synergyPanel.style.justifyContent = Justify.Center;
+        synContainer.Add(synergyPanel);
+        synergyOverlay.Add(synContainer);
+        root.Add(synergyOverlay);
 
-        currentSpellPreview = new VisualElement();
-        currentSpellPreview.style.flexDirection = FlexDirection.Row;
-        currentSpellPreview.style.alignItems = Align.Center;
-        currentSpellPreview.style.marginBottom = 8;
-        runeContainer.Add(currentSpellPreview);
-
-        slotHintLabel = Lbl("Press Q to switch target slot", 16, Dim);
-        slotHintLabel.style.marginBottom = 24;
-        runeContainer.Add(slotHintLabel);
-
-        runePanel = new VisualElement();
-        runePanel.style.flexDirection = FlexDirection.Row;
-        runePanel.style.justifyContent = Justify.Center;
-        runeContainer.Add(runePanel);
-
-        runeOverlay.Add(runeContainer);
-        root.Add(runeOverlay);
-
-        // ── Bottom bar ──
+        // ── Bottom area: element hotbar + combo display ──
         var bottomArea = new VisualElement();
         bottomArea.pickingMode = PickingMode.Ignore;
         bottomArea.style.position = Position.Absolute;
@@ -276,34 +294,112 @@ public class GameHUD : MonoBehaviour
         bottomArea.style.alignItems = Align.Center;
         bottomArea.style.paddingBottom = 16;
 
-        var slotRow = new VisualElement();
-        slotRow.pickingMode = PickingMode.Ignore;
-        slotRow.style.flexDirection = FlexDirection.Row;
-        slotRow.style.alignItems = Align.FlexEnd;
+        // Combo name
+        comboNameLabel = Lbl("", 24, Color.white, FontStyle.Bold);
+        comboNameLabel.style.marginBottom = 8;
+        bottomArea.Add(comboNameLabel);
 
-        spell1Card = BuildSpellCard(0);
-        spell2Card = BuildSpellCard(1);
+        // Orb indicators
+        var orbRow = new VisualElement();
+        orbRow.pickingMode = PickingMode.Ignore;
+        orbRow.style.flexDirection = FlexDirection.Row;
+        orbRow.style.alignItems = Align.Center;
+        orbRow.style.marginBottom = 8;
 
-        var qHint = Lbl("[Q]", 18, Dim, FontStyle.Bold);
-        qHint.style.marginLeft = 16;
-        qHint.style.marginRight = 16;
-        qHint.style.marginBottom = 18;
+        orbLeftIndicator = new VisualElement();
+        orbLeftIndicator.style.width = 32;
+        orbLeftIndicator.style.height = 32;
+        Radius(orbLeftIndicator, 16);
+        Border(orbLeftIndicator, Color.white, 2);
+        orbRow.Add(orbLeftIndicator);
 
-        slotRow.Add(spell1Card);
-        slotRow.Add(qHint);
-        slotRow.Add(spell2Card);
-        bottomArea.Add(slotRow);
+        var plusLabel = Lbl("+", 24, Dim, FontStyle.Bold);
+        plusLabel.style.marginLeft = 8;
+        plusLabel.style.marginRight = 8;
+        orbRow.Add(plusLabel);
 
-        var controls = Lbl("WASD Move   LMB Cast   RMB Dash   Q Swap   F Potion", 14, new Color(0.35f, 0.35f, 0.4f));
-        controls.style.marginTop = 8;
+        orbRightIndicator = new VisualElement();
+        orbRightIndicator.style.width = 32;
+        orbRightIndicator.style.height = 32;
+        Radius(orbRightIndicator, 16);
+        Border(orbRightIndicator, Color.white, 2);
+        orbRow.Add(orbRightIndicator);
+
+        bottomArea.Add(orbRow);
+
+        // Element hotbar (1-4)
+        elementHotbar = new VisualElement();
+        elementHotbar.pickingMode = PickingMode.Ignore;
+        elementHotbar.style.flexDirection = FlexDirection.Row;
+        elementHotbar.style.alignItems = Align.FlexEnd;
+        elementHotbar.style.marginBottom = 8;
+
+        for (int i = 0; i < 4; i++)
+        {
+            var slot = new VisualElement();
+            slot.pickingMode = PickingMode.Ignore;
+            slot.style.width = 70;
+            slot.style.height = 70;
+            slot.style.marginLeft = 6;
+            slot.style.marginRight = 6;
+            slot.style.backgroundColor = CardBg;
+            Radius(slot, 10);
+            Border(slot, InactiveBorder, 2);
+            slot.style.alignItems = Align.Center;
+            slot.style.justifyContent = Justify.Center;
+
+            var keyLabel = Lbl($"{i + 1}", 12, Dim, FontStyle.Bold);
+            keyLabel.style.position = Position.Absolute;
+            keyLabel.style.top = 4;
+            keyLabel.style.left = 6;
+            slot.Add(keyLabel);
+
+            var elemIcon = new VisualElement();
+            elemIcon.name = "elem-icon";
+            elemIcon.style.width = 28;
+            elemIcon.style.height = 28;
+            Radius(elemIcon, 14);
+            slot.Add(elemIcon);
+
+            var chargeFill = new VisualElement();
+            chargeFill.name = "charge-fill";
+            chargeFill.pickingMode = PickingMode.Ignore;
+            chargeFill.style.position = Position.Absolute;
+            chargeFill.style.bottom = 0;
+            chargeFill.style.left = 0;
+            chargeFill.style.right = 0;
+            chargeFill.style.height = new StyleLength(Length.Percent(0));
+            chargeFill.style.backgroundColor = new Color(0.3f, 0.1f, 0.1f, 0.5f);
+            Radius(chargeFill, 10);
+            slot.Add(chargeFill);
+
+            elementSlots[i] = slot;
+            elementHotbar.Add(slot);
+        }
+
+        bottomArea.Add(elementHotbar);
+
+        // Charge bar (for charged shot)
+        chargeBar = new VisualElement();
+        chargeBar.pickingMode = PickingMode.Ignore;
+        chargeBar.style.width = 100;
+        chargeBar.style.height = 6;
+        chargeBar.style.backgroundColor = new Color(1f, 0.8f, 0.2f);
+        Radius(chargeBar, 3);
+        chargeBar.style.display = DisplayStyle.None;
+        bottomArea.Add(chargeBar);
+
+        // Controls hint
+        var controls = Lbl("WASD Move   LMB Cast (hold to charge)   RMB Dash   1-4 Elements   F Potion", 14, new Color(0.35f, 0.35f, 0.4f));
+        controls.style.marginTop = 6;
         bottomArea.Add(controls);
 
-        // ── Dash cooldown indicator ──
+        // Dash cooldown
         dashCDContainer = new VisualElement();
         dashCDContainer.pickingMode = PickingMode.Ignore;
         dashCDContainer.style.width = 80;
         dashCDContainer.style.height = 8;
-        dashCDContainer.style.marginTop = 6;
+        dashCDContainer.style.marginTop = 4;
         dashCDContainer.style.backgroundColor = new Color(0.15f, 0.15f, 0.2f);
         Radius(dashCDContainer, 4);
 
@@ -314,12 +410,9 @@ public class GameHUD : MonoBehaviour
         dashCDFill.style.backgroundColor = new Color(0.3f, 0.7f, 1f);
         Radius(dashCDFill, 4);
         dashCDContainer.Add(dashCDFill);
-
-        var dashLabel = Lbl("DASH", 11, Dim, FontStyle.Bold);
-        dashLabel.style.alignSelf = Align.Center;
         bottomArea.Add(dashCDContainer);
 
-        // Potion indicator
+        // Potion
         var potionRow = new VisualElement();
         potionRow.pickingMode = PickingMode.Ignore;
         potionRow.style.flexDirection = FlexDirection.Row;
@@ -340,7 +433,7 @@ public class GameHUD : MonoBehaviour
 
         root.Add(bottomArea);
 
-        // ── Damage number layer (fullscreen, ignores input) ──
+        // ── Damage number layer ──
         damageNumberLayer = new VisualElement();
         damageNumberLayer.pickingMode = PickingMode.Ignore;
         damageNumberLayer.style.position = Position.Absolute;
@@ -351,92 +444,79 @@ public class GameHUD : MonoBehaviour
         root.Add(damageNumberLayer);
     }
 
-    // ─── SPELL CARDS (bottom) ─────────────────────────────────────
+    // ── Combo Display ──
 
-    VisualElement BuildSpellCard(int index)
+    void RefreshComboDisplay()
     {
-        var card = new VisualElement();
-        card.name = $"spell-card-{index}";
-        card.pickingMode = PickingMode.Ignore;
-        card.style.backgroundColor = CardBg;
-        Pad(card, 12, 16);
-        Radius(card, 12);
-        Border(card, InactiveBorder, 2);
-        card.style.minWidth = 260;
-        card.style.overflow = Overflow.Hidden;
+        if (caster == null) return;
 
-        var header = new VisualElement();
-        header.style.flexDirection = FlexDirection.Row;
-        header.style.alignItems = Align.Center;
-        header.style.marginBottom = 8;
-
-        var slotLbl = Lbl($"Slot {index + 1}", 14, Dim, FontStyle.Bold);
-        header.Add(slotLbl);
-
-        var activeTag = Lbl("ACTIVE", 11, ActiveBorder, FontStyle.Bold);
-        activeTag.name = "active-tag";
-        activeTag.style.marginLeft = 10;
-        activeTag.style.backgroundColor = new Color(1f, 0.85f, 0.2f, 0.15f);
-        Pad(activeTag, 2, 8);
-        Radius(activeTag, 4);
-        header.Add(activeTag);
-
-        // Cooldown label
-        var cdLabel = Lbl("READY", 11, new Color(0.5f, 1f, 0.5f), FontStyle.Bold);
-        cdLabel.name = "cd-label";
-        cdLabel.style.marginLeft = 10;
-        header.Add(cdLabel);
-
-        card.Add(header);
-
-        var pills = new VisualElement();
-        pills.name = "pills";
-        pills.style.flexDirection = FlexDirection.Row;
-        pills.style.flexWrap = Wrap.Wrap;
-        card.Add(pills);
-
-        // Cooldown overlay fill (covers card from bottom)
-        var cdFill = new VisualElement();
-        cdFill.name = "cd-fill";
-        cdFill.pickingMode = PickingMode.Ignore;
-        cdFill.style.position = Position.Absolute;
-        cdFill.style.bottom = 0;
-        cdFill.style.left = 0;
-        cdFill.style.right = 0;
-        cdFill.style.height = new StyleLength(Length.Percent(0));
-        cdFill.style.backgroundColor = new Color(0f, 0f, 0f, 0.5f);
-        card.Add(cdFill);
-
-        if (index == 0) spell1CDFill = cdFill;
-        else spell2CDFill = cdFill;
-
-        return card;
-    }
-
-    void RefreshSpellCard(int index, VisualElement card)
-    {
-        var spell = caster.spellSlots[index];
-        bool active = caster.activeSlot == index;
-
-        Border(card, active ? ActiveBorder : InactiveBorder, active ? 3 : 2);
-        card.Q("active-tag").style.display = active ? DisplayStyle.Flex : DisplayStyle.None;
-
-        var pills = card.Q("pills");
-        pills.Clear();
-
-        if (spell == null || spell.element == null)
+        // Update orb indicators
+        if (caster.leftOrb != null)
         {
-            pills.Add(Pill("Empty", Color.gray, Color.gray));
-            return;
+            orbLeftIndicator.style.backgroundColor = caster.leftOrb.color;
+            orbLeftIndicator.style.display = DisplayStyle.Flex;
+        }
+        else
+            orbLeftIndicator.style.display = DisplayStyle.None;
+
+        if (caster.rightOrb != null)
+        {
+            orbRightIndicator.style.backgroundColor = caster.rightOrb.color;
+            orbRightIndicator.style.display = DisplayStyle.Flex;
+        }
+        else
+            orbRightIndicator.style.display = DisplayStyle.None;
+
+        // Update element hotbar
+        for (int i = 0; i < 4; i++)
+        {
+            var elem = caster.equippedElements[i];
+            var icon = elementSlots[i].Q("elem-icon");
+
+            if (elem != null)
+            {
+                icon.style.backgroundColor = elem.color;
+
+                // Overheat overlay
+                var fill = elementSlots[i].Q("charge-fill");
+                if (caster.IsOverheated(i))
+                {
+                    float progress = caster.GetOverheatProgress(i);
+                    fill.style.height = new StyleLength(Length.Percent((1f - progress) * 100f));
+                    fill.style.backgroundColor = new Color(0.5f, 0.1f, 0.1f, 0.6f);
+                }
+                else
+                {
+                    int ch = caster.GetCharges(i);
+                    int max = elem.maxCharges;
+                    float pct = 1f - (float)ch / max;
+                    fill.style.height = new StyleLength(Length.Percent(pct * 100f));
+                    fill.style.backgroundColor = new Color(0.2f, 0.2f, 0.2f, 0.3f);
+                }
+
+                // Highlight if this element is active as an orb
+                bool isActive = (caster.leftOrb == elem || caster.rightOrb == elem);
+                Border(elementSlots[i], isActive ? ActiveBorder : InactiveBorder, isActive ? 3 : 2);
+            }
+            else
+            {
+                icon.style.backgroundColor = new Color(0.2f, 0.2f, 0.2f);
+            }
         }
 
-        pills.Add(Pill(spell.element.elementName, spell.element.color, Color.white));
-        pills.Add(Pill(spell.form != null ? spell.form.formName : "???", FormColor, Color.white));
-        if (spell.modifier != null && spell.modifier.modifierType != ModifierType.None)
-            pills.Add(Pill(spell.modifier.modifierName, ModColor, Color.white));
+        // Update combo name
+        var def = caster.CurrentComboDef;
+        if (def != null)
+            comboNameLabel.text = def.comboName;
     }
 
-    // ─── HP ───────────────────────────────────────────────────────
+    void OnComboNameChanged(string name)
+    {
+        if (comboNameLabel != null)
+            comboNameLabel.text = name;
+    }
+
+    // ── HP ──
 
     void RefreshHP()
     {
@@ -458,272 +538,136 @@ public class GameHUD : MonoBehaviour
         hpBar.Add(hpText);
     }
 
-    // ─── RUNE SELECTION ───────────────────────────────────────────
+    // ── Upgrade Selection (Dead Cells style) ──
 
-    int rerollsRemaining;
-    Action rerollCallback;
-    Action<int> currentRuneOnSelect;
-    ScriptableObject[] currentRuneOptions;
-
-    public void ShowRuneSelection(ScriptableObject[] options, int rerolls, Action<int> onSelect, Action onReroll)
+    public void ShowUpgradeSelection(UpgradeType[] choices, Action<int> onSelect)
     {
-        runeOverlay.style.display = DisplayStyle.Flex;
-        rerollsRemaining = rerolls;
-        rerollCallback = onReroll;
-        currentRuneOnSelect = onSelect;
-        currentRuneOptions = options;
-        RebuildRuneCards();
-    }
+        upgradeOverlay.style.display = DisplayStyle.Flex;
+        upgradePanel.Clear();
 
-    void RebuildRuneCards()
-    {
-        runePanel.Clear();
-        RefreshCurrentSpellPreview();
-
-        for (int i = 0; i < currentRuneOptions.Length; i++)
+        for (int i = 0; i < choices.Length; i++)
         {
             int idx = i;
-            var card = BuildRuneCard(currentRuneOptions[i], () =>
+            var upgrade = choices[i];
+            var card = BuildUpgradeCard(upgrade, () =>
             {
-                runeOverlay.style.display = DisplayStyle.None;
-                currentRuneOnSelect?.Invoke(idx);
+                upgradeOverlay.style.display = DisplayStyle.None;
+                onSelect?.Invoke(idx);
             });
-            runePanel.Add(card);
-        }
-
-        // Reroll button
-        if (rerollsRemaining > 0 && rerollCallback != null)
-        {
-            var rerollCard = new VisualElement();
-            rerollCard.style.flexDirection = FlexDirection.Column;
-            rerollCard.style.width = 120;
-            rerollCard.style.marginLeft = 8;
-            rerollCard.style.backgroundColor = CardBg;
-            Radius(rerollCard, 14);
-            Border(rerollCard, new Color(0.6f, 0.4f, 0.9f), 2);
-            rerollCard.style.alignItems = Align.Center;
-            rerollCard.style.justifyContent = Justify.Center;
-            Pad(rerollCard, 20, 16);
-
-            var rerollIcon = Lbl("\u21BB", 28, new Color(0.7f, 0.5f, 1f), FontStyle.Bold);
-            rerollCard.Add(rerollIcon);
-            var rerollLbl = Lbl("REROLL", 16, new Color(0.7f, 0.5f, 1f), FontStyle.Bold);
-            rerollCard.Add(rerollLbl);
-            var rerollCount = Lbl($"x{rerollsRemaining}", 14, Dim, FontStyle.Bold);
-            rerollCount.style.marginTop = 4;
-            rerollCard.Add(rerollCount);
-
-            rerollCard.RegisterCallback<ClickEvent>(_ =>
-            {
-                rerollsRemaining--;
-                rerollCallback?.Invoke();
-                RebuildRuneCards();
-            });
-            rerollCard.RegisterCallback<MouseEnterEvent>(_ =>
-            {
-                rerollCard.style.backgroundColor = CardBgHover;
-                Border(rerollCard, new Color(0.8f, 0.6f, 1f), 3);
-            });
-            rerollCard.RegisterCallback<MouseLeaveEvent>(_ =>
-            {
-                rerollCard.style.backgroundColor = CardBg;
-                Border(rerollCard, new Color(0.6f, 0.4f, 0.9f), 2);
-            });
-            runePanel.Add(rerollCard);
+            upgradePanel.Add(card);
         }
     }
 
-    void RefreshCurrentSpellPreview()
+    VisualElement BuildUpgradeCard(UpgradeType type, Action onClick)
     {
-        currentSpellPreview.Clear();
-        var spell = caster.spellSlots[caster.activeSlot];
-
-        currentSpellPreview.Add(Lbl($"Slot {caster.activeSlot + 1}: ", 18, Dim, FontStyle.Bold));
-
-        if (spell != null && spell.element != null)
-        {
-            currentSpellPreview.Add(Pill(spell.element.elementName, spell.element.color, Color.white));
-            if (spell.form != null) currentSpellPreview.Add(Pill(spell.form.formName, FormColor, Color.white));
-            if (spell.modifier != null && spell.modifier.modifierType != ModifierType.None)
-                currentSpellPreview.Add(Pill(spell.modifier.modifierName, ModColor, Color.white));
-        }
-        else
-        {
-            currentSpellPreview.Add(Pill("Empty", Color.gray, Color.gray));
-        }
-    }
-
-    VisualElement BuildRuneCard(ScriptableObject rune, Action onClick)
-    {
-        GetRuneInfo(rune, out string runeName, out string typeName, out Color runeColor, out string description);
-        string preview = ComputePreview(rune);
-
-        // Check modifier compatibility
-        bool incompatible = false;
-        if (rune is ModifierSO modSO && modSO.modifierType != ModifierType.None)
-        {
-            var spell = caster.spellSlots[caster.activeSlot];
-            if (spell?.form != null && !ModifierSO.IsCompatible(modSO.modifierType, spell.form.formType))
-                incompatible = true;
-        }
+        Color col = RunUpgradeSystem.GetColor(type);
+        string name = RunUpgradeSystem.GetName(type);
+        string desc = RunUpgradeSystem.GetDescription(type);
 
         var card = new VisualElement();
-        card.style.flexDirection = FlexDirection.Column;
-        card.style.width = 250;
+        card.style.width = 220;
         card.style.marginLeft = 10;
         card.style.marginRight = 10;
         card.style.backgroundColor = CardBg;
         Radius(card, 14);
-        Border(card, incompatible ? new Color(0.4f, 0.4f, 0.4f) : InactiveBorder, 2);
+        Border(card, InactiveBorder, 2);
         card.style.overflow = Overflow.Hidden;
-        card.style.cursor = StyleKeyword.Auto;
-        if (incompatible) card.style.opacity = 0.45f;
 
-        // Click handler (still allow click — rune replaces the slot even if incompatible)
         card.RegisterCallback<ClickEvent>(_ => onClick?.Invoke());
 
-        // ── Header (colored bar) ──
         var header = new VisualElement();
-        header.style.backgroundColor = runeColor;
+        header.style.backgroundColor = col;
         Pad(header, 14, 18);
-
-        header.Add(Lbl(runeName, 26, Color.white, FontStyle.Bold));
-        var typeLbl = Lbl(typeName, 14, new Color(1, 1, 1, 0.75f), FontStyle.Bold);
-        typeLbl.style.marginTop = 2;
-        header.Add(typeLbl);
+        header.Add(Lbl(name, 22, Color.white, FontStyle.Bold));
         card.Add(header);
 
-        // ── Body ──
         var body = new VisualElement();
         Pad(body, 14, 18);
-        body.style.flexGrow = 1;
-
-        var descLbl = Lbl(description, 16, new Color(0.8f, 0.8f, 0.85f));
+        var descLbl = Lbl(desc, 16, new Color(0.8f, 0.8f, 0.85f));
         descLbl.style.whiteSpace = WhiteSpace.Normal;
-        descLbl.style.marginBottom = 14;
         body.Add(descLbl);
-
-        // Separator
-        var sep = new VisualElement();
-        sep.style.height = 1;
-        sep.style.backgroundColor = new Color(0.3f, 0.3f, 0.35f);
-        sep.style.marginBottom = 10;
-        body.Add(sep);
-
-        if (incompatible)
-        {
-            var warn = Lbl("INCOMPATIBLE WITH CURRENT FORM", 12, new Color(1f, 0.4f, 0.3f), FontStyle.Bold);
-            warn.style.whiteSpace = WhiteSpace.Normal;
-            warn.style.marginBottom = 6;
-            body.Add(warn);
-        }
-
-        body.Add(Lbl("RESULT", 12, Dim, FontStyle.Bold));
-        var previewLbl = Lbl(preview, 18, Color.white, FontStyle.Bold);
-        previewLbl.style.whiteSpace = WhiteSpace.Normal;
-        previewLbl.style.marginTop = 4;
-        body.Add(previewLbl);
-
         card.Add(body);
 
-        // Hover
-        card.RegisterCallback<MouseEnterEvent>(_ =>
-        {
-            card.style.backgroundColor = CardBgHover;
-            Border(card, runeColor, 3);
-        });
-        card.RegisterCallback<MouseLeaveEvent>(_ =>
-        {
-            card.style.backgroundColor = CardBg;
-            Border(card, InactiveBorder, 2);
-        });
+        card.RegisterCallback<MouseEnterEvent>(_ => { card.style.backgroundColor = CardBgHover; Border(card, col, 3); });
+        card.RegisterCallback<MouseLeaveEvent>(_ => { card.style.backgroundColor = CardBg; Border(card, InactiveBorder, 2); });
 
         return card;
     }
 
-    // ─── RUNE INFO ────────────────────────────────────────────────
+    // ── Element Unlock ──
 
-    void GetRuneInfo(ScriptableObject rune, out string name, out string type, out Color color, out string desc)
+    public void ShowElementUnlock(ElementSO newElement, ElementSO[] currentSlots, Action<int> onSlotChosen)
     {
-        name = "?"; type = "?"; color = Color.gray; desc = "";
+        elementUnlockOverlay.style.display = DisplayStyle.Flex;
+        elementUnlockPanel.Clear();
 
-        if (rune is ElementSO e)
+        // Show new element being unlocked
+        var newElemLabel = Lbl($"New: {newElement.elementName}", 24, newElement.color, FontStyle.Bold);
+        newElemLabel.style.marginBottom = 16;
+        // Insert before panel
+        var container = elementUnlockOverlay.Q<VisualElement>();
+
+        for (int i = 0; i < currentSlots.Length; i++)
         {
-            name = e.elementName; type = "ELEMENT"; color = e.color;
-            desc = e.statusEffect switch
+            if (currentSlots[i] == null) continue;
+            int idx = i;
+            var slot = currentSlots[i];
+
+            var card = new VisualElement();
+            card.style.width = 150;
+            card.style.height = 120;
+            card.style.marginLeft = 8;
+            card.style.marginRight = 8;
+            card.style.backgroundColor = CardBg;
+            Radius(card, 12);
+            Border(card, InactiveBorder, 2);
+            card.style.alignItems = Align.Center;
+            card.style.justifyContent = Justify.Center;
+
+            var keyLbl = Lbl($"[{i + 1}]", 14, Dim, FontStyle.Bold);
+            card.Add(keyLbl);
+
+            var icon = new VisualElement();
+            icon.style.width = 36;
+            icon.style.height = 36;
+            Radius(icon, 18);
+            icon.style.backgroundColor = slot.color;
+            icon.style.marginTop = 8;
+            icon.style.marginBottom = 8;
+            card.Add(icon);
+
+            var nameLbl = Lbl(slot.elementName, 16, slot.color, FontStyle.Bold);
+            card.Add(nameLbl);
+
+            var replaceLbl = Lbl("REPLACE", 12, new Color(1f, 0.4f, 0.3f), FontStyle.Bold);
+            replaceLbl.style.marginTop = 4;
+            card.Add(replaceLbl);
+
+            card.RegisterCallback<ClickEvent>(_ =>
             {
-                StatusEffectType.Burn   => $"Base damage: {e.baseDamage}\nBurn: {e.statusDPS} DMG/s for {e.statusDuration}s",
-                StatusEffectType.Slow   => $"Base damage: {e.baseDamage}\nSlow 40% for {e.statusDuration}s\nRepeat hit = Freeze",
-                StatusEffectType.Chain  => $"Base damage: {e.baseDamage}\nChains to {e.chainCount} nearby enemies\nStun {e.statusDuration}s",
-                StatusEffectType.Poison => $"Base damage: {e.baseDamage}\nPoison stacks up to 5\n2 DMG/s per stack",
-                StatusEffectType.VoidMark => $"Base damage: {e.baseDamage}\nOn kill: pulls nearby enemies",
-                _ => $"Base damage: {e.baseDamage}"
-            };
-        }
-        else if (rune is FormSO f)
-        {
-            name = f.formName; type = "FORM"; color = FormColor;
-            desc = f.formType switch
-            {
-                FormType.Bolt  => $"Aimed projectile\nMedium speed, long range\nCD: {f.cooldown}s",
-                FormType.Cone  => $"45 deg frontal arc\nClose range AoE\nCD: {f.cooldown}s",
-                FormType.Beam  => $"Instant hitscan line\nHits all enemies in path\nCD: {f.cooldown}s",
-                FormType.Aura  => $"360 deg pulse around you\nPassive, auto-casts\nCD: {f.cooldown}s",
-                FormType.Orbit => $"Orbiting projectiles\nNo aiming needed\nCD: {f.cooldown}s",
-                FormType.Trap  => $"Mine at cursor position\nTriggers on proximity\nCD: {f.cooldown}s",
-                _ => ""
-            };
-        }
-        else if (rune is ModifierSO m)
-        {
-            name = m.modifierName; type = "MODIFIER"; color = ModColor;
-            desc = m.modifierType switch
-            {
-                ModifierType.Split => $"x{m.splitCount} copies\n-{(int)((1 - m.damageMultiplier) * 100)}% damage each\n{m.splitSpreadAngle} deg spread",
-                ModifierType.Pierce => $"Passes through {m.pierceCount} enemies\nFull damage to each",
-                ModifierType.Bounce => $"Bounces {m.bounceCount} times\nOff walls or between enemies",
-                ModifierType.Leech => $"{(int)(m.leechPercent * 100)}% damage heals you\nSustain in combat",
-                ModifierType.Oversize => $"x{m.sizeMultiplier} size\n-{(int)((1 - m.speedPenalty) * 100)}% projectile speed",
-                ModifierType.Volatile => $"x{m.damageMultiplier} damage\n{(int)(m.volatileMissChance * 100)}% chance to miss",
-                ModifierType.Homing => $"Seeks nearest enemy\n-{(int)((1 - m.homingSpeedMult) * 100)}% projectile speed",
-                _ => "No modification\nPure base spell"
-            };
+                elementUnlockOverlay.style.display = DisplayStyle.None;
+                onSlotChosen?.Invoke(idx);
+            });
+            card.RegisterCallback<MouseEnterEvent>(_ => { Border(card, newElement.color, 3); });
+            card.RegisterCallback<MouseLeaveEvent>(_ => { Border(card, InactiveBorder, 2); });
+
+            elementUnlockPanel.Add(card);
         }
     }
 
-    string ComputePreview(ScriptableObject rune)
+    // ── Synergy Selection ──
+
+    public void ShowSynergySelection(SynergyDef[] choices, Action<int> onSelect)
     {
-        var spell = caster.spellSlots[caster.activeSlot];
-        string elem = spell?.element?.elementName ?? "???";
-        string form = spell?.form?.formName ?? "???";
-        string mod = "";
-        if (spell?.modifier != null && spell.modifier.modifierType != ModifierType.None)
-            mod = " + " + spell.modifier.modifierName;
+        synergyOverlay.style.display = DisplayStyle.Flex;
+        synergyPanel.Clear();
 
-        if (rune is ElementSO e) elem = e.elementName;
-        else if (rune is FormSO f) form = f.formName;
-        else if (rune is ModifierSO m)
-            mod = m.modifierType != ModifierType.None ? " + " + m.modifierName : "";
-
-        return $"{elem}  {form}{mod}";
-    }
-
-    // ─── RELIC SELECTION ─────────────────────────────────────────
-
-    public void ShowRelicSelection(RelicSO[] options, Action<int> onSelect)
-    {
-        runeOverlay.style.display = DisplayStyle.Flex;
-        runePanel.Clear();
-        currentSpellPreview.Clear();
-        currentSpellPreview.Add(Lbl("Choose a Relic", 18, new Color(1f, 0.85f, 0.3f), FontStyle.Bold));
-        slotHintLabel.text = "Relics give passive bonuses for the rest of the run";
-
-        for (int i = 0; i < options.Length; i++)
+        for (int i = 0; i < choices.Length; i++)
         {
             int idx = i;
-            var relic = options[i];
+            var syn = choices[i];
+
             var card = new VisualElement();
-            card.style.flexDirection = FlexDirection.Column;
             card.style.width = 250;
             card.style.marginLeft = 10;
             card.style.marginRight = 10;
@@ -734,56 +678,192 @@ public class GameHUD : MonoBehaviour
 
             card.RegisterCallback<ClickEvent>(_ =>
             {
-                runeOverlay.style.display = DisplayStyle.None;
+                synergyOverlay.style.display = DisplayStyle.None;
                 onSelect?.Invoke(idx);
             });
 
-            // Header
             var header = new VisualElement();
-            header.style.backgroundColor = relic.color;
+            header.style.backgroundColor = syn.color;
             Pad(header, 14, 18);
-            header.Add(Lbl(relic.relicName, 26, Color.white, FontStyle.Bold));
-            var typeLbl = Lbl("RELIC", 14, new Color(1, 1, 1, 0.75f), FontStyle.Bold);
-            typeLbl.style.marginTop = 2;
-            header.Add(typeLbl);
+            header.Add(Lbl(syn.name, 24, Color.white, FontStyle.Bold));
             card.Add(header);
 
-            // Body
             var body = new VisualElement();
             Pad(body, 14, 18);
-            var descLbl = Lbl(relic.description, 18, new Color(0.85f, 0.85f, 0.9f));
+            var descLbl = Lbl(syn.description, 16, new Color(0.8f, 0.8f, 0.85f));
             descLbl.style.whiteSpace = WhiteSpace.Normal;
             body.Add(descLbl);
             card.Add(body);
 
-            // Hover
-            card.RegisterCallback<MouseEnterEvent>(_ =>
-            {
-                card.style.backgroundColor = CardBgHover;
-                Border(card, relic.color, 3);
-            });
-            card.RegisterCallback<MouseLeaveEvent>(_ =>
-            {
-                card.style.backgroundColor = CardBg;
-                Border(card, InactiveBorder, 2);
-            });
+            card.RegisterCallback<MouseEnterEvent>(_ => { card.style.backgroundColor = CardBgHover; Border(card, syn.color, 3); });
+            card.RegisterCallback<MouseLeaveEvent>(_ => { card.style.backgroundColor = CardBg; Border(card, InactiveBorder, 2); });
 
-            runePanel.Add(card);
+            synergyPanel.Add(card);
         }
     }
 
-    public void ShowShopRoom(RelicSO[] allRelics, RelicManager mgr, int price, int playerGold, Action<RelicSO> onDone)
-    {
-        runeOverlay.style.display = DisplayStyle.Flex;
-        runePanel.Clear();
-        currentSpellPreview.Clear();
-        currentSpellPreview.Add(Lbl("SHOP", 24, new Color(1f, 0.85f, 0.2f), FontStyle.Bold));
-        slotHintLabel.text = $"Your gold: {playerGold}";
+    // ── Relic Selection (reused from old system) ──
 
-        // Gather available relics
+    public void ShowRelicSelection(RelicSO[] options, Action<int> onSelect)
+    {
+        upgradeOverlay.style.display = DisplayStyle.Flex;
+        upgradePanel.Clear();
+
+        for (int i = 0; i < options.Length; i++)
+        {
+            int idx = i;
+            var relic = options[i];
+            var card = new VisualElement();
+            card.style.width = 220;
+            card.style.marginLeft = 10;
+            card.style.marginRight = 10;
+            card.style.backgroundColor = CardBg;
+            Radius(card, 14);
+            Border(card, InactiveBorder, 2);
+            card.style.overflow = Overflow.Hidden;
+
+            card.RegisterCallback<ClickEvent>(_ =>
+            {
+                upgradeOverlay.style.display = DisplayStyle.None;
+                onSelect?.Invoke(idx);
+            });
+
+            var header = new VisualElement();
+            header.style.backgroundColor = relic.color;
+            Pad(header, 14, 18);
+            header.Add(Lbl(relic.relicName, 22, Color.white, FontStyle.Bold));
+            if (relic.isCursed)
+            {
+                var cursedTag = Lbl("CURSED", 12, new Color(1f, 0.3f, 0.3f), FontStyle.Bold);
+                cursedTag.style.marginTop = 2;
+                header.Add(cursedTag);
+            }
+            card.Add(header);
+
+            var body = new VisualElement();
+            Pad(body, 14, 18);
+            var descLbl = Lbl(relic.description, 16, new Color(0.8f, 0.8f, 0.85f));
+            descLbl.style.whiteSpace = WhiteSpace.Normal;
+            body.Add(descLbl);
+            card.Add(body);
+
+            card.RegisterCallback<MouseEnterEvent>(_ => { card.style.backgroundColor = CardBgHover; Border(card, relic.color, 3); });
+            card.RegisterCallback<MouseLeaveEvent>(_ => { card.style.backgroundColor = CardBg; Border(card, InactiveBorder, 2); });
+
+            upgradePanel.Add(card);
+        }
+    }
+
+    // ── Event room (reused) ──
+
+    public void ShowEventRoom(string title, string subtitle, Color titleColor,
+        string[] labels, string[] descriptions, Color[] colors, Action<int> onChoice)
+    {
+        upgradeOverlay.style.display = DisplayStyle.Flex;
+        upgradePanel.Clear();
+
+        for (int i = 0; i < labels.Length; i++)
+        {
+            int idx = i;
+            var card = new VisualElement();
+            card.style.width = 200;
+            card.style.marginLeft = 10;
+            card.style.marginRight = 10;
+            card.style.backgroundColor = CardBg;
+            Radius(card, 14);
+            Border(card, InactiveBorder, 2);
+            card.style.overflow = Overflow.Hidden;
+
+            card.RegisterCallback<ClickEvent>(_ =>
+            {
+                upgradeOverlay.style.display = DisplayStyle.None;
+                onChoice?.Invoke(idx);
+            });
+
+            var header = new VisualElement();
+            header.style.backgroundColor = colors[i];
+            Pad(header, 12, 14);
+            header.Add(Lbl(labels[i], 20, Color.white, FontStyle.Bold));
+            card.Add(header);
+
+            var body = new VisualElement();
+            Pad(body, 12, 14);
+            var descLbl = Lbl(descriptions[i], 14, new Color(0.8f, 0.8f, 0.85f));
+            descLbl.style.whiteSpace = WhiteSpace.Normal;
+            body.Add(descLbl);
+            card.Add(body);
+
+            card.RegisterCallback<MouseEnterEvent>(_ => { Border(card, colors[idx], 3); });
+            card.RegisterCallback<MouseLeaveEvent>(_ => { Border(card, InactiveBorder, 2); });
+
+            upgradePanel.Add(card);
+        }
+    }
+
+    // ── Public API ──
+
+    public void SetWave(int w) { if (waveLabel != null) waveLabel.text = $"Wave {w}"; }
+    public void SetWave(int w, int sub, int total) { if (waveLabel != null) waveLabel.text = $"Wave {w} ({sub}/{total})"; }
+    public void SetFloorRoom(int floor, int room) { if (floorRoomLabel != null) floorRoomLabel.text = $"Floor {floor} — Room {room}/10"; }
+    public void SetGold(int gold) { if (goldLabel != null) goldLabel.text = gold.ToString(); }
+    public void Refresh() { RefreshHP(); RefreshComboDisplay(); }
+
+    public void ShowDeath(bool show, int metaCurrency = 0)
+    {
+        deathOverlay.style.display = show ? DisplayStyle.Flex : DisplayStyle.None;
+        if (show)
+            deathWaveLabel.text = metaCurrency > 0 ? $"+{metaCurrency} Soul Essence" : "";
+    }
+
+    public void ShowVictory(int wave, int floor)
+    {
+        victoryOverlay.style.display = DisplayStyle.Flex;
+    }
+
+    public void ShowBossHP(Health bossHP, string bossName)
+    {
+        trackedBossHP = bossHP;
+        bossHPContainer.style.display = DisplayStyle.Flex;
+        bossNameLabel.text = bossName;
+        bossHP.OnHPChanged += (cur, max) =>
+        {
+            float pct = max > 0 ? (float)cur / max : 0;
+            bossHPFill.style.width = new StyleLength(Length.Percent(pct * 100f));
+        };
+        bossHP.OnDeath += () => bossHPContainer.style.display = DisplayStyle.None;
+    }
+
+    public void HideBossHP()
+    {
+        bossHPContainer.style.display = DisplayStyle.None;
+        trackedBossHP = null;
+    }
+
+    public void RefreshRelics(List<RelicSO> relics)
+    {
+        relicBar.Clear();
+        foreach (var r in relics)
+        {
+            var icon = new VisualElement();
+            icon.style.width = 24;
+            icon.style.height = 24;
+            Radius(icon, 6);
+            icon.style.backgroundColor = r.color;
+            icon.style.marginRight = 4;
+            Border(icon, r.isCursed ? new Color(0.8f, 0.2f, 0.2f) : new Color(0.5f, 0.5f, 0.5f), 1);
+            relicBar.Add(icon);
+        }
+    }
+
+    // ── Shop / Devil Deal / Rest ──
+
+    public void ShowShopRoom(RelicSO[] allRelics, RelicManager relicMgr, int price, int gold, Action<RelicSO> onBuy)
+    {
         var available = new List<RelicSO>();
         foreach (var r in allRelics)
-            if (!mgr.HasRelic(r.relicType)) available.Add(r);
+            if (!relicMgr.HasRelic(r.relicType) && !r.isCursed) available.Add(r);
+
+        if (available.Count == 0) { onBuy(null); return; }
 
         int count = Mathf.Min(3, available.Count);
         var options = new RelicSO[count];
@@ -794,469 +874,187 @@ public class GameHUD : MonoBehaviour
             available.RemoveAt(idx);
         }
 
+        upgradeOverlay.style.display = DisplayStyle.Flex;
+        upgradePanel.Clear();
+
         for (int i = 0; i < count; i++)
         {
             var relic = options[i];
-            bool canAfford = playerGold >= price;
             var card = new VisualElement();
-            card.style.flexDirection = FlexDirection.Column;
             card.style.width = 220;
-            card.style.marginLeft = 8;
-            card.style.marginRight = 8;
+            card.style.marginLeft = 10;
+            card.style.marginRight = 10;
             card.style.backgroundColor = CardBg;
             Radius(card, 14);
-            Border(card, canAfford ? InactiveBorder : new Color(0.4f, 0.2f, 0.2f), 2);
+            Border(card, InactiveBorder, 2);
             card.style.overflow = Overflow.Hidden;
-            if (!canAfford) card.style.opacity = 0.55f;
 
             card.RegisterCallback<ClickEvent>(_ =>
             {
-                runeOverlay.style.display = DisplayStyle.None;
-                onDone?.Invoke(relic);
+                upgradeOverlay.style.display = DisplayStyle.None;
+                onBuy(gold >= price ? relic : null);
             });
 
             var header = new VisualElement();
             header.style.backgroundColor = relic.color;
-            Pad(header, 12, 16);
+            Pad(header, 14, 18);
             header.Add(Lbl(relic.relicName, 22, Color.white, FontStyle.Bold));
+            var priceLbl = Lbl($"{price} gold", 14, new Color(1f, 0.9f, 0.3f), FontStyle.Bold);
+            priceLbl.style.marginTop = 2;
+            header.Add(priceLbl);
             card.Add(header);
 
             var body = new VisualElement();
-            Pad(body, 12, 16);
-            var descLbl = Lbl(relic.description, 16, new Color(0.85f, 0.85f, 0.9f));
+            Pad(body, 14, 18);
+            var descLbl = Lbl(relic.description, 16, new Color(0.8f, 0.8f, 0.85f));
             descLbl.style.whiteSpace = WhiteSpace.Normal;
             body.Add(descLbl);
-
-            // Price tag
-            var priceRow = new VisualElement();
-            priceRow.style.flexDirection = FlexDirection.Row;
-            priceRow.style.alignItems = Align.Center;
-            priceRow.style.marginTop = 10;
-
-            var goldDot = new VisualElement();
-            goldDot.style.width = 12;
-            goldDot.style.height = 12;
-            Radius(goldDot, 6);
-            goldDot.style.backgroundColor = new Color(1f, 0.85f, 0.2f);
-            goldDot.style.marginRight = 6;
-            priceRow.Add(goldDot);
-
-            var priceLbl = Lbl($"{price} Gold", 18, canAfford ? new Color(1f, 0.9f, 0.3f) : new Color(0.8f, 0.3f, 0.3f), FontStyle.Bold);
-            priceRow.Add(priceLbl);
-            body.Add(priceRow);
             card.Add(body);
 
-            card.RegisterCallback<MouseEnterEvent>(_ =>
-            {
-                card.style.backgroundColor = CardBgHover;
-                Border(card, relic.color, 3);
-            });
-            card.RegisterCallback<MouseLeaveEvent>(_ =>
-            {
-                card.style.backgroundColor = CardBg;
-                Border(card, canAfford ? InactiveBorder : new Color(0.4f, 0.2f, 0.2f), 2);
-            });
+            card.RegisterCallback<MouseEnterEvent>(_ => { Border(card, relic.color, 3); });
+            card.RegisterCallback<MouseLeaveEvent>(_ => { Border(card, InactiveBorder, 2); });
 
-            runePanel.Add(card);
+            upgradePanel.Add(card);
         }
 
         // Skip button
-        var skipCard = new VisualElement();
-        skipCard.style.flexDirection = FlexDirection.Column;
-        skipCard.style.width = 120;
-        skipCard.style.marginLeft = 8;
-        skipCard.style.backgroundColor = CardBg;
-        Radius(skipCard, 14);
-        Border(skipCard, Dim, 2);
-        skipCard.style.alignItems = Align.Center;
-        skipCard.style.justifyContent = Justify.Center;
-        Pad(skipCard, 20, 16);
-        skipCard.Add(Lbl("SKIP", 20, Dim, FontStyle.Bold));
-        skipCard.RegisterCallback<ClickEvent>(_ =>
+        var skip = new VisualElement();
+        skip.style.width = 120;
+        skip.style.marginLeft = 10;
+        skip.style.backgroundColor = CardBg;
+        Radius(skip, 14);
+        Border(skip, Dim, 2);
+        skip.style.alignItems = Align.Center;
+        skip.style.justifyContent = Justify.Center;
+        Pad(skip, 20, 16);
+        skip.Add(Lbl("SKIP", 20, Dim, FontStyle.Bold));
+        skip.RegisterCallback<ClickEvent>(_ =>
         {
-            runeOverlay.style.display = DisplayStyle.None;
-            onDone?.Invoke(null);
+            upgradeOverlay.style.display = DisplayStyle.None;
+            onBuy(null);
         });
-        skipCard.RegisterCallback<MouseEnterEvent>(_ =>
-        {
-            skipCard.style.backgroundColor = CardBgHover;
-            Border(skipCard, Color.white, 2);
-        });
-        skipCard.RegisterCallback<MouseLeaveEvent>(_ =>
-        {
-            skipCard.style.backgroundColor = CardBg;
-            Border(skipCard, Dim, 2);
-        });
-        runePanel.Add(skipCard);
+        upgradePanel.Add(skip);
     }
 
-    public void ShowDevilDeal(System.Collections.Generic.List<RelicSO> cursedRelics, RelicManager mgr, Health playerHP, Action<RelicSO> onDone)
+    public void ShowDevilDeal(List<RelicSO> cursedRelics, RelicManager relicMgr, Health playerHP, Action<RelicSO> onChoice)
     {
-        runeOverlay.style.display = DisplayStyle.Flex;
-        runePanel.Clear();
-        currentSpellPreview.Clear();
-        currentSpellPreview.Add(Lbl("DEVIL DEAL", 24, new Color(0.8f, 0.15f, 0.15f), FontStyle.Bold));
-        slotHintLabel.text = "Cost: -1 Max HP per relic. Power demands sacrifice.";
-
         int count = Mathf.Min(2, cursedRelics.Count);
+        var options = new RelicSO[count];
         for (int i = 0; i < count; i++)
         {
-            var relic = cursedRelics[i];
-            var card = new VisualElement();
-            card.style.flexDirection = FlexDirection.Column;
-            card.style.width = 240;
-            card.style.marginLeft = 8;
-            card.style.marginRight = 8;
-            card.style.backgroundColor = new Color(0.12f, 0.04f, 0.06f, 0.95f);
-            Radius(card, 14);
-            Border(card, new Color(0.7f, 0.15f, 0.15f), 2);
-            card.style.overflow = Overflow.Hidden;
-
-            card.RegisterCallback<ClickEvent>(_ =>
-            {
-                runeOverlay.style.display = DisplayStyle.None;
-                onDone?.Invoke(relic);
-            });
-
-            var header = new VisualElement();
-            header.style.backgroundColor = relic.color;
-            Pad(header, 12, 16);
-            header.Add(Lbl(relic.relicName, 22, Color.white, FontStyle.Bold));
-            var cursedTag = Lbl("CURSED", 12, new Color(1f, 0.3f, 0.3f), FontStyle.Bold);
-            cursedTag.style.marginTop = 2;
-            header.Add(cursedTag);
-            card.Add(header);
-
-            var body = new VisualElement();
-            Pad(body, 12, 16);
-            var descLbl = Lbl(relic.description, 16, new Color(0.9f, 0.7f, 0.7f));
-            descLbl.style.whiteSpace = WhiteSpace.Normal;
-            body.Add(descLbl);
-
-            var costLbl = Lbl("-1 Max HP", 16, new Color(1f, 0.3f, 0.2f), FontStyle.Bold);
-            costLbl.style.marginTop = 8;
-            body.Add(costLbl);
-            card.Add(body);
-
-            card.RegisterCallback<MouseEnterEvent>(_ =>
-            {
-                card.style.backgroundColor = new Color(0.18f, 0.06f, 0.08f);
-                Border(card, new Color(1f, 0.2f, 0.2f), 3);
-            });
-            card.RegisterCallback<MouseLeaveEvent>(_ =>
-            {
-                card.style.backgroundColor = new Color(0.12f, 0.04f, 0.06f, 0.95f);
-                Border(card, new Color(0.7f, 0.15f, 0.15f), 2);
-            });
-
-            runePanel.Add(card);
+            int idx = UnityEngine.Random.Range(0, cursedRelics.Count);
+            options[i] = cursedRelics[idx];
+            cursedRelics.RemoveAt(idx);
         }
 
-        // Skip button
-        var skipCard = new VisualElement();
-        skipCard.style.width = 120;
-        skipCard.style.marginLeft = 8;
-        skipCard.style.backgroundColor = CardBg;
-        Radius(skipCard, 14);
-        Border(skipCard, Dim, 2);
-        skipCard.style.alignItems = Align.Center;
-        skipCard.style.justifyContent = Justify.Center;
-        Pad(skipCard, 20, 16);
-        skipCard.Add(Lbl("RESIST", 18, new Color(0.5f, 0.8f, 0.5f), FontStyle.Bold));
-        skipCard.RegisterCallback<ClickEvent>(_ =>
-        {
-            runeOverlay.style.display = DisplayStyle.None;
-            onDone?.Invoke(null);
-        });
-        skipCard.RegisterCallback<MouseEnterEvent>(_ =>
-        {
-            skipCard.style.backgroundColor = CardBgHover;
-            Border(skipCard, new Color(0.5f, 0.8f, 0.5f), 2);
-        });
-        skipCard.RegisterCallback<MouseLeaveEvent>(_ =>
-        {
-            skipCard.style.backgroundColor = CardBg;
-            Border(skipCard, Dim, 2);
-        });
-        runePanel.Add(skipCard);
+        ShowEventRoom("DEVIL'S DEAL", "Trade your vitality for power...",
+            new Color(0.6f, 0.05f, 0.1f),
+            count >= 2 ? new[] { options[0].relicName, options[1].relicName, "LEAVE" }
+                       : new[] { options[0].relicName, "LEAVE" },
+            count >= 2 ? new[] { $"{options[0].description}\nCost: -1 max HP", $"{options[1].description}\nCost: -1 max HP", "Walk away safely" }
+                       : new[] { $"{options[0].description}\nCost: -1 max HP", "Walk away safely" },
+            count >= 2 ? new[] { options[0].color, options[1].color, new Color(0.5f, 0.5f, 0.5f) }
+                       : new[] { options[0].color, new Color(0.5f, 0.5f, 0.5f) },
+            choice =>
+            {
+                if (choice < count)
+                    onChoice(options[choice]);
+                else
+                    onChoice(null);
+            });
     }
 
     public void ShowRestRoom(Action onContinue)
     {
-        runeOverlay.style.display = DisplayStyle.Flex;
-        runePanel.Clear();
-        currentSpellPreview.Clear();
-        currentSpellPreview.Add(Lbl("REST ROOM", 24, new Color(0.3f, 0.9f, 0.5f), FontStyle.Bold));
-        slotHintLabel.text = "You feel refreshed. HP fully restored.";
-
-        var continueCard = new VisualElement();
-        continueCard.style.flexDirection = FlexDirection.Column;
-        continueCard.style.width = 200;
-        continueCard.style.backgroundColor = CardBg;
-        Radius(continueCard, 14);
-        Border(continueCard, new Color(0.3f, 0.8f, 0.5f), 2);
-        continueCard.style.alignItems = Align.Center;
-        continueCard.style.justifyContent = Justify.Center;
-        Pad(continueCard, 24, 20);
-        continueCard.Add(Lbl("CONTINUE", 24, new Color(0.3f, 0.9f, 0.5f), FontStyle.Bold));
-        continueCard.RegisterCallback<ClickEvent>(_ =>
-        {
-            runeOverlay.style.display = DisplayStyle.None;
-            onContinue?.Invoke();
-        });
-        continueCard.RegisterCallback<MouseEnterEvent>(_ =>
-        {
-            continueCard.style.backgroundColor = CardBgHover;
-            Border(continueCard, new Color(0.4f, 1f, 0.6f), 3);
-        });
-        continueCard.RegisterCallback<MouseLeaveEvent>(_ =>
-        {
-            continueCard.style.backgroundColor = CardBg;
-            Border(continueCard, new Color(0.3f, 0.8f, 0.5f), 2);
-        });
-        runePanel.Add(continueCard);
+        ShowEventRoom("REST", "A moment of peace. You are fully healed.",
+            new Color(0.3f, 0.9f, 0.5f),
+            new[] { "CONTINUE" },
+            new[] { "Proceed to the next room" },
+            new[] { new Color(0.3f, 0.9f, 0.5f) },
+            _ => onContinue());
     }
 
-    /// <summary>Show an event room with multiple choice options.</summary>
-    public void ShowEventRoom(string title, string description, Color titleColor,
-        string[] choiceLabels, string[] choiceDescs, Color[] choiceColors, Action<int> onChoice)
-    {
-        runeOverlay.style.display = DisplayStyle.Flex;
-        runePanel.Clear();
-        currentSpellPreview.Clear();
-        currentSpellPreview.Add(Lbl(title, 24, titleColor, FontStyle.Bold));
-        slotHintLabel.text = description;
-
-        for (int i = 0; i < choiceLabels.Length; i++)
-        {
-            int idx = i;
-            var card = new VisualElement();
-            card.style.flexDirection = FlexDirection.Column;
-            card.style.width = 200;
-            card.style.backgroundColor = CardBg;
-            Radius(card, 14);
-            Border(card, choiceColors[i], 2);
-            card.style.alignItems = Align.Center;
-            Pad(card, 18, 16);
-
-            card.Add(Lbl(choiceLabels[i], 18, choiceColors[i], FontStyle.Bold));
-            card.Add(Lbl(choiceDescs[i], 12, Dim));
-
-            card.RegisterCallback<ClickEvent>(_ =>
-            {
-                runeOverlay.style.display = DisplayStyle.None;
-                onChoice?.Invoke(idx);
-            });
-            Color hoverBorder = choiceColors[idx] * 1.3f;
-            Color baseBorder = choiceColors[idx];
-            card.RegisterCallback<MouseEnterEvent>(_ => { card.style.backgroundColor = CardBgHover; Border(card, hoverBorder, 3); });
-            card.RegisterCallback<MouseLeaveEvent>(_ => { card.style.backgroundColor = CardBg; Border(card, baseBorder, 2); });
-            runePanel.Add(card);
-        }
-    }
-
-    public void RefreshRelics(List<RelicSO> relics)
-    {
-        relicBar.Clear();
-        foreach (var r in relics)
-        {
-            var icon = new VisualElement();
-            icon.style.width = 28;
-            icon.style.height = 28;
-            icon.style.marginRight = 4;
-            Radius(icon, 6);
-            icon.style.backgroundColor = r.color;
-            Border(icon, new Color(r.color.r * 0.6f, r.color.g * 0.6f, r.color.b * 0.6f), 1);
-            icon.tooltip = $"{r.relicName}: {r.description}";
-
-            var initial = Lbl(r.relicName.Substring(0, 1), 14, Color.white, FontStyle.Bold);
-            initial.style.alignSelf = Align.Center;
-            initial.style.unityTextAlign = UnityEngine.TextAnchor.MiddleCenter;
-            icon.Add(initial);
-
-            relicBar.Add(icon);
-        }
-    }
-
-    // ─── PUBLIC API ───────────────────────────────────────────────
-
-    public void SetGold(int amount)
-    {
-        if (goldLabel != null) goldLabel.text = amount.ToString();
-    }
-
-    public void SetWave(int w) => waveLabel.text = $"Wave {w}";
-    public void SetWave(int w, int sub, int total) => waveLabel.text = total > 1 ? $"Wave {w} ({sub}/{total})" : $"Wave {w}";
-
-    public void SetFloorRoom(int floor, int room) =>
-        floorRoomLabel.text = $"Floor {floor} — Room {room}/10";
-
-    public void ShowVictory(int waves, int floors)
-    {
-        victoryOverlay.style.display = DisplayStyle.Flex;
-    }
-
-    public void ShowBossHP(Health bossHP, string bossName)
-    {
-        trackedBossHP = bossHP;
-        bossNameLabel.text = bossName;
-        bossHPContainer.style.display = DisplayStyle.Flex;
-        RefreshBossHP(bossHP.currentHP, bossHP.maxHP);
-        bossHP.OnHPChanged += RefreshBossHP;
-    }
-
-    public void HideBossHP()
-    {
-        if (trackedBossHP != null)
-            trackedBossHP.OnHPChanged -= RefreshBossHP;
-        trackedBossHP = null;
-        bossHPContainer.style.display = DisplayStyle.None;
-    }
-
-    void RefreshBossHP(int cur, int max)
-    {
-        float pct = max > 0 ? (float)cur / max : 0;
-        bossHPFill.style.width = new StyleLength(Length.Percent(pct * 100f));
-    }
-
-    public void ShowDeath(bool show, int metaReward = 0)
-    {
-        deathOverlay.style.display = show ? DisplayStyle.Flex : DisplayStyle.None;
-        victoryOverlay.style.display = DisplayStyle.None;
-        if (show)
-        {
-            string rewardText = metaReward > 0 ? $"\n+{metaReward} Soul Essence" : "";
-            deathWaveLabel.text = $"Reached wave {waveLabel.text.Replace("Wave ", "")}{rewardText}";
-        }
-    }
-
-    public void Refresh() { RefreshSpells(); RefreshHP(); }
+    // ── Update (damage numbers, charge bar, cooldowns) ──
 
     void Update()
     {
-        UpdateCooldownUI();
-        UpdateDamageNumbers();
-    }
-
-    void UpdateCooldownUI()
-    {
-        if (caster == null) return;
-
-        // Spell cooldown fill
-        float spellCD = caster.CooldownNormalized;
-        bool isSlot0Active = caster.activeSlot == 0;
-
-        // Active slot shows cooldown, inactive shows 0
-        float cd0 = isSlot0Active ? spellCD : 0f;
-        float cd1 = isSlot0Active ? 0f : spellCD;
-
-        if (spell1CDFill != null)
-            spell1CDFill.style.height = new StyleLength(Length.Percent(cd0 * 100f));
-        if (spell2CDFill != null)
-            spell2CDFill.style.height = new StyleLength(Length.Percent(cd1 * 100f));
-
-        // Cooldown labels
-        UpdateCDLabel(spell1Card, cd0);
-        UpdateCDLabel(spell2Card, cd1);
-
-        // Dash cooldown + charges
-        if (playerCtrl != null && dashCDFill != null)
+        // Damage numbers
+        for (int i = activeDamageNumbers.Count - 1; i >= 0; i--)
         {
-            int charges = playerCtrl.CurrentDashCharges;
-            int maxCharges = playerCtrl.MaxDashCharges;
-            float dashCD = playerCtrl.DashCooldownNormalized;
+            var dn = activeDamageNumbers[i];
+            dn.elapsed += Time.deltaTime;
+            dn.worldPos += dn.velocity * Time.deltaTime;
+            dn.velocity.y += 3f * Time.deltaTime;
 
-            // Show fill based on partial recharge progress
-            float fillPct = charges >= maxCharges ? 100f : ((charges + (1f - dashCD)) / maxCharges * 100f);
-            dashCDFill.style.width = new StyleLength(Length.Percent(fillPct));
-            dashCDFill.style.backgroundColor = charges > 0
-                ? new Color(0.3f, 0.7f, 1f)
-                : new Color(0.4f, 0.4f, 0.5f);
+            if (Camera.main != null)
+            {
+                Vector3 screen = Camera.main.WorldToScreenPoint(dn.worldPos);
+                if (screen.z > 0)
+                {
+                    float x = screen.x;
+                    float y = Screen.height - screen.y;
+                    dn.label.style.left = x - 20;
+                    dn.label.style.top = y;
+                }
+            }
+
+            float alpha = 1f - (dn.elapsed / dn.duration);
+            dn.label.style.opacity = alpha;
+
+            if (dn.elapsed >= dn.duration)
+            {
+                damageNumberLayer.Remove(dn.label);
+                activeDamageNumbers.RemoveAt(i);
+            }
+            else
+            {
+                activeDamageNumbers[i] = dn;
+            }
         }
 
-        // Potion count
-        if (playerCtrl != null && potionLabel != null)
+        // Charge bar
+        if (caster != null)
         {
-            int pots = playerCtrl.PotionsRemaining;
-            potionLabel.text = pots > 0 ? $"[F] Potion x{pots}" : "No Potions";
-            potionLabel.style.color = pots > 0 ? new Color(0.3f, 0.9f, 0.4f) : Dim;
+            if (caster.IsCharging)
+            {
+                chargeBar.style.display = DisplayStyle.Flex;
+                chargeBar.style.width = 100 * caster.ChargeProgress;
+            }
+            else
+            {
+                chargeBar.style.display = DisplayStyle.None;
+            }
+
+            // Cooldown visual
+            float cd = caster.CooldownNormalized;
+            // Could apply to combo display
+
+            // Refresh element charges each frame
+            RefreshComboDisplay();
         }
 
-        // Status effects
-        UpdateStatusBar();
-    }
-
-    void UpdateStatusBar()
-    {
-        if (statusBar == null || playerHealth == null) return;
-        statusBar.Clear();
-
-        if (playerHealth.IsStunned)
+        // Dash cooldown
+        if (playerCtrl != null)
         {
-            Color col = playerHealth.IsFrozen ? new Color(0.4f, 0.8f, 1f) : new Color(1f, 1f, 0.3f);
-            string txt = playerHealth.IsFrozen ? "FROZEN" : "STUNNED";
-            statusBar.Add(MakeStatusIcon(txt, col));
+            float dashPct = 1f - playerCtrl.DashCooldownNormalized;
+            dashCDFill.style.width = new StyleLength(Length.Percent(dashPct * 100));
         }
-        else if (playerHealth.IsSlowed)
-            statusBar.Add(MakeStatusIcon("SLOWED", new Color(0.4f, 0.6f, 1f)));
 
-        if (playerHealth.PoisonStacks > 0)
-            statusBar.Add(MakeStatusIcon($"POISON x{playerHealth.PoisonStacks}", new Color(0.2f, 0.9f, 0.1f)));
-
-        // Check burn via reflection-free approach: if HP is ticking down and not from poison
-        // We expose IsBurning on Health instead
-        if (playerHealth.IsBurning)
-            statusBar.Add(MakeStatusIcon("BURNING", new Color(1f, 0.4f, 0.1f)));
-
-        // Dual-cast bonus active
-        var dc = playerHealth.GetComponent<DualCast>();
-        if (dc != null && dc.IsBonusActive)
-            statusBar.Add(MakeStatusIcon("DUAL CAST", new Color(0.8f, 0.6f, 1f)));
+        // Potion
+        if (playerCtrl != null)
+            potionLabel.text = $"[F] Potion x{playerCtrl.PotionsRemaining}";
     }
-
-    VisualElement MakeStatusIcon(string text, Color color)
-    {
-        var el = new VisualElement();
-        el.pickingMode = PickingMode.Ignore;
-        el.style.backgroundColor = new Color(color.r * 0.2f, color.g * 0.2f, color.b * 0.2f, 0.8f);
-        Radius(el, 4);
-        Border(el, color, 1);
-        el.style.paddingLeft = 6;
-        el.style.paddingRight = 6;
-        el.style.paddingTop = 2;
-        el.style.paddingBottom = 2;
-        el.style.marginRight = 4;
-        el.Add(Lbl(text, 11, color, FontStyle.Bold));
-        return el;
-    }
-
-    void UpdateCDLabel(VisualElement card, float cd)
-    {
-        var lbl = card?.Q<Label>("cd-label");
-        if (lbl == null) return;
-        if (cd <= 0)
-        {
-            lbl.text = "READY";
-            lbl.style.color = new Color(0.5f, 1f, 0.5f);
-        }
-        else
-        {
-            lbl.text = "CD";
-            lbl.style.color = new Color(1f, 0.5f, 0.3f);
-        }
-    }
-
-    // ─── DAMAGE NUMBERS ────────────────────────────────────────
 
     void SpawnDamageNumber(int amount, Vector3 worldPos, bool killed)
     {
-        if (damageNumberLayer == null || Camera.main == null) return;
-
-        var lbl = Lbl(amount.ToString(), killed ? 32 : 22,
-            killed ? new Color(1f, 0.3f, 0.1f) : new Color(1f, 0.95f, 0.4f),
-            FontStyle.Bold);
+        var lbl = new Label(amount.ToString());
         lbl.pickingMode = PickingMode.Ignore;
         lbl.style.position = Position.Absolute;
+        lbl.style.fontSize = killed ? 32 : (amount >= 8 ? 28 : 22);
+        lbl.style.color = killed ? new Color(1f, 0.3f, 0.2f) :
+                          (amount >= 8 ? new Color(1f, 0.85f, 0.2f) : Color.white);
+        lbl.style.unityFontStyleAndWeight = FontStyle.Bold;
+
         damageNumberLayer.Add(lbl);
 
         activeDamageNumbers.Add(new DamageNumberState
@@ -1265,119 +1063,76 @@ public class GameHUD : MonoBehaviour
             worldPos = worldPos,
             elapsed = 0,
             duration = 0.8f,
-            velocity = new Vector3(UnityEngine.Random.Range(-0.5f, 0.5f), 2f, 0)
+            velocity = new Vector3(UnityEngine.Random.Range(-1f, 1f), 2f, 0)
         });
     }
 
-    void UpdateDamageNumbers()
-    {
-        if (Camera.main == null) return;
-
-        for (int i = activeDamageNumbers.Count - 1; i >= 0; i--)
-        {
-            var state = activeDamageNumbers[i];
-            state.elapsed += Time.unscaledDeltaTime;
-            state.worldPos += state.velocity * Time.unscaledDeltaTime;
-            activeDamageNumbers[i] = state;
-
-            float t = state.elapsed / state.duration;
-            if (t >= 1f)
-            {
-                damageNumberLayer.Remove(state.label);
-                activeDamageNumbers.RemoveAt(i);
-                continue;
-            }
-
-            // Project world position to screen
-            Vector3 screenPos = Camera.main.WorldToScreenPoint(state.worldPos);
-            if (screenPos.z < 0) { state.label.style.display = DisplayStyle.None; continue; }
-
-            // Convert to UI Toolkit coordinates (Y is flipped)
-            float uiX = screenPos.x / Screen.width * 1920f;
-            float uiY = (1f - screenPos.y / Screen.height) * 1080f;
-
-            state.label.style.left = uiX - 20;
-            state.label.style.top = uiY - 20;
-            state.label.style.display = DisplayStyle.Flex;
-
-            // Fade and scale
-            float alpha = 1f - t * t;
-            float scale = 1f + (1f - t) * 0.3f;
-            state.label.style.opacity = alpha;
-            state.label.transform.scale = new Vector3(scale, scale, 1f);
-        }
-    }
-
-    void RefreshSpells()
-    {
-        RefreshSpellCard(0, spell1Card);
-        RefreshSpellCard(1, spell2Card);
-    }
-
-    // ─── HELPERS ──────────────────────────────────────────────────
+    // ── Helpers ──
 
     static Label Lbl(string text, int size, Color color, FontStyle style = FontStyle.Normal)
     {
         var l = new Label(text);
+        l.pickingMode = PickingMode.Ignore;
         l.style.fontSize = size;
         l.style.color = color;
         l.style.unityFontStyleAndWeight = style;
         return l;
     }
 
-    static VisualElement Pill(string text, Color bg, Color fg)
+    VisualElement Pill(string text, Color bg, Color fg)
     {
         var pill = new VisualElement();
-        pill.style.flexDirection = FlexDirection.Row;
-        pill.style.alignItems = Align.Center;
-        Color bgA = bg; bgA.a = 0.3f;
-        pill.style.backgroundColor = bgA;
-        Pad(pill, 4, 10);
-        pill.style.marginRight = 6;
-        pill.style.marginTop = 2;
+        pill.style.backgroundColor = bg;
+        pill.style.paddingLeft = 10;
+        pill.style.paddingRight = 10;
+        pill.style.paddingTop = 4;
+        pill.style.paddingBottom = 4;
         Radius(pill, 8);
-
-        var dot = new VisualElement();
-        dot.style.width = 10;
-        dot.style.height = 10;
-        Radius(dot, 5);
-        dot.style.backgroundColor = bg;
-        dot.style.marginRight = 6;
-        pill.Add(dot);
-
-        pill.Add(Lbl(text, 15, fg, FontStyle.Bold));
+        pill.style.marginRight = 6;
+        pill.Add(Lbl(text, 14, fg, FontStyle.Bold));
         return pill;
+    }
+
+    static void Radius(VisualElement e, float r)
+    {
+        e.style.borderTopLeftRadius = r;
+        e.style.borderTopRightRadius = r;
+        e.style.borderBottomLeftRadius = r;
+        e.style.borderBottomRightRadius = r;
+    }
+
+    static void Border(VisualElement e, Color c, float w)
+    {
+        e.style.borderTopColor = c;
+        e.style.borderBottomColor = c;
+        e.style.borderLeftColor = c;
+        e.style.borderRightColor = c;
+        e.style.borderTopWidth = w;
+        e.style.borderBottomWidth = w;
+        e.style.borderLeftWidth = w;
+        e.style.borderRightWidth = w;
+    }
+
+    static void Pad(VisualElement e, float tb, float lr)
+    {
+        e.style.paddingTop = tb;
+        e.style.paddingBottom = tb;
+        e.style.paddingLeft = lr;
+        e.style.paddingRight = lr;
     }
 
     static VisualElement MakeOverlay(Color bg)
     {
-        var o = new VisualElement();
-        o.style.position = Position.Absolute;
-        o.style.top = 0; o.style.bottom = 0; o.style.left = 0; o.style.right = 0;
-        o.style.backgroundColor = bg;
-        o.style.alignItems = Align.Center;
-        o.style.justifyContent = Justify.Center;
-        o.style.display = DisplayStyle.None;
-        return o;
-    }
-
-    static void Border(VisualElement el, Color c, int w)
-    {
-        el.style.borderTopColor = c; el.style.borderBottomColor = c;
-        el.style.borderLeftColor = c; el.style.borderRightColor = c;
-        el.style.borderTopWidth = w; el.style.borderBottomWidth = w;
-        el.style.borderLeftWidth = w; el.style.borderRightWidth = w;
-    }
-
-    static void Radius(VisualElement el, int r)
-    {
-        el.style.borderTopLeftRadius = r; el.style.borderTopRightRadius = r;
-        el.style.borderBottomLeftRadius = r; el.style.borderBottomRightRadius = r;
-    }
-
-    static void Pad(VisualElement el, int v, int h)
-    {
-        el.style.paddingTop = v; el.style.paddingBottom = v;
-        el.style.paddingLeft = h; el.style.paddingRight = h;
+        var overlay = new VisualElement();
+        overlay.style.position = Position.Absolute;
+        overlay.style.top = 0;
+        overlay.style.bottom = 0;
+        overlay.style.left = 0;
+        overlay.style.right = 0;
+        overlay.style.backgroundColor = bg;
+        overlay.style.alignItems = Align.Center;
+        overlay.style.justifyContent = Justify.Center;
+        overlay.style.display = DisplayStyle.None;
+        return overlay;
     }
 }

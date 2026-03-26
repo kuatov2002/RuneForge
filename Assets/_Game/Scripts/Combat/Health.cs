@@ -12,48 +12,30 @@ public class Health : MonoBehaviour
     /// <summary>Fired on every hit: (damageAmount, worldPosition, wasKillingBlow)</summary>
     public event Action<int, Vector3, bool> OnDamaged;
 
-    // Burn
-    float burnDPS;
-    float burnTimer;
-    float burnAccumulator;
-
-    // Slow (Ice)
-    float slowTimer;
-    float slowAmount = 1f;
-    int slowHitCount;
-
-    // Freeze (Ice - repeated slow)
+    // Freeze (Deep Freeze spell)
     float freezeTimer;
 
-    // Stun (Lightning)
+    // Stun
     float stunTimer;
 
-    // Poison (stacking)
-    int poisonStacks;
-    const float PoisonDPSPerStack = 2f;
-    float poisonAccumulator;
-
-    // Void
-    [HideInInspector] public bool voidMarked;
+    // Slow (Magma)
+    float magmaSlowTimer;
 
     bool isDead;
 
     public bool IsDead => isDead;
-    public bool IsSlowed => slowTimer > 0;
     public bool IsFrozen => freezeTimer > 0;
-    public int PoisonStacks => poisonStacks;
+    public bool IsStunned => stunTimer > 0 || freezeTimer > 0;
 
     public float SpeedMultiplier
     {
         get
         {
             if (stunTimer > 0 || freezeTimer > 0) return 0f;
-            return slowTimer > 0 ? slowAmount : 1f;
+            if (magmaSlowTimer > 0) return 0.3f;
+            return 1f;
         }
     }
-
-    public bool IsStunned => stunTimer > 0 || freezeTimer > 0;
-    public bool IsBurning => burnTimer > 0;
 
     void Awake()
     {
@@ -75,8 +57,13 @@ public class Health : MonoBehaviour
         if (isPlayer && hitRecoveryTimer > 0) return;
         if (isPlayer && pc.isInvulnerable) return;
 
-        // Relic: modify incoming damage (Shield blocks first hit per room)
         int dmg = Mathf.Max(1, Mathf.CeilToInt(amount));
+
+        // Weakness / immunity check
+        var elemData = GetComponent<EnemyElementData>();
+        // (weakness/immunity applied at cast time via EnemyElementData.ModifyDamage)
+
+        // Relic: modify incoming damage (Shield blocks first hit per room)
         var relicMgr = GetComponent<RelicManager>();
         if (relicMgr != null)
             dmg = relicMgr.ModifyIncomingDamage(dmg);
@@ -94,7 +81,6 @@ public class Health : MonoBehaviour
             if (!killed)
             {
                 hitRecoveryTimer = HitRecoveryDuration;
-                // Knockback player away from damage source
                 GameFeel.ApplyKnockback(transform, transform.position + transform.forward, 2f);
             }
             if (TopDownCamera.Instance != null)
@@ -109,11 +95,8 @@ public class Health : MonoBehaviour
 
         if (!isPlayer && GameFeel.Instance != null)
         {
-            // Hitstop on significant hits (not DoT ticks)
             if (dmg >= 3)
                 GameFeel.Instance.Hitstop(dmg >= 8 ? 0.05f : 0.03f);
-
-            // Knockback enemies
             GameFeel.ApplyKnockback(transform, transform.position - transform.forward, dmg * 0.3f);
         }
 
@@ -126,7 +109,6 @@ public class Health : MonoBehaviour
         if (killed)
         {
             isDead = true;
-            // Death VFX for enemies
             if (!isPlayer)
             {
                 Color deathColor = Color.white;
@@ -142,7 +124,7 @@ public class Health : MonoBehaviour
         }
     }
 
-    /// <summary>Force-fire the HP changed event (e.g. after direct HP modification).</summary>
+    /// <summary>Force-fire the HP changed event.</summary>
     public void InvokeHPChanged() => OnHPChanged?.Invoke(currentHP, maxHP);
 
     public void Heal(int amount)
@@ -152,59 +134,30 @@ public class Health : MonoBehaviour
         OnHPChanged?.Invoke(currentHP, maxHP);
     }
 
-    public void ApplyStatusEffect(ElementSO element)
+    /// <summary>Freeze enemy completely (Deep Freeze spell).</summary>
+    public void ApplyFreeze(float duration)
     {
-        if (element == null || isDead) return;
+        freezeTimer = Mathf.Max(freezeTimer, duration);
 
-        // Check combo BEFORE applying (we need pre-existing status)
-        ElementCombo.CheckCombo(this, element);
-
-        switch (element.statusEffect)
+        // Visual: blue tint
+        var renderers = GetComponentsInChildren<Renderer>();
+        foreach (var r in renderers)
         {
-            case StatusEffectType.Burn:
-                ApplyBurn(element.statusDPS, element.statusDuration);
-                break;
-            case StatusEffectType.Slow:
-                ApplySlow(element.statusDuration);
-                break;
-            case StatusEffectType.Chain:
-                ApplyStun(element.statusDuration);
-                break;
-            case StatusEffectType.Poison:
-                AddPoisonStack();
-                break;
-            case StatusEffectType.VoidMark:
-                voidMarked = true;
-                break;
+            if (r != null && r.material != null)
+                r.material.SetColor("_EmissionColor", new Color(0.3f, 0.6f, 1f) * 2f);
         }
     }
 
-    public void ApplyBurn(float dps, float duration)
-    {
-        burnDPS = dps;
-        burnTimer = Mathf.Max(burnTimer, duration);
-    }
-
-    public void ApplySlow(float duration)
-    {
-        slowTimer = duration;
-        slowAmount = 0.6f;
-        slowHitCount++;
-        if (slowHitCount >= 2 && freezeTimer <= 0)
-        {
-            freezeTimer = 1.5f;
-            slowHitCount = 0;
-        }
-    }
-
+    /// <summary>Stun enemy (Rubble, Geyser).</summary>
     public void ApplyStun(float duration)
     {
         stunTimer = Mathf.Max(stunTimer, duration);
     }
 
-    public void AddPoisonStack()
+    /// <summary>Magma slow — very heavy, clears when leaving pool.</summary>
+    public void ApplyMagmaSlow()
     {
-        poisonStacks = Mathf.Min(poisonStacks + 1, 5);
+        magmaSlowTimer = 0.3f; // Refreshed each physics tick while in pool
     }
 
     void Update()
@@ -215,7 +168,6 @@ public class Health : MonoBehaviour
         if (hitRecoveryTimer > 0)
         {
             hitRecoveryTimer -= Time.deltaTime;
-            // Flash player during recovery
             var renderers = GetComponentsInChildren<Renderer>();
             bool visible = Mathf.PingPong(Time.time * 20f, 1f) > 0.5f;
             foreach (var r in renderers) if (r != null) r.enabled = visible;
@@ -223,56 +175,38 @@ public class Health : MonoBehaviour
                 foreach (var r in renderers) if (r != null) r.enabled = true;
         }
 
-        // Burn
-        if (burnTimer > 0)
-        {
-            burnTimer -= Time.deltaTime;
-            burnAccumulator += burnDPS * Time.deltaTime;
-            if (burnAccumulator >= 1f)
-            {
-                int ticks = Mathf.FloorToInt(burnAccumulator);
-                burnAccumulator -= ticks;
-                TakeDamage(ticks);
-            }
-        }
-
-        // Slow
-        if (slowTimer > 0)
-        {
-            slowTimer -= Time.deltaTime;
-            if (slowTimer <= 0) { slowAmount = 1f; slowHitCount = 0; }
-        }
-
         // Freeze
         if (freezeTimer > 0)
+        {
             freezeTimer -= Time.deltaTime;
+            if (freezeTimer <= 0)
+            {
+                // Remove blue tint
+                var renderers = GetComponentsInChildren<Renderer>();
+                foreach (var r in renderers)
+                {
+                    if (r != null && r.material != null)
+                        r.material.SetColor("_EmissionColor", Color.black);
+                }
+            }
+        }
 
         // Stun
         if (stunTimer > 0)
             stunTimer -= Time.deltaTime;
 
-        // Poison
-        if (poisonStacks > 0)
-        {
-            poisonAccumulator += poisonStacks * PoisonDPSPerStack * Time.deltaTime;
-            if (poisonAccumulator >= 1f)
-            {
-                int ticks = Mathf.FloorToInt(poisonAccumulator);
-                poisonAccumulator -= ticks;
-                TakeDamage(ticks);
-            }
-        }
+        // Magma slow
+        if (magmaSlowTimer > 0)
+            magmaSlowTimer -= Time.deltaTime;
     }
 
     public void ResetHealth()
     {
         isDead = false;
         currentHP = maxHP;
-        burnTimer = 0; burnAccumulator = 0;
-        slowTimer = 0; slowAmount = 1f; slowHitCount = 0;
-        freezeTimer = 0; stunTimer = 0;
-        poisonStacks = 0; poisonAccumulator = 0;
-        voidMarked = false;
+        freezeTimer = 0;
+        stunTimer = 0;
+        magmaSlowTimer = 0;
         OnHPChanged?.Invoke(currentHP, maxHP);
     }
 }
