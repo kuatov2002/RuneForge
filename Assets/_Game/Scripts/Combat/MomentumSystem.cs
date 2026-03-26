@@ -1,0 +1,113 @@
+using UnityEngine;
+using System;
+using Object = UnityEngine.Object;
+
+/// <summary>
+/// Kill streak momentum system.
+/// Killing enemies without taking damage builds a multiplier.
+/// Taking damage resets it.
+/// Multiplier: x1.0 → x1.15 → x1.3 → x1.5 → x2.0
+/// No 3D visuals — displayed purely in UI (GameHUD).
+/// </summary>
+public class MomentumSystem : MonoBehaviour
+{
+    public event Action<int, float> OnMomentumChanged; // (tier, multiplier)
+
+    int killStreak;
+    int tier; // 0-4
+    float multiplier = 1f;
+    float decayTimer;
+
+    static readonly int[] TierThresholds = { 0, 3, 6, 10, 15 };
+    static readonly float[] TierMultipliers = { 1f, 1.15f, 1.3f, 1.5f, 2f };
+    static readonly float[] TierSpeedBonus = { 0f, 0.05f, 0.08f, 0.12f, 0.15f };
+
+    public static readonly Color[] TierColors = {
+        Color.clear,
+        new Color(1f, 1f, 0.5f),
+        new Color(1f, 0.8f, 0.2f),
+        new Color(1f, 0.5f, 0.1f),
+        new Color(1f, 0.2f, 0.1f)
+    };
+    public static readonly string[] TierNames = { "", "WARM", "HOT", "BLAZING", "INFERNO" };
+
+    public float DamageMultiplier => multiplier;
+    public float SpeedBonus => TierSpeedBonus[tier];
+    public int Tier => tier;
+    public int KillStreak => killStreak;
+
+    void Start()
+    {
+        var hp = GetComponent<Health>();
+        if (hp != null)
+            hp.OnDamaged += OnPlayerDamaged;
+    }
+
+    void OnPlayerDamaged(int amount, Vector3 pos, bool killed)
+    {
+        if (killed) return;
+        ResetMomentum();
+    }
+
+    public void OnEnemyKilled()
+    {
+        killStreak++;
+        decayTimer = 5f;
+
+        int newTier = 0;
+        for (int i = TierThresholds.Length - 1; i >= 0; i--)
+            if (killStreak >= TierThresholds[i]) { newTier = i; break; }
+
+        if (newTier != tier)
+        {
+            tier = newTier;
+            multiplier = TierMultipliers[tier];
+            OnMomentumChanged?.Invoke(tier, multiplier);
+
+            if (tier >= 2)
+            {
+                SFXSystem.Play(SFXSystem.SFXType.LevelUp, transform.position, 0.3f);
+                if (TopDownCamera.Instance != null)
+                    TopDownCamera.Instance.AddTrauma(0.05f);
+            }
+        }
+    }
+
+    void ResetMomentum()
+    {
+        if (tier == 0 && killStreak == 0) return;
+        killStreak = 0;
+        tier = 0;
+        multiplier = 1f;
+        OnMomentumChanged?.Invoke(tier, multiplier);
+    }
+
+    void Update()
+    {
+        if (tier <= 0) return;
+
+        decayTimer -= Time.deltaTime;
+        if (decayTimer <= 0)
+        {
+            killStreak = Mathf.Max(0, killStreak - 1);
+            decayTimer = 2f;
+
+            int newTier = 0;
+            for (int i = TierThresholds.Length - 1; i >= 0; i--)
+                if (killStreak >= TierThresholds[i]) { newTier = i; break; }
+
+            if (newTier != tier)
+            {
+                tier = newTier;
+                multiplier = TierMultipliers[tier];
+                OnMomentumChanged?.Invoke(tier, multiplier);
+            }
+        }
+    }
+
+    void OnDestroy()
+    {
+        var hp = GetComponent<Health>();
+        if (hp != null) hp.OnDamaged -= OnPlayerDamaged;
+    }
+}

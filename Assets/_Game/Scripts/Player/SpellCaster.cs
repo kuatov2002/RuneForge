@@ -218,6 +218,10 @@ public class SpellCaster : MonoBehaviour
         UpdateComboMultiplier();
         float dmgMult = damageBonusMult * comboMultiplier * MetaProgression.DamageMultiplier;
 
+        // Momentum bonus
+        var momentum = GetComponent<MomentumSystem>();
+        if (momentum != null) dmgMult *= momentum.DamageMultiplier;
+
         // Crit chance
         if (UnityEngine.Random.value < MetaProgression.CritChance)
             dmgMult *= 2f;

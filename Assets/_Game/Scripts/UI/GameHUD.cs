@@ -38,6 +38,11 @@ public class GameHUD : MonoBehaviour
     VisualElement synergyOverlay;
     VisualElement synergyPanel;
 
+    // Momentum
+    Label momentumLabel;
+    VisualElement momentumBar;
+    VisualElement momentumFill;
+
     // Relics
     VisualElement relicBar;
 
@@ -154,6 +159,34 @@ public class GameHUD : MonoBehaviour
         floorRoomLabel = Lbl("Floor 1 — Room 1/10", 16, new Color(0.6f, 0.6f, 0.65f));
         floorRoomLabel.style.marginTop = 2;
         rightCol.Add(floorRoomLabel);
+
+        // Momentum indicator
+        var momentumRow = new VisualElement();
+        momentumRow.pickingMode = PickingMode.Ignore;
+        momentumRow.style.flexDirection = FlexDirection.Row;
+        momentumRow.style.alignItems = Align.Center;
+        momentumRow.style.marginTop = 6;
+
+        momentumLabel = Lbl("", 14, new Color(1f, 0.8f, 0.2f), FontStyle.Bold);
+        momentumRow.Add(momentumLabel);
+
+        var momentumBarBg = new VisualElement();
+        momentumBarBg.pickingMode = PickingMode.Ignore;
+        momentumBarBg.style.width = 80;
+        momentumBarBg.style.height = 6;
+        momentumBarBg.style.marginLeft = 6;
+        momentumBarBg.style.backgroundColor = new Color(0.15f, 0.12f, 0.08f);
+        Radius(momentumBarBg, 3);
+
+        momentumFill = new VisualElement();
+        momentumFill.pickingMode = PickingMode.Ignore;
+        momentumFill.style.height = new StyleLength(Length.Percent(100));
+        momentumFill.style.width = new StyleLength(Length.Percent(0));
+        momentumFill.style.backgroundColor = new Color(1f, 0.7f, 0.2f);
+        Radius(momentumFill, 3);
+        momentumBarBg.Add(momentumFill);
+        momentumRow.Add(momentumBarBg);
+        rightCol.Add(momentumRow);
 
         topBar.Add(rightCol);
         root.Add(topBar);
@@ -1043,6 +1076,36 @@ public class GameHUD : MonoBehaviour
         // Potion
         if (playerCtrl != null)
             potionLabel.text = $"[F] Potion x{playerCtrl.PotionsRemaining}";
+
+        // Momentum
+        if (playerCtrl != null && momentumLabel != null)
+        {
+            var momentum = playerCtrl.GetComponent<MomentumSystem>();
+            if (momentum != null)
+            {
+                int mTier = momentum.Tier;
+                if (mTier > 0)
+                {
+                    Color tc = MomentumSystem.TierColors[mTier];
+                    momentumLabel.text = $"x{momentum.DamageMultiplier:F2} {MomentumSystem.TierNames[mTier]}";
+                    momentumLabel.style.color = tc;
+
+                    // Fill bar: progress toward next tier
+                    float[] thresholds = { 0, 3, 6, 10, 15 };
+                    float current = momentum.KillStreak;
+                    float nextThreshold = mTier < 4 ? thresholds[mTier + 1] : thresholds[4];
+                    float currentThreshold = thresholds[mTier];
+                    float pct = (current - currentThreshold) / Mathf.Max(1, nextThreshold - currentThreshold);
+                    momentumFill.style.width = new StyleLength(Length.Percent(Mathf.Clamp01(pct) * 100));
+                    momentumFill.style.backgroundColor = tc;
+                }
+                else
+                {
+                    momentumLabel.text = "";
+                    momentumFill.style.width = new StyleLength(Length.Percent(0));
+                }
+            }
+        }
     }
 
     void SpawnDamageNumber(int amount, Vector3 worldPos, bool killed)

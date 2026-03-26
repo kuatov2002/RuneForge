@@ -1,5 +1,15 @@
 using UnityEngine;
 
+/// <summary>
+/// Shambler — melee zombie-like enemy.
+/// Mechanics:
+/// - Walks toward player, attacks in melee
+/// - ENRAGE below 30% HP: turns red, +50% speed, attacks faster
+/// - DODGE ROLL: occasionally sidesteps incoming projectiles (reacts to nearby SpellProjectiles)
+/// - DEATH BURST: small AoE damage on death (punishes melee-range players)
+/// - Floor 3+: LEAP attack
+/// - Floor 5+: SLAM shockwave
+/// </summary>
 public class ShamblerAI : MonoBehaviour
 {
     public float moveSpeed = 2.5f;
@@ -16,23 +26,34 @@ public class ShamblerAI : MonoBehaviour
     Renderer[] renderers;
     bool isDead;
 
-    // Void pull
-    Vector3 pullTarget;
-    float pullTimer;
+    // Enrage
+    bool isEnraged;
+    float enrageSpeedMult = 1.5f;
+    float enrageCooldownMult = 0.6f;
 
-    // Attack telegraph
+    // Dodge
+    float dodgeCooldown;
+    bool isDodging;
+    float dodgeTimer;
+    Vector3 dodgeDir;
+
+    // Wind-up
     bool isWindingUp;
     float windupTimer;
     const float WindupDuration = 0.35f;
 
-    // Floor 3+: leap attack
+    // Floor 3+: leap
     float leapCooldown;
     bool isLeaping;
     float leapTimer;
     Vector3 leapTarget;
 
-    // Floor 5+: slam AoE
+    // Floor 5+: slam
     float slamCooldown;
+
+    // Void pull
+    Vector3 pullTarget;
+    float pullTimer;
 
     void Start()
     {
@@ -47,8 +68,41 @@ public class ShamblerAI : MonoBehaviour
     void OnDie()
     {
         isDead = true;
-        foreach (var r in renderers)
-            if (r != null) r.material.color = Color.gray;
+
+        // Death burst: small AoE on death
+        Collider[] hits = Physics.OverlapSphere(transform.position, 1.5f);
+        foreach (var h in hits)
+        {
+            var pc = h.GetComponent<PlayerController>();
+            if (pc != null && !pc.isInvulnerable)
+            {
+                var php = h.GetComponent<Health>();
+                if (php != null && !php.IsDead) php.TakeDamage(1);
+            }
+        }
+
+        // Death burst VFX
+        var burstGO = new GameObject("ShamblerDeathBurst");
+        burstGO.transform.position = transform.position + Vector3.up * 0.3f;
+        var ps = burstGO.AddComponent<ParticleSystem>();
+        ps.Stop(true, ParticleSystemStopBehavior.StopEmittingAndClear);
+        var main = ps.main;
+        main.startLifetime = 0.3f;
+        main.startSpeed = new ParticleSystem.MinMaxCurve(2f, 4f);
+        main.startSize = new ParticleSystem.MinMaxCurve(0.06f, 0.12f);
+        main.startColor = new ParticleSystem.MinMaxGradient(baseColor, new Color(0.5f, 0.1f, 0.1f));
+        main.simulationSpace = ParticleSystemSimulationSpace.World;
+        main.duration = 0.1f; main.loop = false;
+        var em = ps.emission; em.rateOverTime = 0;
+        em.SetBursts(new[] { new ParticleSystem.Burst(0f, 12) });
+        var sh = ps.shape; sh.shapeType = ParticleSystemShapeType.Sphere; sh.radius = 0.2f;
+        var mat = new Material(Shader.Find("Particles/Standard Unlit"));
+        mat.SetColor("_Color", baseColor);
+        burstGO.GetComponent<ParticleSystemRenderer>().material = mat;
+        ps.Play();
+        Object.Destroy(burstGO, 0.5f);
+
+        foreach (var r in renderers) if (r != null) r.material.color = Color.gray;
         Destroy(gameObject, 0.3f);
     }
 
@@ -62,28 +116,60 @@ public class ShamblerAI : MonoBehaviour
     {
         if (isDead || target == null) return;
 
+        // Check enrage
+        if (!isEnraged && health.currentHP <= Mathf.CeilToInt(health.maxHP * 0.3f))
+        {
+            isEnraged = true;
+            baseColor = new Color(1f, 0.15f, 0.05f); // bright red
+            // Enrage VFX: brief red flash
+            if (TopDownCamera.Instance != null) TopDownCamera.Instance.AddTrauma(0.05f);
+        }
+
         UpdateStatusVisual();
 
-        // Being pulled by void
+        // Void pull
         if (pullTimer > 0)
         {
             pullTimer -= Time.deltaTime;
-            Vector3 dir = (pullTarget - transform.position);
-            dir.y = 0;
+            Vector3 dir = (pullTarget - transform.position); dir.y = 0;
             if (dir.magnitude > 0.3f)
                 rb.MovePosition(transform.position + dir.normalized * 6f * Time.deltaTime);
             return;
         }
 
-        // Stunned/frozen - can't act
         if (health.IsStunned) return;
-
         float speedMult = health.SpeedMultiplier;
+        float speedFinal = moveSpeed * speedMult * (isEnraged ? enrageSpeedMult : 1f);
+
+        // Dodge roll
+        if (isDodging)
+        {
+            dodgeTimer -= Time.deltaTime;
+            rb.MovePosition(transform.position + dodgeDir * 8f * Time.deltaTime);
+            if (dodgeTimer <= 0) isDodging = false;
+            return;
+        }
+
+        // Check for incoming projectiles to dodge
+        if (dodgeCooldown <= 0)
+        {
+            dodgeCooldown -= Time.deltaTime;
+            if (TryDodgeProjectile())
+            {
+                dodgeCooldown = 3f;
+                return;
+            }
+        }
+        else
+        {
+            dodgeCooldown -= Time.deltaTime;
+        }
+
         Vector3 toPlayer = target.position - transform.position;
         toPlayer.y = 0;
         float dist = toPlayer.magnitude;
 
-        // Wind-up phase
+        // Wind-up
         if (isWindingUp)
         {
             windupTimer -= Time.deltaTime;
@@ -101,23 +187,23 @@ public class ShamblerAI : MonoBehaviour
                     && (playerCtrl == null || !playerCtrl.isInvulnerable)
                     && Vector3.Distance(transform.position, target.position) < attackRange + 0.5f)
                 {
-                    playerHealth.TakeDamage(attackDamage);
+                    playerHealth.TakeDamage(attackDamage + (isEnraged ? 1 : 0));
+                    SFXSystem.Play(SFXSystem.SFXType.Hit, transform.position);
                 }
             }
             return;
         }
 
-        // Floor 3+: leap attack when far from player
+        // Floor 3+: leap
         if (floorLevel >= 3 && !isLeaping)
         {
             leapCooldown -= Time.deltaTime;
             if (leapCooldown <= 0 && dist > 4f && dist < 10f)
             {
-                leapCooldown = 5f - (floorLevel - 3) * 0.5f; // faster on higher floors
+                leapCooldown = isEnraged ? 3f : 5f;
                 isLeaping = true;
                 leapTimer = 0.4f;
                 leapTarget = target.position;
-                // Telegraph: red circle at landing spot
                 var warn = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
                 Destroy(warn.GetComponent<CapsuleCollider>());
                 warn.transform.position = leapTarget + Vector3.up * 0.02f;
@@ -128,18 +214,14 @@ public class ShamblerAI : MonoBehaviour
             }
         }
 
-        // Leap in progress
         if (isLeaping)
         {
             leapTimer -= Time.deltaTime;
-            Vector3 toTarget = leapTarget - transform.position;
-            toTarget.y = 0;
+            Vector3 toTarget = leapTarget - transform.position; toTarget.y = 0;
             rb.MovePosition(transform.position + toTarget.normalized * 18f * Time.deltaTime + Vector3.up * 0.02f);
-
             if (leapTimer <= 0 || toTarget.magnitude < 0.5f)
             {
                 isLeaping = false;
-                // Slam damage on landing
                 Collider[] hits = Physics.OverlapSphere(transform.position, 1.8f);
                 foreach (var h in hits)
                 {
@@ -150,28 +232,25 @@ public class ShamblerAI : MonoBehaviour
                         if (php != null && !php.IsDead) php.TakeDamage(attackDamage + 1);
                     }
                 }
-                // VFX: impact ring
                 GameFeel.SpawnDeathVFX(transform.position, baseColor);
                 if (TopDownCamera.Instance != null) TopDownCamera.Instance.AddTrauma(0.15f);
             }
             return;
         }
 
-        // Floor 5+: periodic slam AoE (telegraphed shockwave)
+        // Floor 5+: slam
         if (floorLevel >= 5 && dist <= attackRange + 1f)
         {
             slamCooldown -= Time.deltaTime;
             if (slamCooldown <= 0)
             {
-                slamCooldown = 4f;
-                // AoE slam: damage + knockback in radius
+                slamCooldown = isEnraged ? 2.5f : 4f;
                 var ring = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
                 Destroy(ring.GetComponent<CapsuleCollider>());
                 ring.transform.position = transform.position + Vector3.up * 0.05f;
                 ring.transform.localScale = new Vector3(0.5f, 0.02f, 0.5f);
                 ring.GetComponent<Renderer>().material = ShaderCache.NewEmissive(new Color(1f, 0.3f, 0.1f), 3f);
                 ring.AddComponent<DeathRingEffect>().Init(5f, 0.5f);
-
                 Collider[] slamHits = Physics.OverlapSphere(transform.position, 2.5f);
                 foreach (var h in slamHits)
                 {
@@ -185,40 +264,59 @@ public class ShamblerAI : MonoBehaviour
             }
         }
 
+        // Movement
         if (dist > attackRange)
         {
             Vector3 moveDir = toPlayer.normalized;
-            rb.MovePosition(transform.position + moveDir * moveSpeed * speedMult * Time.deltaTime);
+            rb.MovePosition(transform.position + moveDir * speedFinal * Time.deltaTime);
             if (moveDir.sqrMagnitude > 0.01f)
                 transform.rotation = Quaternion.LookRotation(moveDir);
         }
         else
         {
+            float cd = attackCooldown * (isEnraged ? enrageCooldownMult : 1f);
             attackTimer -= Time.deltaTime;
             if (attackTimer <= 0)
             {
-                attackTimer = attackCooldown;
+                attackTimer = cd;
                 isWindingUp = true;
-                windupTimer = WindupDuration;
+                windupTimer = WindupDuration * (isEnraged ? 0.6f : 1f);
             }
         }
+    }
+
+    bool TryDodgeProjectile()
+    {
+        // Check for nearby incoming projectiles
+        Collider[] nearby = Physics.OverlapSphere(transform.position, 3f);
+        foreach (var c in nearby)
+        {
+            var proj = c.GetComponent<SpellProjectile>();
+            var fb = c.GetComponent<FireballProjectile>();
+            var ice = c.GetComponent<IceSpikeProjectile>();
+            if (proj == null && fb == null && ice == null) continue;
+
+            // Dodge perpendicular to projectile direction
+            Vector3 projDir = (c.transform.position - transform.position).normalized;
+            Vector3 perpendicular = Vector3.Cross(projDir, Vector3.up).normalized;
+            if (Random.value > 0.5f) perpendicular = -perpendicular;
+
+            isDodging = true;
+            dodgeTimer = 0.2f;
+            dodgeDir = perpendicular;
+            return true;
+        }
+        return false;
     }
 
     void UpdateStatusVisual()
     {
         if (renderers == null || renderers.Length == 0) return;
-
         Color col = baseColor;
-        if (health.IsStunned)
-            col = health.IsFrozen ? new Color(0.6f, 0.9f, 1f) : new Color(1f, 1f, 0.3f);
-
+        if (health.IsStunned) col = health.IsFrozen ? new Color(0.6f, 0.9f, 1f) : new Color(1f, 1f, 0.3f);
         foreach (var r in renderers)
-            if (r != null && r.gameObject.name != "Eye")
-                r.material.color = col;
+            if (r != null && r.gameObject.name != "Eye") r.material.color = col;
     }
 
-    void OnDestroy()
-    {
-        if (health != null) health.OnDeath -= OnDie;
-    }
+    void OnDestroy() { if (health != null) health.OnDeath -= OnDie; }
 }

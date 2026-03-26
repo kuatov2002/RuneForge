@@ -626,6 +626,9 @@ public class Bootstrap : MonoBehaviour
         // Synergy system
         synergySystem = player.AddComponent<SynergySystem>();
 
+        // Momentum system
+        player.AddComponent<MomentumSystem>();
+
         if (!inHub)
         {
             // Initialize with base elements
@@ -1529,10 +1532,13 @@ public class Bootstrap : MonoBehaviour
         if (synergySystem != null && spellCaster != null)
         {
             Vector3 deathPos = enemy.transform.position;
-            // Determine killing element from current orbs (best approximation)
             var killElem = spellCaster.rightOrb != null ? spellCaster.rightOrb.elementType : ElementType.Fire;
             synergySystem.OnEnemyKilled(deathPos, killElem);
         }
+
+        // Momentum system: track kill streak
+        var momentum = player != null ? player.GetComponent<MomentumSystem>() : null;
+        if (momentum != null) momentum.OnEnemyKilled();
 
         enemies.Remove(enemy);
         enemiesAlive--;
