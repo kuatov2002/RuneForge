@@ -1,222 +1,211 @@
 using UnityEngine;
 
 /// <summary>
-/// Fire + Fire = Inferno
-/// Instant massive AoE explosion. Highest burst damage in the game. No DoT.
-/// Balance: radius 2.5 (was 3.5)
+/// Fire + Fire = Fireball
+/// Launches a large flaming projectile that explodes on contact with an enemy.
 /// </summary>
 public static class InfernoSpell
 {
     public static void Cast(Vector3 center, float damage, float radius, bool charged)
     {
+        // center = cursor target, but we fire FROM the player
+        var player = Object.FindAnyObjectByType<PlayerController>();
+        if (player == null) return;
+
+        Vector3 origin = player.transform.position + Vector3.up * 0.5f;
+        Vector3 dir = (center - player.transform.position);
+        dir.y = 0;
+        if (dir.sqrMagnitude < 0.01f) dir = player.transform.forward;
+        dir.Normalize();
+
+        float speed = charged ? 16f : 20f;
+        float size = charged ? 0.45f : 0.3f;
+        float explodeRadius = charged ? radius * 1.4f : radius;
+
+        // Create fireball projectile
+        var go = GameObject.CreatePrimitive(PrimitiveType.Sphere);
+        go.name = "Fireball";
+        go.transform.position = origin + dir * 0.6f;
+        go.transform.localScale = Vector3.one * size;
+
+        var col = go.GetComponent<SphereCollider>();
+        col.isTrigger = true;
+        col.radius = 1.5f;
+
+        var rb = go.AddComponent<Rigidbody>();
+        rb.useGravity = false;
+        rb.isKinematic = true;
+
+        go.GetComponent<Renderer>().material = ShaderCache.NewEmissive(new Color(1f, 0.5f, 0.1f), 5f);
+
+        // Fire particle trail on the fireball
+        var trailGO = new GameObject("FireballTrail");
+        trailGO.transform.SetParent(go.transform, false);
+        var trailPS = trailGO.AddComponent<ParticleSystem>();
+        trailPS.Stop(true, ParticleSystemStopBehavior.StopEmittingAndClear);
+
+        var tm = trailPS.main;
+        tm.startLifetime = new ParticleSystem.MinMaxCurve(0.15f, 0.3f);
+        tm.startSpeed = new ParticleSystem.MinMaxCurve(0.3f, 1f);
+        tm.startSize = new ParticleSystem.MinMaxCurve(0.08f, 0.2f);
+        tm.startColor = new ParticleSystem.MinMaxGradient(
+            new Color(1f, 0.6f, 0.1f), new Color(1f, 0.2f, 0f));
+        tm.simulationSpace = ParticleSystemSimulationSpace.World;
+        tm.gravityModifier = -0.15f;
+        tm.loop = true;
+        tm.maxParticles = 40;
+
+        var te = trailPS.emission;
+        te.rateOverTime = 30;
+
+        var ts = trailPS.shape;
+        ts.shapeType = ParticleSystemShapeType.Sphere;
+        ts.radius = size * 0.5f;
+
+        var tSize = trailPS.sizeOverLifetime;
+        tSize.enabled = true;
+        tSize.size = new ParticleSystem.MinMaxCurve(1f, AnimationCurve.Linear(0f, 1f, 1f, 0f));
+
+        var tMat = new Material(Shader.Find("Particles/Standard Unlit"));
+        tMat.SetColor("_Color", new Color(1f, 0.5f, 0.1f));
+        trailGO.GetComponent<ParticleSystemRenderer>().material = tMat;
+        trailPS.Play();
+
+        // Also add a TrailRenderer for the streak
+        var trail = go.AddComponent<TrailRenderer>();
+        trail.startWidth = size * 1.5f;
+        trail.endWidth = 0f;
+        trail.time = 0.2f;
+        trail.material = ShaderCache.NewEmissive(new Color(1f, 0.4f, 0f), 3f);
+        trail.startColor = new Color(1f, 0.6f, 0.1f);
+        trail.endColor = new Color(1f, 0.2f, 0f, 0f);
+
+        // Add fireball behavior
+        var fb = go.AddComponent<FireballProjectile>();
+        fb.Init(dir, speed, damage, explodeRadius, charged);
+
+        SFXSystem.Play(SFXSystem.SFXType.Cast, origin);
+    }
+}
+
+/// <summary>Fireball projectile that explodes on contact.</summary>
+public class FireballProjectile : MonoBehaviour
+{
+    Vector3 _dir;
+    float _speed;
+    float _damage;
+    float _radius;
+    bool _charged;
+    float _maxDist = 18f;
+    Vector3 _startPos;
+    bool _exploded;
+
+    public void Init(Vector3 dir, float speed, float damage, float radius, bool charged)
+    {
+        _dir = dir;
+        _speed = speed;
+        _damage = damage;
+        _radius = radius;
+        _charged = charged;
+        _startPos = transform.position;
+    }
+
+    void Update()
+    {
+        transform.position += _dir * _speed * Time.deltaTime;
+        if (Vector3.Distance(_startPos, transform.position) > _maxDist)
+        {
+            Explode();
+        }
+    }
+
+    void OnTriggerEnter(Collider other)
+    {
+        if (_exploded) return;
+        if (other.GetComponent<PlayerController>() != null) return;
+        if (other.GetComponent<FireballProjectile>() != null) return;
+        if (other.GetComponent<SpellProjectile>() != null) return;
+
+        // Check if it's a steam cloud to ignite
+        var steam = other.GetComponent<SteamCloudZone>();
+        if (steam != null) { steam.Ignite(); Explode(); return; }
+
+        var hp = other.GetComponent<Health>();
+        if (hp != null && !hp.IsDead)
+            Explode();
+        else if (hp == null)
+            Explode(); // Hit wall
+    }
+
+    void Explode()
+    {
+        if (_exploded) return;
+        _exploded = true;
+
+        Vector3 pos = transform.position;
+
         // AoE damage
-        Collider[] hits = Physics.OverlapSphere(center, radius);
+        Collider[] hits = Physics.OverlapSphere(pos, _radius);
         foreach (var h in hits)
         {
             if (h.GetComponent<PlayerController>() != null) continue;
             var hp = h.GetComponent<Health>();
             if (hp != null && !hp.IsDead)
             {
-                hp.TakeDamage(damage);
-                GameFeel.ApplyKnockback(h.transform, center, damage * 0.5f);
+                hp.TakeDamage(_damage);
+                GameFeel.ApplyKnockback(h.transform, pos, _damage * 0.3f);
             }
         }
 
-        // ── VFX ──
-
-        // 1) Fire particle burst: 30-50 orange-red particles spraying outward
-        var burstGO = new GameObject("InfernoBurst");
-        burstGO.transform.position = center + Vector3.up * 0.3f;
+        // Explosion VFX
+        var burstGO = new GameObject("FireballExplosion");
+        burstGO.transform.position = pos;
         var ps = burstGO.AddComponent<ParticleSystem>();
         ps.Stop(true, ParticleSystemStopBehavior.StopEmittingAndClear);
 
         var main = ps.main;
-        main.startLifetime = new ParticleSystem.MinMaxCurve(0.3f, 0.6f);
-        main.startSpeed = new ParticleSystem.MinMaxCurve(4f, 8f);
-        main.startSize = new ParticleSystem.MinMaxCurve(0.15f, 0.35f);
+        main.startLifetime = new ParticleSystem.MinMaxCurve(0.2f, 0.5f);
+        main.startSpeed = new ParticleSystem.MinMaxCurve(3f, 7f);
+        main.startSize = new ParticleSystem.MinMaxCurve(0.12f, 0.3f);
         main.startColor = new ParticleSystem.MinMaxGradient(
-            new Color(1f, 0.4f, 0f),
-            new Color(1f, 0.15f, 0f));
+            new Color(1f, 0.5f, 0f), new Color(1f, 0.2f, 0f));
         main.simulationSpace = ParticleSystemSimulationSpace.World;
         main.gravityModifier = 0.3f;
-        main.maxParticles = 60;
-        main.duration = 0.6f;
+        main.duration = 0.2f;
         main.loop = false;
 
-        var emission = ps.emission;
-        emission.rateOverTime = 0;
-        int burstCount = charged ? 50 : 35;
-        emission.SetBursts(new[] { new ParticleSystem.Burst(0f, (short)burstCount) });
+        var em = ps.emission;
+        em.rateOverTime = 0;
+        em.SetBursts(new[] { new ParticleSystem.Burst(0f, _charged ? 40 : 25) });
 
-        var shape = ps.shape;
-        shape.shapeType = ParticleSystemShapeType.Sphere;
-        shape.radius = 0.3f;
+        var sh = ps.shape;
+        sh.shapeType = ParticleSystemShapeType.Sphere;
+        sh.radius = 0.3f;
 
-        var sizeOverLife = ps.sizeOverLifetime;
-        sizeOverLife.enabled = true;
-        sizeOverLife.size = new ParticleSystem.MinMaxCurve(1f, AnimationCurve.Linear(0f, 1f, 1f, 0f));
+        var sOL = ps.sizeOverLifetime;
+        sOL.enabled = true;
+        sOL.size = new ParticleSystem.MinMaxCurve(1f, AnimationCurve.Linear(0f, 1f, 1f, 0f));
 
-        var colorOverLife = ps.colorOverLifetime;
-        colorOverLife.enabled = true;
-        var grad = new Gradient();
-        grad.SetKeys(
-            new[] {
-                new GradientColorKey(new Color(1f, 0.9f, 0.3f), 0f),
-                new GradientColorKey(new Color(1f, 0.3f, 0f), 0.4f),
-                new GradientColorKey(new Color(0.3f, 0.05f, 0f), 1f)
-            },
-            new[] {
-                new GradientAlphaKey(1f, 0f),
-                new GradientAlphaKey(0.8f, 0.5f),
-                new GradientAlphaKey(0f, 1f)
-            });
-        colorOverLife.color = grad;
-
-        var renderer = burstGO.GetComponent<ParticleSystemRenderer>();
-        renderer.material = CreateParticleMaterial(new Color(1f, 0.4f, 0f));
-
-        ps.Play();
-        Object.Destroy(burstGO, 1f);
-
-        // 2) Lingering embers: slow upward drift
-        var embersGO = new GameObject("InfernoEmbers");
-        embersGO.transform.position = center + Vector3.up * 0.2f;
-        var emberPS = embersGO.AddComponent<ParticleSystem>();
-        emberPS.Stop(true, ParticleSystemStopBehavior.StopEmittingAndClear);
-
-        var emberMain = emberPS.main;
-        emberMain.startLifetime = new ParticleSystem.MinMaxCurve(0.8f, 1.2f);
-        emberMain.startSpeed = new ParticleSystem.MinMaxCurve(0.5f, 1.5f);
-        emberMain.startSize = new ParticleSystem.MinMaxCurve(0.04f, 0.1f);
-        emberMain.startColor = new ParticleSystem.MinMaxGradient(
-            new Color(1f, 0.7f, 0.1f),
-            new Color(1f, 0.3f, 0f));
-        emberMain.simulationSpace = ParticleSystemSimulationSpace.World;
-        emberMain.gravityModifier = -0.3f; // float upward
-        emberMain.duration = 0.3f;
-        emberMain.loop = false;
-
-        var emberEmission = emberPS.emission;
-        emberEmission.rateOverTime = 0;
-        emberEmission.SetBursts(new[] { new ParticleSystem.Burst(0.1f, 12) });
-
-        var emberShape = emberPS.shape;
-        emberShape.shapeType = ParticleSystemShapeType.Sphere;
-        emberShape.radius = radius * 0.5f;
-
-        var emberSize = emberPS.sizeOverLifetime;
-        emberSize.enabled = true;
-        emberSize.size = new ParticleSystem.MinMaxCurve(1f, AnimationCurve.Linear(0f, 1f, 1f, 0.2f));
-
-        var emberRenderer = embersGO.GetComponent<ParticleSystemRenderer>();
-        emberRenderer.material = CreateParticleMaterial(new Color(1f, 0.6f, 0.1f));
-
-        emberPS.Play();
-        Object.Destroy(embersGO, 1.8f);
-
-        // 3) Ground scorch decal: dark disc on ground
-        var scorch = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
-        Object.Destroy(scorch.GetComponent<CapsuleCollider>());
-        scorch.transform.position = center + Vector3.up * 0.02f;
-        scorch.transform.localScale = new Vector3(radius * 1.8f, 0.01f, radius * 1.8f);
-        scorch.GetComponent<Renderer>().material = ShaderCache.NewLit(new Color(0.08f, 0.05f, 0.03f));
-        scorch.AddComponent<InfernoScorchFade>().Init(2f);
-
-        // 4) Expanding heat ring (replaces old sphere expand)
-        var ringGO = new GameObject("InfernoHeatRing");
-        ringGO.transform.position = center + Vector3.up * 0.5f;
-        var ringPS = ringGO.AddComponent<ParticleSystem>();
-        ringPS.Stop(true, ParticleSystemStopBehavior.StopEmittingAndClear);
-
-        var ringMain = ringPS.main;
-        ringMain.startLifetime = 0.4f;
-        ringMain.startSpeed = new ParticleSystem.MinMaxCurve(6f, 10f);
-        ringMain.startSize = new ParticleSystem.MinMaxCurve(0.08f, 0.15f);
-        ringMain.startColor = new Color(1f, 0.8f, 0.2f, 0.6f);
-        ringMain.simulationSpace = ParticleSystemSimulationSpace.World;
-        ringMain.gravityModifier = 0f;
-        ringMain.duration = 0.1f;
-        ringMain.loop = false;
-
-        var ringEmission = ringPS.emission;
-        ringEmission.rateOverTime = 0;
-        ringEmission.SetBursts(new[] { new ParticleSystem.Burst(0f, 24) });
-
-        var ringShape = ringPS.shape;
-        ringShape.shapeType = ParticleSystemShapeType.Circle;
-        ringShape.radius = 0.2f;
-
-        var ringColor = ringPS.colorOverLifetime;
-        ringColor.enabled = true;
-        var ringGrad = new Gradient();
-        ringGrad.SetKeys(
-            new[] {
-                new GradientColorKey(new Color(1f, 0.9f, 0.5f), 0f),
-                new GradientColorKey(new Color(1f, 0.3f, 0f), 1f)
-            },
-            new[] {
-                new GradientAlphaKey(0.7f, 0f),
-                new GradientAlphaKey(0f, 1f)
-            });
-        ringColor.color = ringGrad;
-
-        ringGO.GetComponent<ParticleSystemRenderer>().material = CreateParticleMaterial(new Color(1f, 0.7f, 0.2f));
-        ringPS.Play();
-        Object.Destroy(ringGO, 0.8f);
-
-        // 5) Brief white-hot flash core
-        var core = GameObject.CreatePrimitive(PrimitiveType.Sphere);
-        Object.Destroy(core.GetComponent<SphereCollider>());
-        core.transform.position = center + Vector3.up * 0.5f;
-        core.transform.localScale = Vector3.one * 0.6f;
-        core.GetComponent<Renderer>().material = ShaderCache.NewEmissive(Color.white, 10f);
-        core.AddComponent<FlashShrink>().Init(0.2f);
-
-        // Game feel
-        if (TopDownCamera.Instance != null)
-            TopDownCamera.Instance.AddTrauma(charged ? 0.5f : 0.35f);
-        if (GameFeel.Instance != null)
-            GameFeel.Instance.Hitstop(charged ? 0.08f : 0.05f);
-        SFXSystem.Play(SFXSystem.SFXType.Explosion, center);
-    }
-
-    static Material CreateParticleMaterial(Color color)
-    {
         var mat = new Material(Shader.Find("Particles/Standard Unlit"));
-        mat.SetColor("_Color", color);
-        mat.SetFloat("_Mode", 1); // Additive
-        return mat;
-    }
-}
+        mat.SetColor("_Color", new Color(1f, 0.5f, 0.1f));
+        burstGO.GetComponent<ParticleSystemRenderer>().material = mat;
+        ps.Play();
+        Object.Destroy(burstGO, 0.8f);
 
-/// <summary>Fades ground scorch mark alpha over time then destroys.</summary>
-public class InfernoScorchFade : MonoBehaviour
-{
-    float _duration;
-    float _timer;
-    Renderer _rend;
-    Color _startColor;
+        // Flash
+        var flash = GameObject.CreatePrimitive(PrimitiveType.Sphere);
+        Object.Destroy(flash.GetComponent<SphereCollider>());
+        flash.transform.position = pos;
+        flash.transform.localScale = Vector3.one * 0.5f;
+        flash.GetComponent<Renderer>().material = ShaderCache.NewEmissive(new Color(1f, 0.9f, 0.5f), 8f);
+        flash.AddComponent<FlashShrink>().Init(0.2f);
 
-    public void Init(float duration)
-    {
-        _duration = duration;
-        _rend = GetComponent<Renderer>();
-        _startColor = _rend.material.color;
-    }
+        if (TopDownCamera.Instance != null)
+            TopDownCamera.Instance.AddTrauma(_charged ? 0.4f : 0.25f);
+        if (GameFeel.Instance != null)
+            GameFeel.Instance.Hitstop(_charged ? 0.06f : 0.04f);
+        SFXSystem.Play(SFXSystem.SFXType.Explosion, pos);
 
-    void Update()
-    {
-        _timer += Time.deltaTime;
-        float t = _timer / _duration;
-        if (t >= 1f) { Destroy(gameObject); return; }
-
-        // Start fading after 60% of duration
-        if (t > 0.6f)
-        {
-            float fade = (t - 0.6f) / 0.4f;
-            Color c = _startColor;
-            c.a = 1f - fade;
-            _rend.material.color = c;
-        }
+        Destroy(gameObject);
     }
 }

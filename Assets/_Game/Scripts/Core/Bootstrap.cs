@@ -195,7 +195,7 @@ public class Bootstrap : MonoBehaviour
             "SteamCloud", "MagmaPool", "PermafrostZone", "BulwarkWall",
             "RubbleStorm", "WildfireBolt", "Bolt", "ReactiveShot",
             "ComboLabel", "ComboArc", "WildfireArc", "ChainArc",
-            "ToxicFrostPool", "GeyserColumn"
+            "ToxicFrostPool", "GeyserColumn", "Fireball", "IceSpike"
         };
         foreach (var tag in spellTags)
         {
@@ -207,6 +207,10 @@ public class Bootstrap : MonoBehaviour
         // Destroy all SpellProjectiles
         foreach (var proj in Object.FindObjectsByType<SpellProjectile>(FindObjectsSortMode.None))
             if (proj != null) Object.Destroy(proj.gameObject);
+        foreach (var fb in Object.FindObjectsByType<FireballProjectile>(FindObjectsSortMode.None))
+            if (fb != null) Object.Destroy(fb.gameObject);
+        foreach (var ice in Object.FindObjectsByType<IceSpikeProjectile>(FindObjectsSortMode.None))
+            if (ice != null) Object.Destroy(ice.gameObject);
 
         // Destroy all BulwarkRise walls
         foreach (var wall in Object.FindObjectsByType<BulwarkRise>(FindObjectsSortMode.None))

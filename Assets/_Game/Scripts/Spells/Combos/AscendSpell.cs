@@ -3,7 +3,7 @@ using UnityEngine;
 /// <summary>
 /// Air + Air = Ascend
 /// Fast dash toward cursor. Player is invulnerable during the dash.
-/// Balance: dash distance 4 (was 5), charged 6 (was 8)
+/// Uses the PlayerController's own movement system so velocity isn't overridden.
 /// </summary>
 public static class AscendSpell
 {
@@ -13,23 +13,16 @@ public static class AscendSpell
         if (player == null) return;
 
         float dashDist = charged ? 6f : 4f;
-        float dashDuration = 0.2f;
+        float dashDuration = 0.18f;
 
-        // Make player invulnerable and dash
-        player.isInvulnerable = true;
-        var rb = player.GetComponent<Rigidbody>();
-        if (rb != null)
-            rb.linearVelocity = direction * (dashDist / dashDuration);
-
-        // Schedule end of invulnerability
-        player.CancelInvoke(nameof(PlayerController) + "_EndAscend");
+        // Use AscendEffect which takes over movement directly
         var ascend = player.gameObject.GetComponent<AscendEffect>();
         if (ascend == null) ascend = player.gameObject.AddComponent<AscendEffect>();
-        ascend.StartAscend(dashDuration, dashDist);
+        ascend.StartAscend(direction, dashDist, dashDuration);
 
         // ── VFX ──
 
-        // 1) Wind swirl trail along the dash path
+        // Wind swirl trail
         var trailGO = new GameObject("AscendWindTrail");
         trailGO.transform.position = origin + Vector3.up * 0.5f;
         var trailPS = trailGO.AddComponent<ParticleSystem>();
@@ -58,33 +51,9 @@ public static class AscendSpell
         shape.position = new Vector3(0, 0, dashDist * 0.5f);
         trailGO.transform.rotation = Quaternion.LookRotation(direction);
 
-        // Velocity over lifetime for swirl effect
-        var vel = trailPS.velocityOverLifetime;
-        vel.enabled = true;
-        vel.space = ParticleSystemSimulationSpace.Local;
-        vel.x = new ParticleSystem.MinMaxCurve(1f,
-            AnimationCurve.EaseInOut(0f, -2f, 1f, 2f));
-        vel.y = new ParticleSystem.MinMaxCurve(1f,
-            AnimationCurve.EaseInOut(0f, 2f, 1f, -2f));
-        vel.z = new ParticleSystem.MinMaxCurve(0f);
-
         var sizeOL = trailPS.sizeOverLifetime;
         sizeOL.enabled = true;
         sizeOL.size = new ParticleSystem.MinMaxCurve(1f, AnimationCurve.Linear(0f, 1f, 1f, 0f));
-
-        var colorOL = trailPS.colorOverLifetime;
-        colorOL.enabled = true;
-        var grad = new Gradient();
-        grad.SetKeys(
-            new[] {
-                new GradientColorKey(new Color(0.85f, 0.93f, 1f), 0f),
-                new GradientColorKey(new Color(0.6f, 0.8f, 1f), 1f)
-            },
-            new[] {
-                new GradientAlphaKey(0.8f, 0f),
-                new GradientAlphaKey(0f, 1f)
-            });
-        colorOL.color = grad;
 
         var trailMat = new Material(Shader.Find("Particles/Standard Unlit"));
         trailMat.SetColor("_Color", new Color(0.8f, 0.9f, 1f, 0.6f));
@@ -92,42 +61,7 @@ public static class AscendSpell
         trailPS.Play();
         Object.Destroy(trailGO, 0.8f);
 
-        // 2) Speed line particles: thin fast particles in dash direction
-        var speedGO = new GameObject("AscendSpeedLines");
-        speedGO.transform.position = origin + Vector3.up * 0.5f;
-        speedGO.transform.rotation = Quaternion.LookRotation(direction);
-        var speedPS = speedGO.AddComponent<ParticleSystem>();
-        speedPS.Stop(true, ParticleSystemStopBehavior.StopEmittingAndClear);
-
-        var speedMain = speedPS.main;
-        speedMain.startLifetime = 0.15f;
-        speedMain.startSpeed = new ParticleSystem.MinMaxCurve(15f, 25f);
-        speedMain.startSize = new ParticleSystem.MinMaxCurve(0.02f, 0.04f);
-        speedMain.startColor = new Color(1f, 1f, 1f, 0.5f);
-        speedMain.simulationSpace = ParticleSystemSimulationSpace.World;
-        speedMain.duration = 0.1f;
-        speedMain.loop = false;
-
-        var speedEmission = speedPS.emission;
-        speedEmission.rateOverTime = 0;
-        speedEmission.SetBursts(new[] { new ParticleSystem.Burst(0f, 15) });
-
-        var speedShape = speedPS.shape;
-        speedShape.shapeType = ParticleSystemShapeType.Cone;
-        speedShape.angle = 5f;
-        speedShape.radius = 0.3f;
-
-        // Stretch particles for speed line look
-        var speedRenderer = speedGO.GetComponent<ParticleSystemRenderer>();
-        speedRenderer.renderMode = ParticleSystemRenderMode.Stretch;
-        speedRenderer.lengthScale = 4f;
-        speedRenderer.velocityScale = 0.1f;
-        speedRenderer.material = trailMat;
-
-        speedPS.Play();
-        Object.Destroy(speedGO, 0.5f);
-
-        // 3) Flash at origin
+        // Flash at origin
         var flash = GameObject.CreatePrimitive(PrimitiveType.Sphere);
         Object.Destroy(flash.GetComponent<SphereCollider>());
         flash.transform.position = origin + Vector3.up * 0.5f;
@@ -141,22 +75,40 @@ public static class AscendSpell
     }
 }
 
+/// <summary>
+/// Handles the Ascend dash by directly moving the transform.
+/// This bypasses Rigidbody velocity which gets overridden by PlayerController.
+/// </summary>
 public class AscendEffect : MonoBehaviour
 {
     float _timer;
     float _duration;
     float _ghostTimer;
+    Vector3 _direction;
+    float _speed;
+    bool _active;
 
-    public void StartAscend(float duration, float distance)
+    public void StartAscend(Vector3 direction, float distance, float duration)
     {
-        _timer = 0;
+        _direction = direction.normalized;
         _duration = duration;
-        enabled = true;
+        _speed = distance / duration;
+        _timer = 0;
+        _active = true;
+
+        // Make invulnerable
+        var pc = GetComponent<PlayerController>();
+        if (pc != null) pc.isInvulnerable = true;
     }
 
     void Update()
     {
+        if (!_active) return;
+
         _timer += Time.deltaTime;
+
+        // Move directly via transform (bypasses rigidbody)
+        transform.position += _direction * _speed * Time.deltaTime;
 
         // Afterimage ghosts
         _ghostTimer -= Time.deltaTime;
@@ -169,9 +121,16 @@ public class AscendEffect : MonoBehaviour
 
         if (_timer >= _duration)
         {
+            _active = false;
             var pc = GetComponent<PlayerController>();
             if (pc != null) pc.isInvulnerable = false;
-            enabled = false;
+
+            // Stop rigidbody velocity that might have built up
+            var rb = GetComponent<Rigidbody>();
+            if (rb != null)
+            {
+                rb.linearVelocity = Vector3.zero;
+            }
         }
     }
 }

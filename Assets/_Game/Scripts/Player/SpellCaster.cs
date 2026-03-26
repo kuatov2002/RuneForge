@@ -161,6 +161,13 @@ public class SpellCaster : MonoBehaviour
         // Don't cast if mouse is over UI
         if (IsPointerOverUI()) return;
 
+        // Don't cast if either orb's element is overheated
+        if (IsElementOverheated(leftOrb) || IsElementOverheated(rightOrb))
+        {
+            isCharging = false;
+            return;
+        }
+
         if (mouse.leftButton.wasPressedThisFrame && cooldownTimer <= 0)
         {
             isCharging = true;
@@ -243,6 +250,13 @@ public class SpellCaster : MonoBehaviour
         TrackElementUsage(rightOrb.elementType);
 
         SFXSystem.Play(SFXSystem.SFXType.Cast, transform.position);
+    }
+
+    bool IsElementOverheated(ElementSO elem)
+    {
+        if (elem == null) return false;
+        int slot = GetElementSlot(elem);
+        return slot >= 0 && overheatTimers[slot] > 0;
     }
 
     void ConsumeCharges(ElementSO elem, int cost)

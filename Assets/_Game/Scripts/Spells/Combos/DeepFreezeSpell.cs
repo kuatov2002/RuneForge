@@ -1,9 +1,8 @@
 using UnityEngine;
 
 /// <summary>
-/// Water + Water = Deep Freeze
-/// Freezes all enemies in radius. They become statues.
-/// Balance: radius 2.2 (was 3.5), freeze duration 2s (was 3s)
+/// Water + Water = Ice Spike
+/// Launches an ice spike projectile that pierces through enemies, freezing them.
 /// </summary>
 public static class DeepFreezeSpell
 {
@@ -11,182 +10,186 @@ public static class DeepFreezeSpell
     {
         if (charged) duration *= 1.5f;
 
-        Collider[] hits = Physics.OverlapSphere(center, radius);
-        foreach (var h in hits)
-        {
-            if (h.GetComponent<PlayerController>() != null) continue;
-            var hp = h.GetComponent<Health>();
-            if (hp != null && !hp.IsDead)
-            {
-                hp.TakeDamage(damage);
-                hp.ApplyFreeze(duration);
+        var player = Object.FindAnyObjectByType<PlayerController>();
+        if (player == null) return;
 
-                // Ice crystal overlay on each frozen enemy
-                SpawnIceOverlay(h.transform, duration);
-            }
-        }
+        Vector3 origin = player.transform.position + Vector3.up * 0.5f;
+        Vector3 dir = (center - player.transform.position);
+        dir.y = 0;
+        if (dir.sqrMagnitude < 0.01f) dir = player.transform.forward;
+        dir.Normalize();
 
-        // ── VFX ──
+        float speed = charged ? 14f : 18f;
+        float spikeLength = charged ? 0.6f : 0.4f;
 
-        // 1) Ice particle burst: 20-30 ice-blue particles bursting up then falling
-        var burstGO = new GameObject("DeepFreezeBurst");
-        burstGO.transform.position = center + Vector3.up * 0.2f;
-        var ps = burstGO.AddComponent<ParticleSystem>();
-        ps.Stop(true, ParticleSystemStopBehavior.StopEmittingAndClear);
+        // Create ice spike projectile (elongated cube)
+        var go = new GameObject("IceSpike");
+        go.transform.position = origin + dir * 0.6f;
+        go.transform.rotation = Quaternion.LookRotation(dir);
 
-        var main = ps.main;
-        main.startLifetime = new ParticleSystem.MinMaxCurve(0.6f, 1.2f);
-        main.startSpeed = new ParticleSystem.MinMaxCurve(2f, 5f);
-        main.startSize = new ParticleSystem.MinMaxCurve(0.06f, 0.15f);
-        main.startColor = new ParticleSystem.MinMaxGradient(
-            new Color(0.5f, 0.8f, 1f),
-            new Color(0.7f, 0.9f, 1f));
-        main.simulationSpace = ParticleSystemSimulationSpace.World;
-        main.gravityModifier = 0.6f; // fall like snow
-        main.duration = 0.2f;
-        main.loop = false;
-        main.maxParticles = 40;
+        // Spike visual: elongated diamond shape
+        var spike = GameObject.CreatePrimitive(PrimitiveType.Cube);
+        Object.Destroy(spike.GetComponent<BoxCollider>());
+        spike.transform.SetParent(go.transform, false);
+        spike.transform.localScale = new Vector3(0.12f, 0.12f, spikeLength);
+        spike.transform.localRotation = Quaternion.Euler(0, 0, 45);
+        spike.GetComponent<Renderer>().material = ShaderCache.NewIce(new Color(0.4f, 0.75f, 1f), 0.85f);
 
-        var emission = ps.emission;
-        emission.rateOverTime = 0;
-        emission.SetBursts(new[] { new ParticleSystem.Burst(0f, 25) });
+        // Second rotated spike for cross shape
+        var spike2 = GameObject.CreatePrimitive(PrimitiveType.Cube);
+        Object.Destroy(spike2.GetComponent<BoxCollider>());
+        spike2.transform.SetParent(go.transform, false);
+        spike2.transform.localScale = new Vector3(0.12f, 0.12f, spikeLength);
+        spike2.GetComponent<Renderer>().material = ShaderCache.NewIce(new Color(0.5f, 0.85f, 1f), 0.8f);
 
-        var shape = ps.shape;
-        shape.shapeType = ParticleSystemShapeType.Cone;
-        shape.angle = 40f;
-        shape.radius = 0.3f;
+        // Trigger collider
+        var col = go.AddComponent<SphereCollider>();
+        col.isTrigger = true;
+        col.radius = 0.4f;
 
-        var sizeOverLife = ps.sizeOverLifetime;
-        sizeOverLife.enabled = true;
-        sizeOverLife.size = new ParticleSystem.MinMaxCurve(1f, AnimationCurve.Linear(0f, 1f, 1f, 0.3f));
+        var rb = go.AddComponent<Rigidbody>();
+        rb.useGravity = false;
+        rb.isKinematic = true;
 
-        var colorOverLife = ps.colorOverLifetime;
-        colorOverLife.enabled = true;
-        var grad = new Gradient();
-        grad.SetKeys(
-            new[] {
-                new GradientColorKey(new Color(0.8f, 0.95f, 1f), 0f),
-                new GradientColorKey(new Color(0.4f, 0.7f, 1f), 1f)
-            },
-            new[] {
-                new GradientAlphaKey(1f, 0f),
-                new GradientAlphaKey(0f, 1f)
-            });
-        colorOverLife.color = grad;
+        // Frost particle trail
+        var trailGO = new GameObject("IceSpikeTrail");
+        trailGO.transform.SetParent(go.transform, false);
+        var trailPS = trailGO.AddComponent<ParticleSystem>();
+        trailPS.Stop(true, ParticleSystemStopBehavior.StopEmittingAndClear);
 
-        burstGO.GetComponent<ParticleSystemRenderer>().material = CreateIceParticleMat();
-        ps.Play();
-        Object.Destroy(burstGO, 1.5f);
+        var tm = trailPS.main;
+        tm.startLifetime = new ParticleSystem.MinMaxCurve(0.2f, 0.4f);
+        tm.startSpeed = new ParticleSystem.MinMaxCurve(0.2f, 0.5f);
+        tm.startSize = new ParticleSystem.MinMaxCurve(0.03f, 0.08f);
+        tm.startColor = new ParticleSystem.MinMaxGradient(
+            new Color(0.6f, 0.85f, 1f, 0.8f), new Color(0.8f, 0.95f, 1f, 0.6f));
+        tm.simulationSpace = ParticleSystemSimulationSpace.World;
+        tm.gravityModifier = -0.05f;
+        tm.loop = true;
 
-        // 2) Ground ice ring expanding outward with frost particles
-        var ringGO = new GameObject("DeepFreezeRing");
-        ringGO.transform.position = center + Vector3.up * 0.05f;
-        var ringPS = ringGO.AddComponent<ParticleSystem>();
-        ringPS.Stop(true, ParticleSystemStopBehavior.StopEmittingAndClear);
+        var te = trailPS.emission;
+        te.rateOverTime = 20;
 
-        var ringMain = ringPS.main;
-        ringMain.startLifetime = 0.5f;
-        ringMain.startSpeed = new ParticleSystem.MinMaxCurve(3f, 6f);
-        ringMain.startSize = new ParticleSystem.MinMaxCurve(0.1f, 0.2f);
-        ringMain.startColor = new Color(0.6f, 0.85f, 1f, 0.8f);
-        ringMain.simulationSpace = ParticleSystemSimulationSpace.World;
-        ringMain.gravityModifier = 0f;
-        ringMain.duration = 0.1f;
-        ringMain.loop = false;
-        ringMain.startRotation3D = false;
+        var ts = trailPS.shape;
+        ts.shapeType = ParticleSystemShapeType.Sphere;
+        ts.radius = 0.08f;
 
-        var ringEmission = ringPS.emission;
-        ringEmission.rateOverTime = 0;
-        ringEmission.SetBursts(new[] { new ParticleSystem.Burst(0f, 20) });
+        var tMat = new Material(Shader.Find("Particles/Standard Unlit"));
+        tMat.SetColor("_Color", new Color(0.6f, 0.9f, 1f, 0.7f));
+        trailGO.GetComponent<ParticleSystemRenderer>().material = tMat;
+        trailPS.Play();
 
-        var ringShape = ringPS.shape;
-        ringShape.shapeType = ParticleSystemShapeType.Circle;
-        ringShape.radius = 0.2f;
-        ringShape.arc = 360f;
+        // Trail renderer
+        var trail = go.AddComponent<TrailRenderer>();
+        trail.startWidth = 0.15f;
+        trail.endWidth = 0f;
+        trail.time = 0.3f;
+        trail.material = ShaderCache.NewEmissive(new Color(0.4f, 0.7f, 1f), 2f);
+        trail.startColor = new Color(0.5f, 0.8f, 1f);
+        trail.endColor = new Color(0.3f, 0.6f, 1f, 0f);
 
-        var ringSizeOL = ringPS.sizeOverLifetime;
-        ringSizeOL.enabled = true;
-        ringSizeOL.size = new ParticleSystem.MinMaxCurve(1f, AnimationCurve.Linear(0f, 1f, 1f, 0f));
+        // Add ice spike behavior
+        var iceSpike = go.AddComponent<IceSpikeProjectile>();
+        iceSpike.Init(dir, speed, damage, duration, charged ? 5 : 3);
 
-        ringGO.GetComponent<ParticleSystemRenderer>().material = CreateIceParticleMat();
-        ringPS.Play();
-        Object.Destroy(ringGO, 0.8f);
+        SFXSystem.Play(SFXSystem.SFXType.Cast, origin);
+    }
+}
 
-        // 3) Crystal shards: small cubes with ice-blue emissive scattered around
-        Color shardCol = new Color(0.5f, 0.85f, 1f);
-        for (int i = 0; i < 8; i++)
-        {
-            var shard = GameObject.CreatePrimitive(PrimitiveType.Cube);
-            Object.Destroy(shard.GetComponent<BoxCollider>());
-            Vector3 offset = Random.insideUnitSphere * radius * 0.7f;
-            offset.y = Mathf.Abs(offset.y) * 0.3f;
-            shard.transform.position = center + offset;
-            float s = Random.Range(0.05f, 0.12f);
-            shard.transform.localScale = new Vector3(s * 0.6f, s, s * 0.6f);
-            shard.transform.rotation = Random.rotation;
-            shard.GetComponent<Renderer>().material = ShaderCache.NewIce(shardCol, 0.8f);
-            Object.Destroy(shard, duration * 0.8f);
-        }
+/// <summary>Ice spike that pierces enemies and freezes them.</summary>
+public class IceSpikeProjectile : MonoBehaviour
+{
+    Vector3 _dir;
+    float _speed;
+    float _damage;
+    float _freezeDuration;
+    int _piercesLeft;
+    float _maxDist = 16f;
+    Vector3 _startPos;
+    System.Collections.Generic.HashSet<Collider> _hit = new();
 
-        // 4) Ice disc on ground (persistent for duration)
-        var disc = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
-        Object.Destroy(disc.GetComponent<CapsuleCollider>());
-        disc.transform.position = center + Vector3.up * 0.02f;
-        disc.transform.localScale = new Vector3(radius * 1.6f, 0.015f, radius * 1.6f);
-        disc.GetComponent<Renderer>().material = ShaderCache.NewIce(new Color(0.6f, 0.88f, 1f), 0.5f);
-        Object.Destroy(disc, duration);
-
-        if (TopDownCamera.Instance != null)
-            TopDownCamera.Instance.AddTrauma(0.2f);
-        SFXSystem.Play(SFXSystem.SFXType.Cast, center);
+    public void Init(Vector3 dir, float speed, float damage, float freezeDuration, int pierces)
+    {
+        _dir = dir;
+        _speed = speed;
+        _damage = damage;
+        _freezeDuration = freezeDuration;
+        _piercesLeft = pierces;
+        _startPos = transform.position;
     }
 
-    static void SpawnIceOverlay(Transform enemy, float duration)
+    void Update()
     {
-        // Translucent ice cube overlay on enemy
+        transform.position += _dir * _speed * Time.deltaTime;
+        if (Vector3.Distance(_startPos, transform.position) > _maxDist)
+            Destroy(gameObject);
+    }
+
+    void OnTriggerEnter(Collider other)
+    {
+        if (other.GetComponent<PlayerController>() != null) return;
+        if (other.GetComponent<IceSpikeProjectile>() != null) return;
+        if (other.GetComponent<SpellProjectile>() != null) return;
+        if (_hit.Contains(other)) return;
+
+        var hp = other.GetComponent<Health>();
+        if (hp != null && !hp.IsDead)
+        {
+            hp.TakeDamage(_damage);
+            hp.ApplyFreeze(_freezeDuration);
+            _hit.Add(other);
+
+            // Ice crystal on frozen enemy
+            SpawnFreezeEffect(other.transform);
+
+            _piercesLeft--;
+            if (_piercesLeft <= 0)
+            {
+                Shatter();
+                return;
+            }
+
+            SFXSystem.Play(SFXSystem.SFXType.Hit, other.transform.position);
+        }
+        else if (hp == null)
+        {
+            // Hit wall
+            Shatter();
+        }
+    }
+
+    void SpawnFreezeEffect(Transform enemy)
+    {
         var ice = GameObject.CreatePrimitive(PrimitiveType.Cube);
         Object.Destroy(ice.GetComponent<BoxCollider>());
         ice.transform.SetParent(enemy, false);
         ice.transform.localPosition = Vector3.up * 0.5f;
         ice.transform.localScale = new Vector3(0.7f, 1.1f, 0.7f);
-        Color iceCol = new Color(0.5f, 0.8f, 1f, 0.6f);
-        ice.GetComponent<Renderer>().material = ShaderCache.NewIce(iceCol, 0.6f);
-
-        // Frost particle effect on the frozen enemy
-        var frostGO = new GameObject("FrostParticles");
-        frostGO.transform.SetParent(enemy, false);
-        frostGO.transform.localPosition = Vector3.up * 0.8f;
-        var frostPS = frostGO.AddComponent<ParticleSystem>();
-        frostPS.Stop(true, ParticleSystemStopBehavior.StopEmittingAndClear);
-
-        var fm = frostPS.main;
-        fm.startLifetime = new ParticleSystem.MinMaxCurve(0.3f, 0.6f);
-        fm.startSpeed = new ParticleSystem.MinMaxCurve(0.2f, 0.5f);
-        fm.startSize = new ParticleSystem.MinMaxCurve(0.03f, 0.06f);
-        fm.startColor = new Color(0.7f, 0.9f, 1f, 0.7f);
-        fm.simulationSpace = ParticleSystemSimulationSpace.World;
-        fm.gravityModifier = -0.1f;
-        fm.duration = duration;
-        fm.loop = true;
-
-        var fe = frostPS.emission;
-        fe.rateOverTime = 8;
-
-        var fs = frostPS.shape;
-        fs.shapeType = ParticleSystemShapeType.Box;
-        fs.scale = new Vector3(0.5f, 0.8f, 0.5f);
-
-        frostGO.GetComponent<ParticleSystemRenderer>().material = CreateIceParticleMat();
-        frostPS.Play();
-
-        Object.Destroy(ice, duration);
-        Object.Destroy(frostGO, duration);
+        ice.GetComponent<Renderer>().material = ShaderCache.NewIce(new Color(0.5f, 0.8f, 1f), 0.5f);
+        Object.Destroy(ice, _freezeDuration);
     }
 
-    static Material CreateIceParticleMat()
+    void Shatter()
     {
-        var mat = new Material(Shader.Find("Particles/Standard Unlit"));
-        mat.SetColor("_Color", new Color(0.6f, 0.9f, 1f, 0.8f));
-        return mat;
+        Vector3 pos = transform.position;
+
+        // Ice shard fragments
+        for (int i = 0; i < 6; i++)
+        {
+            var shard = GameObject.CreatePrimitive(PrimitiveType.Cube);
+            Object.Destroy(shard.GetComponent<BoxCollider>());
+            shard.transform.position = pos + Random.insideUnitSphere * 0.3f;
+            float s = Random.Range(0.03f, 0.08f);
+            shard.transform.localScale = new Vector3(s, s, s);
+            shard.transform.rotation = Random.rotation;
+            shard.GetComponent<Renderer>().material = ShaderCache.NewIce(new Color(0.5f, 0.85f, 1f), 0.8f);
+            var srb = shard.AddComponent<Rigidbody>();
+            srb.mass = 0.02f;
+            srb.AddForce(Random.insideUnitSphere * 3f + Vector3.up * 2f, ForceMode.Impulse);
+            Object.Destroy(shard, 0.6f);
+        }
+
+        SFXSystem.Play(SFXSystem.SFXType.Hit, pos);
+        Destroy(gameObject);
     }
 }
