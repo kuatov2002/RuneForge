@@ -3,6 +3,7 @@ using UnityEngine.InputSystem;
 using System;
 using System.Collections.Generic;
 using Random = UnityEngine.Random;
+using Object = UnityEngine.Object;
 
 public class Bootstrap : MonoBehaviour
 {
@@ -183,6 +184,68 @@ public class Bootstrap : MonoBehaviour
         enemies.Clear();
         enemiesAlive = 0;
         bossActive = false;
+        CleanupSpellEffects();
+    }
+
+    /// <summary>Destroy all lingering spell effect objects between rooms.</summary>
+    static void CleanupSpellEffects()
+    {
+        // Destroy named spell effect objects
+        string[] spellTags = {
+            "SteamCloud", "MagmaPool", "PermafrostZone", "BulwarkWall",
+            "RubbleStorm", "WildfireBolt", "Bolt", "ReactiveShot",
+            "ComboLabel", "ComboArc", "WildfireArc", "ChainArc",
+            "ToxicFrostPool", "GeyserColumn"
+        };
+        foreach (var tag in spellTags)
+        {
+            var objs = GameObject.FindObjectsByType<GameObject>(FindObjectsSortMode.None);
+            foreach (var obj in objs)
+                if (obj != null && obj.name == tag) Object.Destroy(obj);
+        }
+
+        // Destroy all SpellProjectiles
+        foreach (var proj in Object.FindObjectsByType<SpellProjectile>(FindObjectsSortMode.None))
+            if (proj != null) Object.Destroy(proj.gameObject);
+
+        // Destroy all BulwarkRise walls
+        foreach (var wall in Object.FindObjectsByType<BulwarkRise>(FindObjectsSortMode.None))
+            if (wall != null) Object.Destroy(wall.gameObject);
+
+        // Destroy all zone effects
+        foreach (var zone in Object.FindObjectsByType<SteamCloudZone>(FindObjectsSortMode.None))
+            if (zone != null) Object.Destroy(zone.gameObject);
+        foreach (var zone in Object.FindObjectsByType<MagmaPoolZone>(FindObjectsSortMode.None))
+            if (zone != null) Object.Destroy(zone.gameObject);
+        foreach (var zone in Object.FindObjectsByType<PermafrostZone>(FindObjectsSortMode.None))
+            if (zone != null) Object.Destroy(zone.gameObject);
+        foreach (var storm in Object.FindObjectsByType<RubbleStorm>(FindObjectsSortMode.None))
+            if (storm != null) Object.Destroy(storm.gameObject);
+        foreach (var ascend in Object.FindObjectsByType<AscendEffect>(FindObjectsSortMode.None))
+            if (ascend != null) ascend.enabled = false;
+
+        // Destroy lingering VFX primitives
+        foreach (var vfx in Object.FindObjectsByType<ComboExpandVFX>(FindObjectsSortMode.None))
+            if (vfx != null) Object.Destroy(vfx.gameObject);
+        foreach (var vfx in Object.FindObjectsByType<ComboShrinkVFX>(FindObjectsSortMode.None))
+            if (vfx != null) Object.Destroy(vfx.gameObject);
+        foreach (var vfx in Object.FindObjectsByType<FlashShrink>(FindObjectsSortMode.None))
+            if (vfx != null) Object.Destroy(vfx.gameObject);
+        foreach (var vfx in Object.FindObjectsByType<GeyserRise>(FindObjectsSortMode.None))
+            if (vfx != null) Object.Destroy(vfx.gameObject);
+
+        // Destroy any standalone particle systems not parented to player/camera
+        foreach (var ps in Object.FindObjectsByType<ParticleSystem>(FindObjectsSortMode.None))
+        {
+            if (ps == null) continue;
+            var root = ps.transform.root;
+            if (root.GetComponent<PlayerController>() != null) continue;
+            if (root.GetComponent<Camera>() != null) continue;
+            if (root.GetComponent<Bootstrap>() != null) continue;
+            // Only destroy if it's a spell effect (has no Health = not an enemy)
+            if (root.GetComponent<Health>() == null && ps.transform.parent == null)
+                Object.Destroy(ps.gameObject);
+        }
     }
 
     void Update()
@@ -215,16 +278,16 @@ public class Bootstrap : MonoBehaviour
     void CreateSpellData()
     {
         // Base elements (unlocked from start)
-        fireElem = CreateElement("Fire", ElementType.Fire, 10, new Color(1f, 0.4f, 0.1f));
-        waterElem = CreateElement("Water", ElementType.Water, 7, new Color(0.3f, 0.7f, 1f));
-        earthElem = CreateElement("Earth", ElementType.Earth, 8, new Color(0.6f, 0.4f, 0.2f));
-        airElem = CreateElement("Air", ElementType.Air, 6, new Color(0.8f, 0.9f, 1f));
+        fireElem = CreateElement("Fire", ElementType.Fire, 6, new Color(1f, 0.4f, 0.1f));
+        waterElem = CreateElement("Water", ElementType.Water, 4, new Color(0.3f, 0.7f, 1f));
+        earthElem = CreateElement("Earth", ElementType.Earth, 5, new Color(0.6f, 0.4f, 0.2f));
+        airElem = CreateElement("Air", ElementType.Air, 3, new Color(0.8f, 0.9f, 1f));
         baseElements = new[] { fireElem, waterElem, earthElem, airElem };
 
         // Advanced elements (unlockable mid-run)
-        lightningElem = CreateElement("Lightning", ElementType.Lightning, 9, new Color(1f, 1f, 0.3f));
-        poisonElem = CreateElement("Poison", ElementType.Poison, 5, new Color(0.2f, 0.9f, 0.1f));
-        voidElem = CreateElement("Void", ElementType.Void, 10, new Color(0.6f, 0.1f, 0.9f));
+        lightningElem = CreateElement("Lightning", ElementType.Lightning, 7, new Color(1f, 1f, 0.3f));
+        poisonElem = CreateElement("Poison", ElementType.Poison, 3, new Color(0.2f, 0.9f, 0.1f));
+        voidElem = CreateElement("Void", ElementType.Void, 8, new Color(0.6f, 0.1f, 0.9f));
 
         allElements = new[] { fireElem, waterElem, earthElem, airElem, lightningElem, poisonElem, voidElem };
 
@@ -388,6 +451,9 @@ public class Bootstrap : MonoBehaviour
         enemies.Clear();
         enemiesAlive = 0;
 
+        // Destroy all lingering spell effects between rooms
+        CleanupSpellEffects();
+
         currentRoom++;
         currentNodeType = nodeType;
 
@@ -521,7 +587,7 @@ public class Bootstrap : MonoBehaviour
         head.transform.parent = player.transform;
         head.transform.localPosition = new Vector3(0, 1.05f, 0);
         head.transform.localScale = new Vector3(0.35f, 0.35f, 0.35f);
-        head.GetComponent<Renderer>().material = MakeLit(new Color(0.85f, 0.7f, 0.55f));
+        head.GetComponent<Renderer>().material = ShaderCache.NewSkin(new Color(0.85f, 0.7f, 0.55f));
 
         // Staff
         var staff = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
@@ -540,7 +606,7 @@ public class Bootstrap : MonoBehaviour
         staffTip.transform.parent = staff.transform;
         staffTip.transform.localPosition = new Vector3(0, 1.1f, 0);
         staffTip.transform.localScale = new Vector3(2.5f, 0.4f, 2.5f);
-        staffTip.GetComponent<Renderer>().material = MakeEmissive(fireElem != null ? fireElem.color : Color.white);
+        staffTip.GetComponent<Renderer>().material = ShaderCache.NewMagic(fireElem != null ? fireElem.color : Color.white, 4f);
 
         // Components
         playerCtrl = player.AddComponent<PlayerController>();
@@ -567,7 +633,7 @@ public class Bootstrap : MonoBehaviour
             spellCaster.OnOrbsChanged += () =>
             {
                 if (spellCaster.rightOrb != null && staffTip != null)
-                    staffTip.GetComponent<Renderer>().material = MakeEmissive(spellCaster.rightOrb.color);
+                    staffTip.GetComponent<Renderer>().material = ShaderCache.NewMagic(spellCaster.rightOrb.color, 4f);
             };
         }
         else
@@ -1106,8 +1172,8 @@ public class Bootstrap : MonoBehaviour
     {
         var e = new GameObject("Shambler"); Color c = new(0.75f, 0.15f, 0.15f);
         AddCapsuleCol(e, 1.2f, 0.35f, 0.6f); BuildBody(e.transform, c, 1f);
-        RegisterEnemy(e, 20 + wave * 5);
-        var ai = e.AddComponent<ShamblerAI>(); ai.moveSpeed = 2.5f + wave * 0.2f; ai.baseColor = c; ai.floorLevel = currentFloor;
+        RegisterEnemy(e, 12 + wave * 3);
+        var ai = e.AddComponent<ShamblerAI>(); ai.moveSpeed = 2.5f + wave * 0.15f; ai.baseColor = c; ai.floorLevel = currentFloor;
     }
 
     void SpawnArcher()
@@ -1120,7 +1186,7 @@ public class Bootstrap : MonoBehaviour
         bow.transform.localScale = new Vector3(0.04f, 0.25f, 0.04f);
         bow.transform.localRotation = Quaternion.Euler(0, 0, -30);
         bow.GetComponent<Renderer>().material = MakeLit(new Color(0.4f, 0.25f, 0.1f));
-        RegisterEnemy(e, 15 + wave * 3);
+        RegisterEnemy(e, 10 + wave * 2);
         var archerAI = e.AddComponent<ArcherAI>(); archerAI.baseColor = c; archerAI.floorLevel = currentFloor;
     }
 
@@ -1128,7 +1194,7 @@ public class Bootstrap : MonoBehaviour
     {
         var e = new GameObject("Brute"); Color c = new(0.5f, 0.2f, 0.15f);
         AddCapsuleCol(e, 1.6f, 0.5f, 0.8f); BuildBody(e.transform, c, 1.4f);
-        RegisterEnemy(e, 60 + wave * 15);
+        RegisterEnemy(e, 30 + wave * 8);
         e.AddComponent<BruteAI>().baseColor = c;
     }
 
@@ -1142,7 +1208,7 @@ public class Bootstrap : MonoBehaviour
         body.transform.localScale = Vector3.one * 0.25f;
         body.GetComponent<Renderer>().material = MakeLit(c);
         CreateEye(e.transform, new Vector3(0, 0.3f, 0.1f), new Color(1f, 0.8f, 0.1f));
-        RegisterEnemy(e, 5 + wave);
+        RegisterEnemy(e, 3 + wave);
         e.AddComponent<SwarmAI>().baseColor = c;
     }
 
@@ -1150,7 +1216,7 @@ public class Bootstrap : MonoBehaviour
     {
         var e = new GameObject("Mirror"); Color c = new(0.7f, 0.7f, 0.75f);
         AddCapsuleCol(e, 1.2f, 0.35f, 0.6f); BuildBody(e.transform, c, 1f);
-        RegisterEnemy(e, 30 + wave * 5);
+        RegisterEnemy(e, 18 + wave * 3);
         e.AddComponent<MirrorAI>().baseColor = c;
     }
 
@@ -1162,8 +1228,8 @@ public class Bootstrap : MonoBehaviour
         shield.name = "Shield"; Destroy(shield.GetComponent<BoxCollider>());
         shield.transform.parent = e.transform; shield.transform.localPosition = new Vector3(0, 0.5f, 0.35f);
         shield.transform.localScale = new Vector3(0.6f, 0.7f, 0.08f);
-        shield.GetComponent<Renderer>().material = MakeLit(new Color(0.5f, 0.5f, 0.6f));
-        RegisterEnemy(e, 35 + wave * 5);
+        shield.GetComponent<Renderer>().material = ShaderCache.NewMetal(new Color(0.5f, 0.5f, 0.6f));
+        RegisterEnemy(e, 22 + wave * 3);
         e.AddComponent<ShieldBearerAI>().baseColor = c;
     }
 
@@ -1175,7 +1241,7 @@ public class Bootstrap : MonoBehaviour
         eye.transform.parent = parent;
         eye.transform.localPosition = localPos;
         eye.transform.localScale = Vector3.one * 0.08f;
-        eye.GetComponent<Renderer>().material = MakeEmissive(color);
+        eye.GetComponent<Renderer>().material = ShaderCache.NewMagic(color, 3f);
     }
 
     static void CreateArm(Transform parent, Vector3 localPos, Color color)
@@ -1232,7 +1298,7 @@ public class Bootstrap : MonoBehaviour
         BuildBody(e.transform, c, 1.6f);
         e.transform.position = new Vector3(6, 0, 10);
         var rb = e.AddComponent<Rigidbody>(); rb.useGravity = false; rb.isKinematic = true;
-        var hp = e.AddComponent<Health>(); hp.maxHP = 150; hp.currentHP = 150;
+        var hp = e.AddComponent<Health>(); hp.maxHP = 80; hp.currentHP = 80;
         e.AddComponent<EnemyHealthBar>();
         e.AddComponent<WardenBoss>();
         var enemyRef = e;
@@ -1259,7 +1325,7 @@ public class Bootstrap : MonoBehaviour
         }
         e.transform.position = new Vector3(6, 0, 10);
         var rb = e.AddComponent<Rigidbody>(); rb.useGravity = false; rb.isKinematic = true;
-        var hp = e.AddComponent<Health>(); hp.maxHP = 200; hp.currentHP = 200;
+        var hp = e.AddComponent<Health>(); hp.maxHP = 110; hp.currentHP = 110;
         e.AddComponent<EnemyHealthBar>();
         e.AddComponent<SwarmQueenBoss>();
         var enemyRef = e;
@@ -1290,7 +1356,7 @@ public class Bootstrap : MonoBehaviour
         shieldVis.GetComponent<Renderer>().material = MakeEmissive(new Color(0.5f, 0.5f, 0.8f));
         e.transform.position = new Vector3(6, 0, 10);
         var rb = e.AddComponent<Rigidbody>(); rb.useGravity = false; rb.isKinematic = true;
-        var hp = e.AddComponent<Health>(); hp.maxHP = 250; hp.currentHP = 250;
+        var hp = e.AddComponent<Health>(); hp.maxHP = 140; hp.currentHP = 140;
         e.AddComponent<EnemyHealthBar>();
         e.AddComponent<MirrorKnightBoss>();
         var enemyRef = e;
@@ -1319,7 +1385,7 @@ public class Bootstrap : MonoBehaviour
         tip.GetComponent<Renderer>().material = MakeEmissive(new Color(0.6f, 0f, 1f));
         e.transform.position = new Vector3(6, 0, 10);
         var rb = e.AddComponent<Rigidbody>(); rb.useGravity = false; rb.isKinematic = true;
-        var hp = e.AddComponent<Health>(); hp.maxHP = 300; hp.currentHP = 300;
+        var hp = e.AddComponent<Health>(); hp.maxHP = 180; hp.currentHP = 180;
         e.AddComponent<EnemyHealthBar>();
         e.AddComponent<LichBoss>();
         var enemyRef = e;
@@ -1345,7 +1411,7 @@ public class Bootstrap : MonoBehaviour
         }
         e.transform.position = new Vector3(6, 0, 10);
         var rb = e.AddComponent<Rigidbody>(); rb.useGravity = false; rb.isKinematic = true;
-        var hp = e.AddComponent<Health>(); hp.maxHP = 400; hp.currentHP = 400;
+        var hp = e.AddComponent<Health>(); hp.maxHP = 220; hp.currentHP = 220;
         e.AddComponent<EnemyHealthBar>();
         e.AddComponent<RunebreakerBoss>();
         var enemyRef = e;

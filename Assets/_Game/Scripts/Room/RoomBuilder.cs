@@ -13,10 +13,10 @@ public static class RoomBuilder
     {
         var room = new GameObject("Room");
         var (wallCol, floorCol, floorAltCol, pillarCol) = FloorGenerator.GetFloorTheme(floorIndex);
-        floorMat = ShaderCache.NewLit(floorCol);
-        floorTileMat = ShaderCache.NewLit(floorAltCol);
-        wallMat = ShaderCache.NewLit(wallCol);
-        pillarMat = ShaderCache.NewLit(pillarCol);
+        floorMat = ShaderCache.NewFloor(floorCol, floorAltCol);
+        floorTileMat = floorMat;
+        wallMat = ShaderCache.NewStone(wallCol);
+        pillarMat = ShaderCache.NewStone(pillarCol);
 
         // Floor - checkerboard tiles
         for (int x = 0; x < width; x++)
@@ -197,7 +197,7 @@ public static class RoomBuilder
         sphere.transform.parent = torchGO.transform;
         sphere.transform.localPosition = Vector3.zero;
         sphere.transform.localScale = Vector3.one * 0.15f;
-        var mat = ShaderCache.NewEmissive(color, 5f);
+        var mat = ShaderCache.NewFire(color);
         sphere.GetComponent<Renderer>().material = mat;
     }
 

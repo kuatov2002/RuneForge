@@ -63,7 +63,7 @@ public class OrbDisplay : MonoBehaviour
     {
         if (_caster.leftOrb != null)
         {
-            _leftRenderer.material = ShaderCache.NewEmissive(_caster.leftOrb.color, 4f);
+            _leftRenderer.material = ShaderCache.NewMagic(_caster.leftOrb.color, 4f);
             _leftOrb.SetActive(true);
         }
         else
@@ -71,7 +71,7 @@ public class OrbDisplay : MonoBehaviour
 
         if (_caster.rightOrb != null)
         {
-            _rightRenderer.material = ShaderCache.NewEmissive(_caster.rightOrb.color, 4f);
+            _rightRenderer.material = ShaderCache.NewMagic(_caster.rightOrb.color, 4f);
             _rightOrb.SetActive(true);
         }
         else

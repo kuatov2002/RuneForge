@@ -63,7 +63,7 @@ public class GoldSystem : MonoBehaviour
         sphere.transform.localPosition = Vector3.zero;
         float scale = Mathf.Lerp(0.12f, 0.25f, Mathf.Clamp01(amount / 20f));
         sphere.transform.localScale = Vector3.one * scale;
-        sphere.GetComponent<Renderer>().material = ShaderCache.NewEmissive(new Color(1f, 0.85f, 0.2f), 3f);
+        sphere.GetComponent<Renderer>().material = ShaderCache.NewGold();
 
         // Scatter impulse
         var rb = go.AddComponent<Rigidbody>();

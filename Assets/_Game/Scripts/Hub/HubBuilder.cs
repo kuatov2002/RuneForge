@@ -35,7 +35,7 @@ public static class HubBuilder
                 tile.transform.position = new Vector3(x + 0.5f, -0.25f, z + 0.5f);
                 tile.transform.localScale = new Vector3(0.98f, 0.5f, 0.98f);
                 bool alt = (x + z) % 2 == 0;
-                tile.GetComponent<Renderer>().material = ShaderCache.NewLit(alt ? floorCol : floorAltCol);
+                tile.GetComponent<Renderer>().material = ShaderCache.NewFloor(floorCol, floorAltCol);
                 tile.isStatic = true;
             }
         }
@@ -51,7 +51,7 @@ public static class HubBuilder
         circle.transform.parent = hub.transform;
         circle.transform.position = new Vector3(half, -0.01f, half);
         circle.transform.localScale = new Vector3(4f, 0.02f, 4f);
-        circle.GetComponent<Renderer>().material = ShaderCache.NewEmissive(new Color(0.4f, 0.2f, 0.8f), 1.5f);
+        circle.GetComponent<Renderer>().material = ShaderCache.NewMagic(new Color(0.4f, 0.2f, 0.8f), 2f);
 
         // ── NPC Stations ──
 
@@ -106,7 +106,7 @@ public static class HubBuilder
     {
         float half = size / 2f;
         float wh = 3f;
-        var mat = ShaderCache.NewLit(wallCol);
+        var mat = ShaderCache.NewStone(wallCol);
 
         // 4 main walls
         CreateWall(parent, new Vector3(half, wh / 2, size + 0.25f), new Vector3(size + 1, wh, 0.5f), mat);
@@ -148,7 +148,7 @@ public static class HubBuilder
         head.transform.parent = station.transform;
         head.transform.localPosition = new Vector3(0, 1f * bodyScale, 0);
         head.transform.localScale = Vector3.one * 0.35f * bodyScale;
-        head.GetComponent<Renderer>().material = ShaderCache.NewLit(new Color(0.85f, 0.7f, 0.55f));
+        head.GetComponent<Renderer>().material = ShaderCache.NewSkin(new Color(0.85f, 0.7f, 0.55f));
 
         // Eyes
         CreateEye(station.transform, new Vector3(-0.08f * bodyScale, 1.05f * bodyScale, 0.15f * bodyScale), color);
@@ -187,7 +187,7 @@ public static class HubBuilder
         ring.transform.parent = portal.transform;
         ring.transform.localPosition = Vector3.up * 0.05f;
         ring.transform.localScale = new Vector3(2.5f, 0.05f, 2.5f);
-        ring.GetComponent<Renderer>().material = ShaderCache.NewEmissive(new Color(0.2f, 0.8f, 0.4f), 3f);
+        ring.GetComponent<Renderer>().material = ShaderCache.NewMagic(new Color(0.2f, 0.8f, 0.4f), 4f);
 
         // Glowing pillar of light
         var beam = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
@@ -196,7 +196,7 @@ public static class HubBuilder
         beam.transform.parent = portal.transform;
         beam.transform.localPosition = Vector3.up * 2f;
         beam.transform.localScale = new Vector3(0.3f, 2f, 0.3f);
-        beam.GetComponent<Renderer>().material = ShaderCache.NewEmissive(new Color(0.2f, 1f, 0.5f), 4f);
+        beam.GetComponent<Renderer>().material = ShaderCache.NewMagic(new Color(0.2f, 1f, 0.5f), 4f);
 
         // Point light
         var light = new GameObject("PortalLight");
@@ -226,7 +226,7 @@ public static class HubBuilder
         pillar.transform.parent = parent;
         pillar.transform.position = pos + Vector3.up * 1.5f;
         pillar.transform.localScale = new Vector3(0.6f, 1.5f, 0.6f);
-        pillar.GetComponent<Renderer>().material = ShaderCache.NewLit(col);
+        pillar.GetComponent<Renderer>().material = ShaderCache.NewStone(col);
         pillar.isStatic = true;
     }
 
@@ -244,7 +244,7 @@ public static class HubBuilder
         Object.Destroy(sphere.GetComponent<SphereCollider>());
         sphere.transform.parent = torch.transform;
         sphere.transform.localScale = Vector3.one * 0.12f;
-        sphere.GetComponent<Renderer>().material = ShaderCache.NewEmissive(col, 4f);
+        sphere.GetComponent<Renderer>().material = ShaderCache.NewFire(col);
     }
 
     static void CreateEye(Transform parent, Vector3 localPos, Color color)
@@ -255,6 +255,6 @@ public static class HubBuilder
         eye.transform.parent = parent;
         eye.transform.localPosition = localPos;
         eye.transform.localScale = Vector3.one * 0.06f;
-        eye.GetComponent<Renderer>().material = ShaderCache.NewEmissive(color);
+        eye.GetComponent<Renderer>().material = ShaderCache.NewMagic(color, 3f);
     }
 }

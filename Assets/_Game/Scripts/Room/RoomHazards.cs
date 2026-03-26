@@ -160,7 +160,7 @@ public static class RoomHazards
         pool.transform.position = new Vector3(pos.x, 0.02f, pos.z);
         float size = Random.Range(1.5f, 2.5f);
         pool.transform.localScale = new Vector3(size, 0.02f, size);
-        pool.GetComponent<Renderer>().material = ShaderCache.NewEmissive(new Color(0.3f, 0.5f, 0.8f), 1.5f);
+        pool.GetComponent<Renderer>().material = ShaderCache.NewWater(new Color(0.3f, 0.5f, 0.8f), 0.7f);
 
         var col = pool.AddComponent<SphereCollider>();
         col.isTrigger = true;
@@ -223,7 +223,7 @@ public class SpikeTrapBehavior : MonoBehaviour
             float oz = (i < 2 ? -0.3f : 0.3f);
             spike.transform.localPosition = new Vector3(ox, -0.3f, oz);
             spike.transform.localScale = new Vector3(0.1f, 0.6f, 0.1f);
-            spike.GetComponent<Renderer>().material = ShaderCache.NewLit(new Color(0.5f, 0.5f, 0.55f));
+            spike.GetComponent<Renderer>().material = ShaderCache.NewMetal(new Color(0.5f, 0.5f, 0.55f));
             spike.SetActive(false);
             _spikes[i] = spike;
         }
@@ -322,7 +322,7 @@ public class FireVentBehavior : MonoBehaviour
         _flame.transform.parent = transform;
         _flame.transform.localPosition = Vector3.up * 0.6f;
         _flame.transform.localScale = new Vector3(0.5f, 0.6f, 0.5f);
-        _flame.GetComponent<Renderer>().material = ShaderCache.NewEmissive(new Color(1f, 0.4f, 0.1f), 3f);
+        _flame.GetComponent<Renderer>().material = ShaderCache.NewFire(new Color(1f, 0.4f, 0.1f));
         _flame.SetActive(false);
 
         // Point light

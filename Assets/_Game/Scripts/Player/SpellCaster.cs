@@ -1,5 +1,6 @@
 using UnityEngine;
 using UnityEngine.InputSystem;
+using UnityEngine.UIElements;
 using System;
 
 public class SpellCaster : MonoBehaviour
@@ -156,6 +157,9 @@ public class SpellCaster : MonoBehaviour
 
         // ── Casting (LMB) ──
         if (leftOrb == null || rightOrb == null) return;
+
+        // Don't cast if mouse is over UI
+        if (IsPointerOverUI()) return;
 
         if (mouse.leftButton.wasPressedThisFrame && cooldownTimer <= 0)
         {
@@ -314,6 +318,37 @@ public class SpellCaster : MonoBehaviour
         var def = CurrentComboDef;
         if (def != null)
             OnComboNameChanged?.Invoke(def.comboName);
+    }
+
+    /// <summary>Check if the mouse pointer is over any UI element.</summary>
+    bool IsPointerOverUI()
+    {
+        // Check UIElements (UIDocument panels)
+        var uiDocs = FindObjectsByType<UIDocument>(FindObjectsSortMode.None);
+        foreach (var doc in uiDocs)
+        {
+            if (doc == null || doc.rootVisualElement == null) continue;
+            var panel = doc.rootVisualElement.panel;
+            if (panel == null) continue;
+
+            var mouse = Mouse.current;
+            if (mouse == null) continue;
+            Vector2 mousePos = mouse.position.ReadValue();
+            // UIElements uses top-left origin, Mouse uses bottom-left
+            mousePos.y = Screen.height - mousePos.y;
+
+            // Pick the element under the mouse
+            var picked = panel.Pick(new Vector2(mousePos.x, mousePos.y));
+            if (picked != null && picked != doc.rootVisualElement && picked.pickingMode != PickingMode.Ignore)
+                return true;
+        }
+
+        // Also check legacy EventSystem
+        if (UnityEngine.EventSystems.EventSystem.current != null &&
+            UnityEngine.EventSystems.EventSystem.current.IsPointerOverGameObject())
+            return true;
+
+        return false;
     }
 
     void OnDisable()
