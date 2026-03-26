@@ -230,9 +230,10 @@ public class Bootstrap : MonoBehaviour
         foreach (var ice in Object.FindObjectsByType<IceSpikeProjectile>(FindObjectsSortMode.None))
             if (ice != null) Object.Destroy(ice.gameObject);
 
-        // Destroy all BulwarkRise walls
-        foreach (var wall in Object.FindObjectsByType<BulwarkRise>(FindObjectsSortMode.None))
+        // Destroy all Bulwark walls
+        foreach (var wall in Object.FindObjectsByType<BulwarkFortress>(FindObjectsSortMode.None))
             if (wall != null) Object.Destroy(wall.gameObject);
+        BulwarkSpell._activeWall = null;
 
         // Destroy all zone effects
         foreach (var zone in Object.FindObjectsByType<SteamCloudZone>(FindObjectsSortMode.None))

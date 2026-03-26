@@ -24,6 +24,7 @@ public static class ComboSpellFactory
 
         switch (def.comboType)
         {
+            // ── Base element combos ──
             case ComboType.Inferno:
                 InfernoSpell.Cast(targetPos, dmg, radius, charged);
                 break;
@@ -36,6 +37,8 @@ public static class ComboSpellFactory
             case ComboType.Ascend:
                 AscendSpell.Cast(origin, dir, charged);
                 break;
+
+            // ── Cross element combos ──
             case ComboType.Steam:
                 SteamSpell.Cast(targetPos, dmg, radius, def.duration, charged);
                 break;
@@ -55,7 +58,67 @@ public static class ComboSpellFactory
                 RubbleSpell.Cast(targetPos, dmg, radius, def.duration, charged);
                 break;
 
-            // Advanced combos — use generic implementations for now
+            // ── Lightning combos ──
+            case ComboType.LightningStrike:
+                LightningStrikeSpell.Cast(targetPos, dmg, radius, charged);
+                break;
+            case ComboType.Thunderstorm:
+                ThunderstormSpell.Cast(targetPos, dmg, radius, def.duration, charged);
+                break;
+            case ComboType.FrostShock:
+                FrostShockSpell.Cast(targetPos, dmg, radius, def.duration, charged);
+                break;
+            case ComboType.Earthquake:
+                EarthquakeSpell.Cast(targetPos, dmg, radius, def.duration, charged);
+                break;
+            case ComboType.Cyclone:
+                CycloneSpell.Cast(targetPos, dmg, radius, def.duration, charged);
+                break;
+
+            // ── Poison combos ──
+            case ComboType.Plague:
+                PlagueSpell.Cast(targetPos, dmg, radius, def.duration, charged);
+                break;
+            case ComboType.Detonate:
+                DetonateSpell.Cast(targetPos, dmg, radius, charged);
+                break;
+            case ComboType.ToxicFrost:
+                ToxicFrostSpell.Cast(targetPos, dmg, radius, def.duration, charged);
+                break;
+            case ComboType.Quicksand:
+                QuicksandSpell.Cast(targetPos, dmg, radius, def.duration, charged);
+                break;
+            case ComboType.Miasma:
+                MiasmaSpell.Cast(targetPos, dmg, radius, def.duration, charged);
+                break;
+            case ComboType.PlagueSpark:
+                PlagueSparkSpell.Cast(targetPos, dmg, radius, charged);
+                break;
+
+            // ── Void combos ──
+            case ComboType.Collapse:
+                CollapseSpell.Cast(targetPos, dmg, radius, charged);
+                break;
+            case ComboType.Implode:
+                ImplodeSpell.Cast(targetPos, dmg, radius, charged);
+                break;
+            case ComboType.Rift:
+                RiftSpell.Cast(targetPos, dmg, radius, def.duration, charged);
+                break;
+            case ComboType.Gravity:
+                GravitySpell.Cast(targetPos, dmg, radius, charged);
+                break;
+            case ComboType.Vacuum:
+                VacuumSpell.Cast(targetPos, dmg, radius, def.duration, charged);
+                break;
+            case ComboType.RiftShock:
+                RiftShockSpell.Cast(targetPos, dmg, radius, charged);
+                break;
+            case ComboType.Corruption:
+                CorruptionSpell.Cast(targetPos, dmg, radius, def.duration, charged);
+                break;
+
+            // Fallback
             default:
                 GenericComboSpell.Cast(def, targetPos, dmg, radius, charged);
                 break;

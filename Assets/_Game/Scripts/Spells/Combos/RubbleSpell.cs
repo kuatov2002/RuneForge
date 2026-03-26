@@ -14,6 +14,37 @@ public static class RubbleSpell
         int waves = charged ? 5 : 3;
         float interval = duration / waves;
 
+        var player = Object.FindAnyObjectByType<PlayerController>();
+        if (player == null) { SpawnStorm(center, damagePerWave, radius, waves, interval, duration); return; }
+
+        Vector3 origin = player.transform.position + Vector3.up * 0.5f;
+        Vector3 dir = (center - player.transform.position);
+        dir.y = 0;
+        if (dir.sqrMagnitude < 0.01f) dir = player.transform.forward;
+
+        // Boulder projectile
+        var projGO = GameObject.CreatePrimitive(PrimitiveType.Sphere);
+        Object.Destroy(projGO.GetComponent<SphereCollider>());
+        projGO.name = "RubbleProjectile";
+        projGO.transform.position = origin;
+        projGO.transform.localScale = Vector3.one * 0.3f;
+        projGO.GetComponent<Renderer>().material = ShaderCache.NewEmissive(new Color(0.5f, 0.35f, 0.2f), 2f);
+
+        var col = projGO.AddComponent<SphereCollider>();
+        col.isTrigger = true;
+        col.radius = 0.3f;
+
+        var rb = projGO.AddComponent<Rigidbody>();
+        rb.isKinematic = true;
+        rb.useGravity = false;
+
+        float dpw = damagePerWave; float rad = radius; int w = waves; float intv = interval; float dur = duration;
+        var zp = projGO.AddComponent<ZoneProjectile>();
+        zp.Init(dir, 13f, 2f, 16f, new Color(0.5f, 0.35f, 0.2f), (pos) => SpawnStorm(pos, dpw, rad, w, intv, dur));
+    }
+
+    static void SpawnStorm(Vector3 center, float damagePerWave, float radius, int waves, float interval, float duration)
+    {
         var go = new GameObject("RubbleStorm");
         go.transform.position = center;
         var storm = go.AddComponent<RubbleStorm>();

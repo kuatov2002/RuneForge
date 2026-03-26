@@ -11,6 +11,37 @@ public static class SteamSpell
     {
         if (charged) { radius *= 1.3f; duration *= 1.5f; }
 
+        var player = Object.FindAnyObjectByType<PlayerController>();
+        if (player == null) { SpawnZone(center, damage, radius, duration, charged); return; }
+
+        Vector3 origin = player.transform.position + Vector3.up * 0.5f;
+        Vector3 dir = (center - player.transform.position);
+        dir.y = 0;
+        if (dir.sqrMagnitude < 0.01f) dir = player.transform.forward;
+
+        // Steam puff sphere
+        var projGO = GameObject.CreatePrimitive(PrimitiveType.Sphere);
+        Object.Destroy(projGO.GetComponent<SphereCollider>());
+        projGO.name = "SteamProjectile";
+        projGO.transform.position = origin;
+        projGO.transform.localScale = Vector3.one * 0.2f;
+        projGO.GetComponent<Renderer>().material = ShaderCache.NewEmissive(new Color(0.9f, 0.9f, 0.95f), 2f);
+
+        var col = projGO.AddComponent<SphereCollider>();
+        col.isTrigger = true;
+        col.radius = 0.3f;
+
+        var rb = projGO.AddComponent<Rigidbody>();
+        rb.isKinematic = true;
+        rb.useGravity = false;
+
+        float dmg = damage; float rad = radius; float dur = duration; bool ch = charged;
+        var zp = projGO.AddComponent<ZoneProjectile>();
+        zp.Init(dir, 16f, 0f, 16f, new Color(0.9f, 0.9f, 0.95f), (pos) => SpawnZone(pos, dmg, rad, dur, ch));
+    }
+
+    public static void SpawnZone(Vector3 center, float damage, float radius, float duration, bool charged)
+    {
         var cloudGO = new GameObject("SteamCloud");
         cloudGO.transform.position = center;
 

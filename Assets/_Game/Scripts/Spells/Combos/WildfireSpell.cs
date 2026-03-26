@@ -216,7 +216,7 @@ public class WildfireBoltBehavior : MonoBehaviour
                 WildfireSpell.CreateWildfireBolt(
                     target.position + Vector3.up * 0.5f,
                     (nextTarget.position - target.position).normalized,
-                    _damage * 0.8f,
+                    _damage * 0.85f, // was 0.8 — less steep decay
                     _chainRadius,
                     _chainsLeft - 1);
 

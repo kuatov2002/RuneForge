@@ -46,13 +46,14 @@ public class MomentumSystem : MonoBehaviour
     void OnPlayerDamaged(int amount, Vector3 pos, bool killed)
     {
         if (killed) return;
-        ResetMomentum();
+        // Drop 1 tier instead of full reset — high tiers should be reachable
+        DropMomentumTier();
     }
 
     public void OnEnemyKilled()
     {
         killStreak++;
-        decayTimer = 5f;
+        decayTimer = 7f; // was 5f — more time to maintain streaks
 
         int newTier = 0;
         for (int i = TierThresholds.Length - 1; i >= 0; i--)
@@ -73,6 +74,24 @@ public class MomentumSystem : MonoBehaviour
         }
     }
 
+    void DropMomentumTier()
+    {
+        if (tier == 0 && killStreak == 0) return;
+        // Halve kill streak instead of zeroing — keeps momentum partially
+        killStreak = killStreak / 2;
+
+        int newTier = 0;
+        for (int i = TierThresholds.Length - 1; i >= 0; i--)
+            if (killStreak >= TierThresholds[i]) { newTier = i; break; }
+
+        if (newTier != tier || tier == 0)
+        {
+            tier = newTier;
+            multiplier = TierMultipliers[tier];
+            OnMomentumChanged?.Invoke(tier, multiplier);
+        }
+    }
+
     void ResetMomentum()
     {
         if (tier == 0 && killStreak == 0) return;
@@ -90,7 +109,7 @@ public class MomentumSystem : MonoBehaviour
         if (decayTimer <= 0)
         {
             killStreak = Mathf.Max(0, killStreak - 1);
-            decayTimer = 2f;
+            decayTimer = 3f; // was 2f — slower decay
 
             int newTier = 0;
             for (int i = TierThresholds.Length - 1; i >= 0; i--)

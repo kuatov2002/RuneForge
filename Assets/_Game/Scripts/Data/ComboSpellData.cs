@@ -75,74 +75,75 @@ public static class ComboSpellRegistry
         Register(ElementType.Fire, ElementType.Fire, new ComboSpellDef
         {
             comboType = ComboType.Inferno, comboName = "Inferno",
-            description = "Instant AoE explosion",
-            baseDamage = 18, radius = 2.5f, cooldown = 0.8f,
-            chargedDamageMultiplier = 2.2f, chargedRadiusMultiplier = 1.4f,
+            description = "Fireball that explodes on impact",
+            baseDamage = 14, radius = 2.5f, cooldown = 0.9f, // was 18 dmg, 0.8 CD — too dominant
+            chargedDamageMultiplier = 2f, chargedRadiusMultiplier = 1.3f,
             color = new Color(1f, 0.3f, 0f)
         });
         Register(ElementType.Water, ElementType.Water, new ComboSpellDef
         {
             comboType = ComboType.DeepFreeze, comboName = "Deep Freeze",
-            description = "Freezes all enemies in radius",
-            baseDamage = 3, radius = 2.2f, duration = 2f, cooldown = 1f,
+            description = "Piercing ice spike that freezes enemies",
+            baseDamage = 4, radius = 2.5f, duration = 2.5f, cooldown = 0.9f, // was 3 dmg, 2.2 radius, 2s — buffed
             color = new Color(0.3f, 0.7f, 1f)
         });
         Register(ElementType.Earth, ElementType.Earth, new ComboSpellDef
         {
             comboType = ComboType.Bulwark, comboName = "Bulwark",
-            description = "Stone wall blocking projectiles",
-            baseDamage = 0, radius = 0, duration = 4f, cooldown = 1.2f,
+            description = "Fortress wall, recast to shatter",
+            baseDamage = 5, radius = 0, duration = 5f, cooldown = 1f, // was 0 dmg, 4s, 1.2 CD — now useful
             color = new Color(0.6f, 0.4f, 0.2f)
         });
         Register(ElementType.Air, ElementType.Air, new ComboSpellDef
         {
-            comboType = ComboType.Ascend, comboName = "Ascend",
-            description = "Dash toward cursor, invulnerable",
-            baseDamage = 0, radius = 0, cooldown = 0.8f,
+            comboType = ComboType.Ascend, comboName = "Wind Slash",
+            description = "Piercing wind blade, charged = 3 blades",
+            baseDamage = 6, radius = 2f, cooldown = 0.7f, // was 0 dmg dash — now offensive
             color = new Color(0.8f, 0.9f, 1f)
         });
 
         // ── Cross element combos ──
+        // Zone spells are now projectiles = harder to land = can be stronger
         Register(ElementType.Fire, ElementType.Water, new ComboSpellDef
         {
             comboType = ComboType.Steam, comboName = "Steam",
             description = "Steam cloud, ignitable by Fire",
-            baseDamage = 2, radius = 2f, duration = 3.5f, cooldown = 0.7f,
+            baseDamage = 3, radius = 2.5f, duration = 4f, cooldown = 0.7f, // was 2 dps, 2m, 3.5s — buffed
             color = new Color(0.8f, 0.8f, 0.9f)
         });
         Register(ElementType.Fire, ElementType.Earth, new ComboSpellDef
         {
             comboType = ComboType.Magma, comboName = "Magma",
             description = "Lava pool: slow + DoT",
-            baseDamage = 3, radius = 2f, duration = 4f, cooldown = 0.8f,
+            baseDamage = 4, radius = 2.5f, duration = 4.5f, cooldown = 0.8f, // was 3 dps, 2m, 4s — buffed
             color = new Color(1f, 0.5f, 0f)
         });
         Register(ElementType.Fire, ElementType.Air, new ComboSpellDef
         {
             comboType = ComboType.Wildfire, comboName = "Wildfire",
             description = "Fire chains between enemies",
-            baseDamage = 8, radius = 3f, cooldown = 0.7f,
+            baseDamage = 9, radius = 3.5f, cooldown = 0.7f, // was 8 dmg, 3m — slight buff
             color = new Color(1f, 0.6f, 0.1f)
         });
         Register(ElementType.Water, ElementType.Earth, new ComboSpellDef
         {
             comboType = ComboType.Permafrost, comboName = "Permafrost",
             description = "Ice floor, enemies slide",
-            baseDamage = 1, radius = 3f, duration = 3.5f, cooldown = 0.8f,
+            baseDamage = 2, radius = 3.5f, duration = 4f, cooldown = 0.8f, // was 1 dps, 3m, 3.5s — significantly buffed
             color = new Color(0.5f, 0.8f, 0.9f)
         });
         Register(ElementType.Water, ElementType.Air, new ComboSpellDef
         {
             comboType = ComboType.Geyser, comboName = "Geyser",
-            description = "Water pillar launches enemies",
-            baseDamage = 10, radius = 1.8f, cooldown = 0.7f,
+            description = "Water bomb launches enemies",
+            baseDamage = 12, radius = 2.2f, cooldown = 0.8f, // was 10 dmg, 1.8m — buffed back (hard to land arc)
             color = new Color(0.2f, 0.5f, 1f)
         });
         Register(ElementType.Earth, ElementType.Air, new ComboSpellDef
         {
             comboType = ComboType.Rubble, comboName = "Rubble",
-            description = "Rock rain with stun",
-            baseDamage = 5, radius = 2.5f, duration = 1.5f, cooldown = 0.8f,
+            description = "Boulder that spawns rock rain",
+            baseDamage = 6, radius = 3f, duration = 1.8f, cooldown = 0.8f, // was 5 dmg, 2.5m, 1.5s — buffed
             color = new Color(0.5f, 0.4f, 0.3f)
         });
 

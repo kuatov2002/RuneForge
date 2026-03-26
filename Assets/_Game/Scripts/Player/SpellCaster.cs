@@ -329,14 +329,12 @@ public class SpellCaster : MonoBehaviour
 
         int uniqueCount = seen.Count;
 
-        if (uniqueCount <= 1)
-            comboMultiplier = 0.7f; // Spam penalty
-        else if (uniqueCount == 2)
-            comboMultiplier = 1.0f; // Normal
+        if (uniqueCount <= 2)
+            comboMultiplier = 1.0f; // No penalty for specialization
         else if (uniqueCount == 3)
-            comboMultiplier = 1.15f; // Good variety
+            comboMultiplier = 1.15f; // Good variety bonus
         else
-            comboMultiplier = 1.3f; // Excellent variety
+            comboMultiplier = 1.3f; // Excellent variety bonus
     }
 
     void UpdateComboName()

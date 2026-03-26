@@ -11,6 +11,37 @@ public static class GeyserSpell
     {
         if (charged) { radius *= 1.4f; damage *= 1.5f; }
 
+        var player = Object.FindAnyObjectByType<PlayerController>();
+        if (player == null) { DoGeyser(center, damage, radius); return; }
+
+        Vector3 origin = player.transform.position + Vector3.up * 0.5f;
+        Vector3 dir = (center - player.transform.position);
+        dir.y = 0;
+        if (dir.sqrMagnitude < 0.01f) dir = player.transform.forward;
+
+        // Water bomb sphere
+        var projGO = GameObject.CreatePrimitive(PrimitiveType.Sphere);
+        Object.Destroy(projGO.GetComponent<SphereCollider>());
+        projGO.name = "GeyserProjectile";
+        projGO.transform.position = origin;
+        projGO.transform.localScale = Vector3.one * 0.25f;
+        projGO.GetComponent<Renderer>().material = ShaderCache.NewEmissive(new Color(0.3f, 0.6f, 1f), 3f);
+
+        var col = projGO.AddComponent<SphereCollider>();
+        col.isTrigger = true;
+        col.radius = 0.3f;
+
+        var rb = projGO.AddComponent<Rigidbody>();
+        rb.isKinematic = true;
+        rb.useGravity = false;
+
+        float dmg = damage; float rad = radius;
+        var zp = projGO.AddComponent<ZoneProjectile>();
+        zp.Init(dir, 12f, 5f, 16f, new Color(0.3f, 0.6f, 1f), (pos) => DoGeyser(pos, dmg, rad));
+    }
+
+    static void DoGeyser(Vector3 center, float damage, float radius)
+    {
         Collider[] hits = Physics.OverlapSphere(center, radius);
         foreach (var h in hits)
         {

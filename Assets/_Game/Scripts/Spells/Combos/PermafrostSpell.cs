@@ -11,6 +11,37 @@ public static class PermafrostSpell
     {
         if (charged) { radius *= 1.4f; duration *= 1.5f; }
 
+        var player = Object.FindAnyObjectByType<PlayerController>();
+        if (player == null) { SpawnZone(center, damage, radius, duration); return; }
+
+        Vector3 origin = player.transform.position + Vector3.up * 0.5f;
+        Vector3 dir = (center - player.transform.position);
+        dir.y = 0;
+        if (dir.sqrMagnitude < 0.01f) dir = player.transform.forward;
+
+        // Ice shard projectile
+        var projGO = GameObject.CreatePrimitive(PrimitiveType.Sphere);
+        Object.Destroy(projGO.GetComponent<SphereCollider>());
+        projGO.name = "PermafrostProjectile";
+        projGO.transform.position = origin;
+        projGO.transform.localScale = Vector3.one * 0.2f;
+        projGO.GetComponent<Renderer>().material = ShaderCache.NewEmissive(new Color(0.6f, 0.88f, 0.95f), 3f);
+
+        var col = projGO.AddComponent<SphereCollider>();
+        col.isTrigger = true;
+        col.radius = 0.3f;
+
+        var rb = projGO.AddComponent<Rigidbody>();
+        rb.isKinematic = true;
+        rb.useGravity = false;
+
+        float dmg = damage; float rad = radius; float dur = duration;
+        var zp = projGO.AddComponent<ZoneProjectile>();
+        zp.Init(dir, 15f, 2f, 16f, new Color(0.6f, 0.88f, 0.95f), (pos) => SpawnZone(pos, dmg, rad, dur));
+    }
+
+    public static void SpawnZone(Vector3 center, float damage, float radius, float duration)
+    {
         center.y = 0.05f;
 
         var iceGO = new GameObject("PermafrostZone");
@@ -127,13 +158,13 @@ public static class PermafrostSpell
         mistPS.Play();
 
         // Trigger
-        var col = iceGO.AddComponent<SphereCollider>();
-        col.isTrigger = true;
-        col.radius = radius;
+        var zoneCol = iceGO.AddComponent<SphereCollider>();
+        zoneCol.isTrigger = true;
+        zoneCol.radius = radius;
 
-        var rb = iceGO.AddComponent<Rigidbody>();
-        rb.isKinematic = true;
-        rb.useGravity = false;
+        var zoneRb = iceGO.AddComponent<Rigidbody>();
+        zoneRb.isKinematic = true;
+        zoneRb.useGravity = false;
 
         iceGO.AddComponent<PermafrostZone>().Init(damage, duration);
 
