@@ -115,6 +115,18 @@ public class SwarmAI : MonoBehaviour
         scatterTimer = 0.5f;
     }
 
+    // Queen command: charge a specific position at high speed
+    Vector3 chargeTarget;
+    bool isCharging;
+    float chargeTimer;
+
+    public void CommandCharge(Vector3 targetPos)
+    {
+        chargeTarget = targetPos;
+        isCharging = true;
+        chargeTimer = 1.5f; // Charge for 1.5s then resume normal behavior
+    }
+
     void Update()
     {
         if (isDead || target == null) return;
@@ -126,6 +138,21 @@ public class SwarmAI : MonoBehaviour
         {
             scatterTimer -= Time.deltaTime;
             rb.MovePosition(transform.position + scatterDir * moveSpeed * 2f * Time.deltaTime);
+            return;
+        }
+
+        // Queen command: charge at target
+        if (isCharging)
+        {
+            chargeTimer -= Time.deltaTime;
+            Vector3 toCharge = chargeTarget - transform.position; toCharge.y = 0;
+            if (toCharge.magnitude > 0.5f)
+            {
+                rb.MovePosition(transform.position + toCharge.normalized * moveSpeed * 3f * speedMult * Time.deltaTime);
+                transform.rotation = Quaternion.LookRotation(toCharge.normalized);
+            }
+            if (chargeTimer <= 0 || toCharge.magnitude < 0.5f)
+                isCharging = false;
             return;
         }
 
