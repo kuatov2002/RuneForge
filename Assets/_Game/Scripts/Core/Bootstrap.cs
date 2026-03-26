@@ -1,5 +1,7 @@
 using UnityEngine;
 using UnityEngine.InputSystem;
+using UnityEngine.Rendering;
+using UnityEngine.Rendering.Universal;
 using System;
 using System.Collections.Generic;
 using Random = UnityEngine.Random;
@@ -687,10 +689,38 @@ public class Bootstrap : MonoBehaviour
         camera.farClipPlane = 60f;
         camGO.AddComponent<AudioListener>();
 
+        // Enable post-processing on URP camera
+        var cameraData = camGO.GetComponent<UniversalAdditionalCameraData>();
+        if (cameraData == null)
+            cameraData = camGO.AddComponent<UniversalAdditionalCameraData>();
+        cameraData.renderPostProcessing = true;
+
         cam = camGO.AddComponent<TopDownCamera>();
         cam.target = player.transform;
         cam.distance = 14f;
         cam.pitch = 60f;
+
+        // Global Volume for post-processing
+        var volumeGO = new GameObject("GlobalVolume");
+        var volume = volumeGO.AddComponent<Volume>();
+        volume.isGlobal = true;
+        var profile = volume.profile;
+
+        var tonemapping = profile.Add<Tonemapping>();
+        tonemapping.mode.overrideState = true;
+        tonemapping.mode.value = TonemappingMode.ACES;
+
+        var bloom = profile.Add<Bloom>();
+        bloom.intensity.overrideState = true;
+        bloom.intensity.value = 0.25f;
+        bloom.threshold.overrideState = true;
+        bloom.threshold.value = 1f;
+        bloom.scatter.overrideState = true;
+        bloom.scatter.value = 0.5f;
+
+        var vignette = profile.Add<Vignette>();
+        vignette.intensity.overrideState = true;
+        vignette.intensity.value = 0.2f;
     }
 
     // ─── LIGHTING ─────────────────────────────────────────────────
