@@ -1018,20 +1018,55 @@ public class GameHUD : MonoBehaviour
     public void SetGold(int gold) { if (goldLabel != null) goldLabel.text = gold.ToString(); }
     public void Refresh() { RefreshHP(); RefreshComboDisplay(); }
 
-    public void ShowDeath(bool show, int metaCurrency = 0, int floor = 0, int room = 0, int kills = 0)
+    public void ShowDeath(bool show, int metaCurrency = 0, int floor = 0, int room = 0, int kills = 0,
+        int relicCount = 0)
     {
         deathOverlay.style.display = show ? DisplayStyle.Flex : DisplayStyle.None;
         if (show)
         {
             deathOverlay.Clear();
 
+            // Ensure dark overlay background
+            deathOverlay.style.backgroundColor = new Color(0, 0, 0, 0.7f);
+
+            // Central panel for content
+            var panel = new VisualElement();
+            panel.style.alignItems = Align.Center;
+            panel.style.justifyContent = Justify.Center;
+            panel.style.paddingTop = 32;
+            panel.style.paddingBottom = 32;
+            panel.style.paddingLeft = 48;
+            panel.style.paddingRight = 48;
+            panel.style.backgroundColor = new Color(0.05f, 0.05f, 0.08f, 0.85f);
+            panel.style.borderTopLeftRadius = 12;
+            panel.style.borderTopRightRadius = 12;
+            panel.style.borderBottomLeftRadius = 12;
+            panel.style.borderBottomRightRadius = 12;
+            panel.style.borderTopWidth = 1;
+            panel.style.borderBottomWidth = 1;
+            panel.style.borderLeftWidth = 1;
+            panel.style.borderRightWidth = 1;
+            panel.style.borderTopColor = new Color(0.9f, 0.1f, 0.1f, 0.4f);
+            panel.style.borderBottomColor = new Color(0.9f, 0.1f, 0.1f, 0.4f);
+            panel.style.borderLeftColor = new Color(0.9f, 0.1f, 0.1f, 0.4f);
+            panel.style.borderRightColor = new Color(0.9f, 0.1f, 0.1f, 0.4f);
+
             var title = Lbl("YOU DIED", 64, new Color(0.9f, 0.1f, 0.1f), FontStyle.Bold);
-            deathOverlay.Add(title);
+            panel.Add(title);
+
+            // Separator
+            var sep = new VisualElement();
+            sep.style.width = 200;
+            sep.style.height = 2;
+            sep.style.backgroundColor = new Color(0.9f, 0.1f, 0.1f, 0.3f);
+            sep.style.marginTop = 8;
+            sep.style.marginBottom = 12;
+            panel.Add(sep);
 
             // Stats
             var statsContainer = new VisualElement();
             statsContainer.style.alignItems = Align.Center;
-            statsContainer.style.marginTop = 16;
+            statsContainer.style.marginTop = 8;
 
             if (floor > 0)
                 statsContainer.Add(Lbl($"Floor {floor} — Room {room}", 22, new Color(0.7f, 0.7f, 0.75f)));
@@ -1042,6 +1077,31 @@ public class GameHUD : MonoBehaviour
             if (momentum != null && momentum.KillStreak > 0)
                 statsContainer.Add(Lbl($"Best streak: {momentum.KillStreak}", 18, new Color(1f, 0.8f, 0.2f)));
 
+            // Combos & Reactions discovered
+            int comboDisc = Codex.DiscoveredComboCount;
+            int comboTotal = Codex.TotalComboCount;
+            int reactDisc = Codex.DiscoveredReactions.Count;
+            if (comboTotal > 0)
+            {
+                var comboLbl = Lbl($"Combos discovered: {comboDisc}/{comboTotal}", 18, new Color(0.3f, 0.7f, 0.9f));
+                comboLbl.style.marginTop = 4;
+                statsContainer.Add(comboLbl);
+            }
+            if (reactDisc > 0)
+            {
+                var reactLbl = Lbl($"Reactions discovered: {reactDisc}", 18, new Color(1f, 0.7f, 0.2f));
+                reactLbl.style.marginTop = 2;
+                statsContainer.Add(reactLbl);
+            }
+
+            // Relics discovered
+            if (relicCount > 0)
+            {
+                var relicLbl = Lbl($"Relics collected: {relicCount}", 18, new Color(0.6f, 0.9f, 0.6f));
+                relicLbl.style.marginTop = 2;
+                statsContainer.Add(relicLbl);
+            }
+
             if (metaCurrency > 0)
             {
                 var reward = Lbl($"+{metaCurrency} Soul Essence", 24, new Color(0.8f, 0.6f, 1f), FontStyle.Bold);
@@ -1049,11 +1109,25 @@ public class GameHUD : MonoBehaviour
                 statsContainer.Add(reward);
             }
 
-            deathOverlay.Add(statsContainer);
+            panel.Add(statsContainer);
+
+            // Motivational tip based on floor
+            string tip = floor switch
+            {
+                0 or 1 => "Try switching elements for powerful reactions!",
+                2 => "Combine spells to discover new combos!",
+                _ => "Elemental reactions deal 2x damage!"
+            };
+            var tipLbl = Lbl(tip, 16, new Color(0.5f, 0.8f, 0.5f), FontStyle.Italic);
+            tipLbl.style.marginTop = 16;
+            tipLbl.style.unityTextAlign = UnityEngine.TextAnchor.MiddleCenter;
+            panel.Add(tipLbl);
 
             var hint = Lbl("Press  R  to return to the Sanctum", 20, new Color(0.6f, 0.6f, 0.65f));
-            hint.style.marginTop = 24;
-            deathOverlay.Add(hint);
+            hint.style.marginTop = 20;
+            panel.Add(hint);
+
+            deathOverlay.Add(panel);
         }
     }
 

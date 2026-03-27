@@ -66,14 +66,6 @@ public class SwarmAI : MonoBehaviour
                 if (php != null && !php.IsDead) php.TakeDamage(1);
             }
 
-            // Damage other swarm units (chain reaction!)
-            var otherSwarm = h.GetComponent<SwarmAI>();
-            if (otherSwarm != null && !otherSwarm.isDead)
-            {
-                var ohp = h.GetComponent<Health>();
-                if (ohp != null && !ohp.IsDead) ohp.TakeDamage(2);
-            }
-
             // Make nearby swarm scatter
             var scatterSwarm = h.GetComponent<SwarmAI>();
             if (scatterSwarm != null && !scatterSwarm.isDead)

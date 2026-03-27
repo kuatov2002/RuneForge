@@ -201,7 +201,7 @@ public class Bootstrap : MonoBehaviour
     void ApplyMetaProgressionToPlayer()
     {
         // HP bonus
-        int baseHP = 5 + MetaProgression.MaxHPBonus;
+        int baseHP = 8 + MetaProgression.MaxHPBonus;
         playerHealth.maxHP = baseHP;
         playerHealth.currentHP = baseHP;
 
@@ -779,7 +779,7 @@ public class Bootstrap : MonoBehaviour
         playerCtrl = player.AddComponent<PlayerController>();
         spellCaster = player.AddComponent<SpellCaster>();
         playerHealth = player.AddComponent<Health>();
-        int baseHP = 5 + MetaProgression.MaxHPBonus;
+        int baseHP = 8 + MetaProgression.MaxHPBonus;
         playerHealth.maxHP = baseHP;
         playerHealth.currentHP = baseHP;
 
@@ -1003,21 +1003,72 @@ public class Bootstrap : MonoBehaviour
                 hud.SetObjective(currentEncounter.GetObjectiveText());
                 break;
             case EncounterSystem.EncounterType.PriorityTarget:
-                // Mark a support enemy as priority
+                // Find a support enemy (Healer/Buffer) as priority, fallback to first enemy
+                GameObject priorityTarget = null;
                 foreach (var e in enemies)
                 {
                     if (e == null) continue;
                     if (e.GetComponent<HealerAI>() != null || e.GetComponent<BufferAI>() != null)
                     {
-                        // Add glowing outline
-                        var mark = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
-                        Destroy(mark.GetComponent<CapsuleCollider>());
-                        mark.name = "PriorityMark";
-                        mark.transform.parent = e.transform;
-                        mark.transform.localPosition = new Vector3(0, 0.05f, 0);
-                        mark.transform.localScale = new Vector3(1.2f, 0.02f, 1.2f);
-                        mark.GetComponent<Renderer>().material = ShaderCache.NewEmissive(new Color(1f, 0.2f, 0.2f), 5f);
+                        priorityTarget = e;
                         break;
+                    }
+                }
+                // Fallback: mark the first enemy if no support enemy exists
+                if (priorityTarget == null)
+                {
+                    foreach (var e in enemies)
+                    {
+                        if (e != null) { priorityTarget = e; break; }
+                    }
+                }
+
+                if (priorityTarget != null)
+                {
+                    // Pulsing ring mark at the enemy's feet
+                    var mark = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
+                    Destroy(mark.GetComponent<CapsuleCollider>());
+                    mark.name = "PriorityMark";
+                    mark.transform.parent = priorityTarget.transform;
+                    mark.transform.localPosition = new Vector3(0, 0.05f, 0);
+                    mark.transform.localScale = new Vector3(1.2f, 0.02f, 1.2f);
+                    mark.GetComponent<Renderer>().material = ShaderCache.NewEmissive(new Color(1f, 0.2f, 0.2f), 5f);
+                    var pulse = mark.AddComponent<PriorityMarkPulse>();
+                    pulse.rotateSpeed = 90f;
+
+                    // Vertical beacon pillar — tall, thin, semi-transparent red
+                    var beacon = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
+                    Destroy(beacon.GetComponent<CapsuleCollider>());
+                    beacon.name = "PriorityBeacon";
+                    beacon.transform.parent = priorityTarget.transform;
+                    beacon.transform.localPosition = new Vector3(0, 4f, 0);
+                    beacon.transform.localScale = new Vector3(0.15f, 4f, 0.15f);
+                    var beaconMat = ShaderCache.NewEmissive(new Color(1f, 0.15f, 0.15f, 0.4f), 6f);
+                    beaconMat.SetFloat("_Surface", 1); // transparent
+                    beaconMat.SetInt("_SrcBlend", (int)UnityEngine.Rendering.BlendMode.SrcAlpha);
+                    beaconMat.SetInt("_DstBlend", (int)UnityEngine.Rendering.BlendMode.OneMinusSrcAlpha);
+                    beaconMat.renderQueue = 3000;
+                    beacon.GetComponent<Renderer>().material = beaconMat;
+                    var beaconPulse = beacon.AddComponent<PriorityMarkPulse>();
+                    beaconPulse.minIntensity = 2f;
+                    beaconPulse.maxIntensity = 8f;
+                    beaconPulse.pulseSpeed = 2f;
+                    beaconPulse.rotateSpeed = 0f;
+
+                    // Track priority target death to complete the encounter
+                    var targetHealth = priorityTarget.GetComponent<Health>();
+                    if (targetHealth != null)
+                    {
+                        var encounter = currentEncounter;
+                        targetHealth.OnDeath += () =>
+                        {
+                            if (encounter != null && !encounter.IsComplete)
+                            {
+                                encounter.CompleteObjective();
+                                if (goldSystem != null) goldSystem.AddGold(encounter.BonusGold);
+                                if (hud != null) hud.SetObjective(encounter.GetObjectiveText());
+                            }
+                        };
                     }
                 }
                 hud.SetObjective(currentEncounter.GetObjectiveText());
@@ -1155,7 +1206,7 @@ public class Bootstrap : MonoBehaviour
         {
             if (type == 3) // Swarm spawns pack
             {
-                int sc = Random.Range(8, 13);
+                int sc = Random.Range(4, 7);
                 for (int s = 0; s < sc; s++) { SpawnEnemy(type); enemiesAlive++; }
             }
             else { SpawnEnemy(type); enemiesAlive++; }
@@ -1200,7 +1251,7 @@ public class Bootstrap : MonoBehaviour
 
                 if (type == 3)
                 {
-                    int sc = Random.Range(8, 13);
+                    int sc = Random.Range(4, 7);
                     for (int s = 0; s < sc; s++) { SpawnEnemy(type); enemiesAlive++; }
                 }
                 else { SpawnEnemy(type); enemiesAlive++; }
@@ -1513,13 +1564,27 @@ public class Bootstrap : MonoBehaviour
             foreach (var r in relicMgr.OwnedRelics)
                 if (r.isCursed) { hasCurse = true; break; }
 
+        // Check if player has mutations for option 4
+        bool hasMutations = SpellMutationSystem.ActiveMutations.Count > 0;
+
         string[] labels = hasCurse
-            ? new[] { "REST & HEAL", "UPGRADE POTIONS", "PURIFY CURSE" }
-            : new[] { "REST & HEAL", "UPGRADE POTIONS", "MEDITATE" };
+            ? new[] { "REST & HEAL", "UPGRADE POTIONS", "PURIFY CURSE",
+                      hasMutations ? "REFORGE SPELL" : "SHARPEN FOCUS",
+                      "SCOUT AHEAD" }
+            : new[] { "REST & HEAL", "UPGRADE POTIONS", "MEDITATE",
+                      hasMutations ? "REFORGE SPELL" : "SHARPEN FOCUS",
+                      "SCOUT AHEAD" };
         string[] descs = hasCurse
-            ? new[] { "Heal to full HP", "+1 potion capacity", "Remove a cursed relic" }
-            : new[] { "Heal to full HP", "+1 potion capacity", "+1 max HP" };
-        Color[] cols = new[] { new Color(0.3f, 0.9f, 0.4f), new Color(0.3f, 0.7f, 1f), new Color(0.8f, 0.6f, 1f) };
+            ? new[] { "Heal to full HP", "+1 potion capacity", "Remove a cursed relic",
+                      hasMutations ? "Replace a random mutation" : "+10% spell damage this floor",
+                      "See what lies ahead" }
+            : new[] { "Heal to full HP", "+1 potion capacity", "+1 max HP",
+                      hasMutations ? "Replace a random mutation" : "+10% spell damage this floor",
+                      "See what lies ahead" };
+        Color[] cols = new[] {
+            new Color(0.3f, 0.9f, 0.4f), new Color(0.3f, 0.7f, 1f), new Color(0.8f, 0.6f, 1f),
+            new Color(1f, 0.6f, 0.2f), new Color(0.2f, 0.8f, 0.8f)
+        };
 
         hud.ShowEventRoom("REST SITE", "A safe haven to recover...", new Color(0.3f, 0.9f, 0.5f),
             labels, descs, cols, choice =>
@@ -1545,6 +1610,30 @@ public class Bootstrap : MonoBehaviour
                         {
                             if (playerHealth != null) { playerHealth.maxHP += 1; playerHealth.Heal(1); }
                         }
+                        break;
+                    case 3:
+                        if (hasMutations)
+                        {
+                            // Reforge: remove a random mutation, then add a new random one
+                            var active = new List<SpellMutationSystem.MutationType>(SpellMutationSystem.ActiveMutations);
+                            var toRemove = active[Random.Range(0, active.Count)];
+                            SpellMutationSystem.Reset();
+                            // Re-add all except the removed one
+                            foreach (var m in active)
+                                if (m != toRemove) SpellMutationSystem.AddMutation(m);
+                            // Add a random new mutation
+                            var mutChoices = SpellMutationSystem.GenerateChoices(1);
+                            if (mutChoices.Length > 0) SpellMutationSystem.AddMutation(mutChoices[0].type);
+                        }
+                        else
+                        {
+                            // Sharpen Focus: +10% spell damage
+                            if (spellCaster != null) spellCaster.damageBonusMult += 0.1f;
+                        }
+                        break;
+                    case 4:
+                        // Scout Ahead: +15% damage for the next room
+                        if (spellCaster != null) spellCaster.damageBonusMult += 0.15f;
                         break;
                 }
                 SFXSystem.Play(SFXSystem.SFXType.LevelUp, player.transform.position);
@@ -2540,7 +2629,8 @@ public class Bootstrap : MonoBehaviour
         // Brief slow-mo then show death screen
         if (GameFeel.Instance != null) GameFeel.Instance.Hitstop(0.1f);
 
-        hud.ShowDeath(true, metaReward, currentFloor, currentRoom, enemiesKilledThisRun);
+        int ownedRelicCount = relicMgr != null ? relicMgr.OwnedRelics.Count : 0;
+        hud.ShowDeath(true, metaReward, currentFloor, currentRoom, enemiesKilledThisRun, ownedRelicCount);
         playerCtrl.enabled = false;
         spellCaster.enabled = false;
 

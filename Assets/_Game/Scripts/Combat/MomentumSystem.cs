@@ -18,6 +18,11 @@ public class MomentumSystem : MonoBehaviour
     float multiplier = 1f;
     float decayTimer;
 
+    // Particle aura
+    ParticleSystem auraPS;
+    static readonly float[] AuraEmissionRates = { 0f, 5f, 10f, 15f, 25f };
+    static readonly float[] AuraStartSizes = { 0f, 0.15f, 0.2f, 0.3f, 0.4f };
+
     static readonly int[] TierThresholds = { 0, 3, 6, 10, 15 };
     static readonly float[] TierMultipliers = { 1f, 1.15f, 1.3f, 1.5f, 2f };
     static readonly float[] TierSpeedBonus = { 0f, 0.05f, 0.08f, 0.12f, 0.15f };
@@ -41,6 +46,83 @@ public class MomentumSystem : MonoBehaviour
         var hp = GetComponent<Health>();
         if (hp != null)
             hp.OnDamaged += OnPlayerDamaged;
+
+        CreateAuraParticleSystem();
+    }
+
+    void CreateAuraParticleSystem()
+    {
+        var go = new GameObject("MomentumAura");
+        go.transform.SetParent(transform, false);
+        go.transform.localPosition = new Vector3(0f, 0.5f, 0f);
+
+        auraPS = go.AddComponent<ParticleSystem>();
+        auraPS.Stop(true, ParticleSystemStopBehavior.StopEmittingAndClear);
+
+        var main = auraPS.main;
+        main.loop = true;
+        main.startLifetime = 0.8f;
+        main.startSpeed = 0.3f;
+        main.startSize = 0.15f;
+        main.startColor = TierColors[1];
+        main.simulationSpace = ParticleSystemSimulationSpace.World;
+        main.maxParticles = 40;
+        main.gravityModifier = -0.2f;
+
+        var emission = auraPS.emission;
+        emission.rateOverTime = 0f;
+
+        var shape = auraPS.shape;
+        shape.shapeType = ParticleSystemShapeType.Sphere;
+        shape.radius = 0.4f;
+
+        var colorOverLifetime = auraPS.colorOverLifetime;
+        colorOverLifetime.enabled = true;
+        var gradient = new Gradient();
+        gradient.SetKeys(
+            new[] { new GradientColorKey(Color.white, 0f), new GradientColorKey(Color.white, 1f) },
+            new[] { new GradientAlphaKey(0.6f, 0f), new GradientAlphaKey(0f, 1f) }
+        );
+        colorOverLifetime.color = gradient;
+
+        var sizeOverLifetime = auraPS.sizeOverLifetime;
+        sizeOverLifetime.enabled = true;
+        sizeOverLifetime.size = new ParticleSystem.MinMaxCurve(1f, 0.3f);
+
+        var mat = new Material(ShaderCache.ParticleShader);
+        go.GetComponent<ParticleSystemRenderer>().material = mat;
+    }
+
+    void UpdateAura()
+    {
+        if (auraPS == null) return;
+
+        if (tier <= 0)
+        {
+            if (auraPS.isPlaying)
+                auraPS.Stop(true, ParticleSystemStopBehavior.StopEmitting);
+            return;
+        }
+
+        if (!auraPS.isPlaying)
+            auraPS.Play();
+
+        var main = auraPS.main;
+        main.startColor = TierColors[tier];
+        main.startSize = AuraStartSizes[tier];
+
+        var emission = auraPS.emission;
+        emission.rateOverTime = AuraEmissionRates[tier];
+
+        // Brighter material at higher tiers
+        var renderer = auraPS.GetComponent<ParticleSystemRenderer>();
+        if (renderer != null && renderer.material != null)
+        {
+            Color c = TierColors[tier];
+            renderer.material.color = c;
+            float emissionIntensity = 0.5f + tier * 0.5f;
+            renderer.material.SetColor("_EmissionColor", c * emissionIntensity);
+        }
     }
 
     void OnPlayerDamaged(int amount, Vector3 pos, bool killed)
@@ -63,6 +145,7 @@ public class MomentumSystem : MonoBehaviour
             tier = newTier;
             multiplier = TierMultipliers[tier];
             OnMomentumChanged?.Invoke(tier, multiplier);
+            UpdateAura();
 
             if (tier >= 2)
             {
@@ -89,6 +172,7 @@ public class MomentumSystem : MonoBehaviour
         tier = newTier;
         multiplier = TierMultipliers[tier];
         OnMomentumChanged?.Invoke(tier, multiplier);
+        UpdateAura();
 
         // Feedback for losing momentum
         if (oldTier > newTier)
@@ -121,6 +205,7 @@ public class MomentumSystem : MonoBehaviour
                 tier = newTier;
                 multiplier = TierMultipliers[tier];
                 OnMomentumChanged?.Invoke(tier, multiplier);
+                UpdateAura();
 
                 if (oldTier > newTier)
                     OnMomentumLost?.Invoke(tier);
@@ -132,5 +217,8 @@ public class MomentumSystem : MonoBehaviour
     {
         var hp = GetComponent<Health>();
         if (hp != null) hp.OnDamaged -= OnPlayerDamaged;
+
+        if (auraPS != null)
+            Object.Destroy(auraPS.gameObject);
     }
 }

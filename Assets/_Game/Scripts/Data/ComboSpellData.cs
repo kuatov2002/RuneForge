@@ -111,7 +111,7 @@ public static class ComboSpellRegistry
         {
             comboType = ComboType.Steam, comboName = "Steam",
             description = "Steam cloud, ignitable by Fire",
-            baseDamage = 2.5f, radius = 2.5f, duration = 4f, cooldown = 0.7f, // nerfed for reaction balance
+            baseDamage = 4, radius = 2.5f, duration = 5f, cooldown = 0.7f, // buffed: utility spell needs decent DPS
             color = new Color(0.8f, 0.8f, 0.9f)
         });
         Register(ElementType.Fire, ElementType.Earth, new ComboSpellDef
@@ -132,7 +132,7 @@ public static class ComboSpellRegistry
         {
             comboType = ComboType.Permafrost, comboName = "Permafrost",
             description = "Ice floor, enemies slide",
-            baseDamage = 1.5f, radius = 3.5f, duration = 4f, cooldown = 0.8f, // nerfed for reaction balance
+            baseDamage = 3.5f, radius = 4f, duration = 5f, cooldown = 0.8f, // buffed: area control needs bite
             color = new Color(0.5f, 0.8f, 0.9f)
         });
         Register(ElementType.Water, ElementType.Air, new ComboSpellDef
@@ -183,7 +183,7 @@ public static class ComboSpellRegistry
         {
             comboType = ComboType.Cyclone, comboName = "Cyclone",
             description = "Whirlwind pulling enemies",
-            baseDamage = 3.5f, radius = 2.5f, duration = 2.5f, cooldown = 0.9f,
+            baseDamage = 5, radius = 3f, duration = 3f, cooldown = 0.9f, // buffed: pull utility needs reward
             color = new Color(0.7f, 0.9f, 1f)
         });
 
@@ -192,7 +192,7 @@ public static class ComboSpellRegistry
         {
             comboType = ComboType.Plague, comboName = "Plague",
             description = "Spreading poison cloud",
-            baseDamage = 1.5f, radius = 3f, duration = 4f, cooldown = 0.9f,
+            baseDamage = 3, radius = 3.5f, duration = 5f, cooldown = 0.9f, // buffed: DoT cloud needs area threat
             color = new Color(0.2f, 0.9f, 0.1f)
         });
         Register(ElementType.Poison, ElementType.Fire, new ComboSpellDef
@@ -206,21 +206,21 @@ public static class ComboSpellRegistry
         {
             comboType = ComboType.ToxicFrost, comboName = "Toxic Frost",
             description = "Slow + poison zone",
-            baseDamage = 1.5f, radius = 2.5f, duration = 3f, cooldown = 0.8f,
+            baseDamage = 3, radius = 2.5f, duration = 4f, cooldown = 0.8f, // buffed: slow+poison needs damage
             color = new Color(0.3f, 0.8f, 0.6f)
         });
         Register(ElementType.Poison, ElementType.Earth, new ComboSpellDef
         {
             comboType = ComboType.Quicksand, comboName = "Quicksand",
             description = "Trapping poisonous ground",
-            baseDamage = 2.5f, radius = 2.5f, duration = 3f, cooldown = 0.8f,
+            baseDamage = 3.5f, radius = 3f, duration = 4f, cooldown = 0.8f, // buffed: trap needs teeth
             color = new Color(0.4f, 0.5f, 0.2f)
         });
         Register(ElementType.Poison, ElementType.Air, new ComboSpellDef
         {
             comboType = ComboType.Miasma, comboName = "Miasma",
             description = "Poisonous wind",
-            baseDamage = 2.5f, radius = 3.5f, duration = 2.5f, cooldown = 0.8f,
+            baseDamage = 3.5f, radius = 3.5f, duration = 3.5f, cooldown = 0.8f, // buffed: poison wind needs damage
             color = new Color(0.4f, 0.7f, 0.2f)
         });
         Register(ElementType.Poison, ElementType.Lightning, new ComboSpellDef

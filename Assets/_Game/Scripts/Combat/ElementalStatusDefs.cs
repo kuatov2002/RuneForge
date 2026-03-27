@@ -68,12 +68,12 @@ public static class ElementalStatusDefs
 
     static readonly Dictionary<ElementalStatusType, StatusParams> _params = new()
     {
-        { ElementalStatusType.Burning,   new StatusParams(2f,   3f, 1f,  1f) },
+        { ElementalStatusType.Burning,   new StatusParams(4f,   4f, 1f,  1f) },
         { ElementalStatusType.Wet,       new StatusParams(0f,   6f, 1f,  1f) },
         { ElementalStatusType.Weighted,  new StatusParams(0f,   4f, 0.7f,1f) },
         { ElementalStatusType.Windswept, new StatusParams(0f,   4f, 1f,  1f) },
         { ElementalStatusType.Charged,   new StatusParams(0f,   5f, 1f,  1f) },
-        { ElementalStatusType.Poisoned,  new StatusParams(1.5f, 4f, 1f,  1f) },
+        { ElementalStatusType.Poisoned,  new StatusParams(3f,   5f, 1f,  1f) },
         { ElementalStatusType.Exposed,   new StatusParams(0f,   5f, 1f,  1.25f) },
     };
 
