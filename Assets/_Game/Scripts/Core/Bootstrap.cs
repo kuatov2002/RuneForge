@@ -2351,7 +2351,7 @@ public class Bootstrap : MonoBehaviour
         MetaProgression.RecordFloor(currentFloor);
 
         // Boss gold drop (CursedGold: 3x)
-        int goldDrop = GoldSystem.CalculateEnemyDrop(wave, true);
+        int goldDrop = GoldSystem.CalculateEnemyDrop(wave, true, currentFloor);
         if (relicMgr != null && relicMgr.HasRelic(RelicType.CursedGold))
             goldDrop *= 3;
         GoldSystem.SpawnGoldDrop(boss.transform.position, goldDrop);
@@ -2458,7 +2458,7 @@ public class Bootstrap : MonoBehaviour
     void OnEnemyDeath(GameObject enemy)
     {
         // Gold drop (CursedGold: 3x)
-        int goldDrop = GoldSystem.CalculateEnemyDrop(wave, false);
+        int goldDrop = GoldSystem.CalculateEnemyDrop(wave, false, currentFloor);
         if (relicMgr != null && relicMgr.HasRelic(RelicType.CursedGold))
             goldDrop *= 3;
         GoldSystem.SpawnGoldDrop(enemy.transform.position, goldDrop);

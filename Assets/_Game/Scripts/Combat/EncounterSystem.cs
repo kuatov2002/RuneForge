@@ -31,18 +31,18 @@ public class EncounterSystem
         {
             case EncounterType.Survival:
                 Timer = 30f + (floor - 1) * 5f; // 30s floor 1, 50s floor 5
-                BonusGold = 30 + floor * 5;
+                BonusGold = 35 + floor * 8;
                 break;
             case EncounterType.TimedChallenge:
                 Timer = 25f + (floor - 1) * 3f; // more time on harder floors
-                BonusGold = 50 + floor * 10;
+                BonusGold = 55 + floor * 12;
                 break;
             case EncounterType.Gauntlet:
                 Timer = 40f + (floor - 1) * 5f; // timed onslaught
-                BonusGold = 40 + floor * 8;
+                BonusGold = 45 + floor * 10;
                 break;
             case EncounterType.PriorityTarget:
-                BonusGold = 25 + floor * 5;
+                BonusGold = 30 + floor * 8;
                 break;
             default:
                 BonusGold = 0;

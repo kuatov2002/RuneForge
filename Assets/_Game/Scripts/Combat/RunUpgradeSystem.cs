@@ -30,32 +30,54 @@ public static class RunUpgradeSystem
     static int runExtraCharges;
     static float runRechargeMultiplier = 1f;
 
+    // Hard caps: prevent overheat system from becoming irrelevant in late runs
+    public const int MaxExtraCharges = 2;
+    public const float MinRechargeMultiplier = 0.5f;
+
     public static int RunExtraCharges => runExtraCharges;
     public static float RunRechargeMultiplier => runRechargeMultiplier;
+    public static bool IsChargesMaxed => runExtraCharges >= MaxExtraCharges;
+    public static bool IsRechargeMaxed => runRechargeMultiplier <= MinRechargeMultiplier + 0.01f;
 
     public static void ResetRunUpgrades()
     {
         runExtraCharges = 0;
         runRechargeMultiplier = 1f;
+        damageCapped = false;
+        cooldownCapped = false;
+        durationCapped = false;
+        radiusCapped = false;
     }
 
-    /// <summary>Generate random upgrade choices (no duplicates).</summary>
+    /// <summary>Generate random upgrade choices (no duplicates, excludes maxed upgrades).</summary>
     public static UpgradeType[] GenerateChoices(int count = 3)
     {
-        count = Mathf.Min(count, AllUpgrades.Length);
-        var choices = new UpgradeType[count];
-        var used = new System.Collections.Generic.HashSet<int>();
+        // Build available pool, excluding upgrades that hit their cap
+        var pool = new System.Collections.Generic.List<UpgradeType>();
+        foreach (var u in AllUpgrades)
+        {
+            if (u == UpgradeType.ChargesUp && IsChargesMaxed) continue;
+            if (u == UpgradeType.RechargeDown && IsRechargeMaxed) continue;
+            if (u == UpgradeType.DamageUp && damageCapped) continue;
+            if (u == UpgradeType.CooldownDown && cooldownCapped) continue;
+            if (u == UpgradeType.DurationUp && durationCapped) continue;
+            if (u == UpgradeType.RadiusUp && radiusCapped) continue;
+            pool.Add(u);
+        }
 
+        count = Mathf.Min(count, pool.Count);
+        var choices = new UpgradeType[count];
         for (int i = 0; i < count; i++)
         {
-            int idx;
-            do { idx = Random.Range(0, AllUpgrades.Length); }
-            while (used.Contains(idx));
-            used.Add(idx);
-            choices[i] = AllUpgrades[idx];
+            int idx = Random.Range(0, pool.Count);
+            choices[i] = pool[idx];
+            pool.RemoveAt(idx);
         }
         return choices;
     }
+
+    // Track which stat upgrades have reached their caps (set during ApplyUpgrade)
+    static bool damageCapped, cooldownCapped, durationCapped, radiusCapped;
 
     /// <summary>Apply an upgrade to the player's SpellCaster.</summary>
     public static void ApplyUpgrade(SpellCaster caster, UpgradeType upgrade)
@@ -63,23 +85,26 @@ public static class RunUpgradeSystem
         switch (upgrade)
         {
             case UpgradeType.DamageUp:
-                caster.damageBonusMult = Mathf.Min(caster.damageBonusMult + 0.15f, 3f); // cap at 3x
+                caster.damageBonusMult = Mathf.Min(caster.damageBonusMult + 0.15f, 3f);
+                if (caster.damageBonusMult >= 2.95f) damageCapped = true;
                 break;
             case UpgradeType.CooldownDown:
                 caster.cooldownBonusMult = Mathf.Max(0.3f, caster.cooldownBonusMult - 0.15f);
+                if (caster.cooldownBonusMult <= 0.35f) cooldownCapped = true;
                 break;
             case UpgradeType.DurationUp:
                 caster.durationBonusMult = Mathf.Min(caster.durationBonusMult + 0.20f, 3f);
+                if (caster.durationBonusMult >= 2.95f) durationCapped = true;
                 break;
             case UpgradeType.RadiusUp:
                 caster.radiusBonusMult = Mathf.Min(caster.radiusBonusMult + 0.20f, 3f);
+                if (caster.radiusBonusMult >= 2.95f) radiusCapped = true;
                 break;
             case UpgradeType.ChargesUp:
-                // Store extra charges as run-level data, not on ScriptableObject
-                runExtraCharges++;
+                runExtraCharges = Mathf.Min(runExtraCharges + 1, MaxExtraCharges);
                 break;
             case UpgradeType.RechargeDown:
-                runRechargeMultiplier = Mathf.Max(0.3f, runRechargeMultiplier * 0.8f);
+                runRechargeMultiplier = Mathf.Max(MinRechargeMultiplier, runRechargeMultiplier * 0.8f);
                 break;
         }
     }
@@ -118,8 +143,8 @@ public static class RunUpgradeSystem
             UpgradeType.CooldownDown => $"Cooldowns -15% (current: {caster.cooldownBonusMult:F2}x)",
             UpgradeType.DurationUp => $"Duration +20% (current: {caster.durationBonusMult:F2}x)",
             UpgradeType.RadiusUp => $"Radius +20% (current: {caster.radiusBonusMult:F2}x)",
-            UpgradeType.ChargesUp => $"+1 charge per element (current bonus: +{runExtraCharges})",
-            UpgradeType.RechargeDown => $"Recharge -20% (current: {runRechargeMultiplier:F2}x)",
+            UpgradeType.ChargesUp => $"+1 charge per element (current: +{runExtraCharges}/{MaxExtraCharges})",
+            UpgradeType.RechargeDown => $"Recharge -20% (current: {runRechargeMultiplier:F2}x, min {MinRechargeMultiplier:F1}x)",
             _ => ""
         };
     }

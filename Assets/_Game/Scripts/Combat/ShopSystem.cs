@@ -43,7 +43,7 @@ public static class ShopSystem
                 type = ShopItemType.Relic,
                 name = relic.relicName,
                 description = relic.description,
-                price = ApplyDiscount(60 + floor * 15),
+                price = ApplyDiscount(60 + floor * 10),
                 color = relic.color,
                 relic = relic
             });
@@ -61,7 +61,7 @@ public static class ShopSystem
                     type = ShopItemType.Mutation,
                     name = choices[0].name,
                     description = choices[0].description,
-                    price = ApplyDiscount(80 + floor * 15),
+                    price = ApplyDiscount(80 + floor * 10),
                     color = choices[0].color,
                     mutation = choices[0]
                 });
@@ -74,7 +74,7 @@ public static class ShopSystem
             type = ShopItemType.Potion,
             name = "Healing Potion",
             description = "+1 potion for this floor",
-            price = ApplyDiscount(30 + floor * 5),
+            price = ApplyDiscount(30 + floor * 3),
             color = new Color(0.3f, 0.9f, 0.4f)
         });
 
@@ -84,7 +84,7 @@ public static class ShopSystem
             type = ShopItemType.Reroll,
             name = "Rune Reroll",
             description = "Reroll your next upgrade choice",
-            price = ApplyDiscount(50 + floor * 10),
+            price = ApplyDiscount(50 + floor * 6),
             color = new Color(0.6f, 0.4f, 0.9f)
         });
 
@@ -103,7 +103,7 @@ public static class ShopSystem
                     type = ShopItemType.CursedRelic,
                     name = cursed.relicName,
                     description = cursed.description,
-                    price = ApplyDiscount(50 + floor * 10),
+                    price = ApplyDiscount(50 + floor * 8),
                     color = cursed.color,
                     relic = cursed
                 });
@@ -116,7 +116,7 @@ public static class ShopSystem
                     type = ShopItemType.Relic,
                     name = relic2.relicName,
                     description = relic2.description,
-                    price = ApplyDiscount(75 + floor * 15),
+                    price = ApplyDiscount(75 + floor * 10),
                     color = relic2.color,
                     relic = relic2
                 });

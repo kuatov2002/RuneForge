@@ -216,6 +216,17 @@ public class SpellCaster : MonoBehaviour
         SFXSystem.Play(SFXSystem.SFXType.MenuClick, transform.position, 0.3f);
     }
 
+    /// <summary>
+    /// Soft cap for damage multiplier. Below the threshold, returns the value unchanged.
+    /// Above it, excess is sqrt-compressed to create diminishing returns.
+    /// Example: threshold=4, input=9 → 4 + sqrt(9-4) = 4 + 2.24 = 6.24 (instead of 9)
+    /// </summary>
+    static float SoftCapMultiplier(float value, float threshold = 4f)
+    {
+        if (value <= threshold) return value;
+        return threshold + Mathf.Sqrt(value - threshold);
+    }
+
     void Fire(bool charged)
     {
         var def = CurrentComboDef;
@@ -245,6 +256,9 @@ public class SpellCaster : MonoBehaviour
         // Crit chance
         if (UnityEngine.Random.value < MetaProgression.CritChance)
             dmgMult *= 2f;
+
+        // Diminishing returns: soft cap prevents trivial endgame from stacked multipliers
+        dmgMult = SoftCapMultiplier(dmgMult);
 
         // Relic modifiers
         var relicMgr = GetComponent<RelicManager>();

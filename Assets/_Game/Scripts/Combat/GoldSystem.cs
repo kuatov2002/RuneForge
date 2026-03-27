@@ -91,14 +91,16 @@ public class GoldSystem : MonoBehaviour
         Object.Destroy(go, 15f);
     }
 
-    /// <summary>Calculate gold drop for an enemy based on wave.</summary>
-    public static int CalculateEnemyDrop(int wave, bool isBoss)
+    /// <summary>Calculate gold drop for an enemy based on wave and floor.</summary>
+    public static int CalculateEnemyDrop(int wave, bool isBoss, int floor = 1)
     {
-        if (isBoss) return 30 + wave * 5;
-        // Regular enemies: 4-8 gold base, scaling with wave (increased from 2-4)
-        int baseGold = Random.Range(4, 9); // Random.Range(int,int) excludes max, so 4-8
+        if (isBoss) return 30 + wave * 5 + floor * 10;
+        // Regular enemies: base gold + wave scaling + floor scaling
+        // Floor scaling ensures gold keeps pace with shop prices on later floors
+        int baseGold = Random.Range(4, 9); // 4-8
         int waveBonus = Mathf.FloorToInt(wave * 0.8f);
-        return baseGold + waveBonus;
+        int floorBonus = (floor - 1) * 3; // +0/+3/+6/+9/+12 for floors 1-5
+        return baseGold + waveBonus + floorBonus;
     }
 }
 
