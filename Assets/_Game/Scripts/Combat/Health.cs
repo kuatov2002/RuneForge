@@ -23,6 +23,9 @@ public class Health : MonoBehaviour
 
     bool isDead;
 
+    /// <summary>Second Wind: survive lethal hits, set to 1 HP instead. Decrements each use.</summary>
+    [HideInInspector] public int secondWindCharges;
+
     public bool IsDead => isDead;
     public bool IsFrozen => freezeTimer > 0;
     public bool IsStunned => stunTimer > 0 || freezeTimer > 0;
@@ -69,9 +72,17 @@ public class Health : MonoBehaviour
 
         currentHP -= dmg;
         if (currentHP < 0) currentHP = 0;
-        OnHPChanged?.Invoke(currentHP, maxHP);
 
+        // Second Wind: survive lethal hit, set to 1 HP
         bool killed = currentHP <= 0;
+        if (killed && isPlayer && secondWindCharges > 0)
+        {
+            secondWindCharges--;
+            currentHP = 1;
+            killed = false;
+        }
+
+        OnHPChanged?.Invoke(currentHP, maxHP);
 
         // Player: hit recovery i-frames + knockback
         if (isPlayer)

@@ -62,6 +62,10 @@ public class ElementalStatus : MonoBehaviour
         // Apply / refresh the incoming status
         ApplyStatus(incoming);
 
+        // Elemental Mastery: bonus damage on reactions
+        if (reactionMult > 1f)
+            reactionMult *= MetaProgression.ReactionDamageBonus;
+
         return reactionMult;
     }
 

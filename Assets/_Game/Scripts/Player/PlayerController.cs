@@ -8,7 +8,15 @@ public class PlayerController : MonoBehaviour
     public float dashCooldown = 1f;
 
     const float DashDuration = 0.15f;
-    const float IFrameDuration = 0.2f;
+    const float BaseIFrameDuration = 0.2f;
+
+    /// <summary>Extra i-frame duration from Phase Step meta-upgrade.</summary>
+    [HideInInspector] public float phaseStepBonus;
+
+    /// <summary>Damage dealt to enemies when dashing through them (Blink Strike).</summary>
+    [HideInInspector] public int blinkStrikeDamage;
+
+    float IFrameDuration => BaseIFrameDuration + phaseStepBonus;
 
     [HideInInspector] public bool isInvulnerable;
 
@@ -137,6 +145,18 @@ public class PlayerController : MonoBehaviour
             var momentum = GetComponent<MomentumSystem>();
             if (momentum != null)
                 rb.linearVelocity *= (1f + momentum.SpeedBonus);
+
+            // Blink Strike: damage enemies along dash path
+            if (blinkStrikeDamage > 0)
+            {
+                var hits = Physics.SphereCastAll(dashFrom, 0.8f, dashDir, dashDistance, ~0, QueryTriggerInteraction.Ignore);
+                foreach (var hit in hits)
+                {
+                    var hp = hit.collider.GetComponent<Health>();
+                    if (hp != null && hp.gameObject != gameObject && !hp.IsDead)
+                        hp.TakeDamage(blinkStrikeDamage);
+                }
+            }
 
             // Dash fire relic
             var relicMgr = GetComponent<RelicManager>();

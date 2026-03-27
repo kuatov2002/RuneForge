@@ -256,11 +256,12 @@ public class HubUI : MonoBehaviour
         root.Add(panelOverlay);
     }
 
-    // ─── UPGRADE PANEL (Forge Master) ───────────────────────────
+    // ─── UPGRADE PANEL (Forge Master) — A/B Branching ──────────
 
     void BuildUpgradePanel()
     {
-        var desc = Lbl("Spend Rune Essence to permanently strengthen yourself.", 16, Dim);
+        var desc = Lbl("Each slot has two paths with independent levels. Switch freely — both keep their progress.", 16, Dim);
+        desc.style.whiteSpace = WhiteSpace.Normal;
         desc.style.marginBottom = 16;
         panelContent.Add(desc);
 
@@ -269,105 +270,140 @@ public class HubUI : MonoBehaviour
         grid.style.flexWrap = Wrap.Wrap;
         grid.style.justifyContent = Justify.Center;
 
-        foreach (var def in MetaProgression.AllUpgrades)
+        foreach (var slot in MetaProgression.AllUpgradeSlots)
         {
-            var card = BuildUpgradeCard(def);
+            var card = BuildUpgradeSlotCard(slot);
             grid.Add(card);
         }
         panelContent.Add(grid);
     }
 
-    VisualElement BuildUpgradeCard(MetaProgression.UpgradeDef def)
+    VisualElement BuildUpgradeSlotCard(MetaProgression.UpgradeSlot slot)
     {
-        int level = def.getLevel();
-        bool maxed = level >= def.maxLevel;
-        int cost = maxed ? 0 : def.getCost(level);
+        string activePath = MetaProgression.GetChosenPath(slot.pathA.id); // "A" or "B"
+        var activeDef = activePath == "B" ? slot.pathB : slot.pathA;
+        var inactiveDef = activePath == "B" ? slot.pathA : slot.pathB;
+
+        int level = activeDef.getLevel();
+        bool maxed = level >= activeDef.maxLevel;
+        int cost = maxed ? 0 : activeDef.getCost(level);
         bool canAfford = MetaProgression.Currency >= cost;
 
-        var card = new VisualElement();
-        card.style.width = 250;
-        card.style.marginTop = 8; card.style.marginBottom = 8; card.style.marginLeft = 8; card.style.marginRight = 8;
-        card.style.backgroundColor = CardBg;
-        Radius(card, 12);
-        Border(card, maxed ? new Color(0.4f, 0.8f, 0.3f) : new Color(0.3f, 0.3f, 0.35f), 2);
-        card.style.overflow = Overflow.Hidden;
+        int inactiveLevel = inactiveDef.getLevel();
 
-        // Header
+        var container = new VisualElement();
+        container.style.width = 280;
+        container.style.marginTop = 8; container.style.marginBottom = 8;
+        container.style.marginLeft = 6; container.style.marginRight = 6;
+        container.style.backgroundColor = CardBg;
+        Radius(container, 12);
+        Border(container, maxed ? new Color(0.4f, 0.8f, 0.3f) : activeDef.color, 2);
+        container.style.overflow = Overflow.Hidden;
+
+        // ── HEADER: active path name + pips ──
         var header = new VisualElement();
-        header.style.backgroundColor = def.color;
-        Pad(header, 10, 14);
-        header.Add(Lbl(def.name, 20, Color.white, FontStyle.Bold));
-        card.Add(header);
+        header.style.backgroundColor = activeDef.color;
+        Pad(header, 8, 12);
+        header.Add(Lbl(activeDef.name, 18, Color.white, FontStyle.Bold));
+        container.Add(header);
 
-        // Body
+        // ── BODY ──
         var body = new VisualElement();
-        Pad(body, 12, 14);
+        Pad(body, 10, 12);
 
-        body.Add(Lbl(def.description, 14, new Color(0.8f, 0.8f, 0.85f)));
+        body.Add(Lbl(activeDef.description, 13, new Color(0.8f, 0.8f, 0.85f)));
 
         // Level pips
         var pipRow = new VisualElement();
         pipRow.style.flexDirection = FlexDirection.Row;
-        pipRow.style.marginTop = 8;
-        pipRow.style.marginBottom = 8;
-        for (int i = 0; i < def.maxLevel; i++)
+        pipRow.style.marginTop = 6;
+        pipRow.style.marginBottom = 6;
+        for (int i = 0; i < activeDef.maxLevel; i++)
         {
             var pip = new VisualElement();
-            pip.style.width = 16;
-            pip.style.height = 16;
-            pip.style.marginRight = 4;
+            pip.style.width = 14; pip.style.height = 14;
+            pip.style.marginRight = 3;
             Radius(pip, 3);
-            pip.style.backgroundColor = i < level ? def.color : new Color(0.2f, 0.2f, 0.25f);
-            if (i < level) Border(pip, Color.Lerp(def.color, Color.white, 0.3f), 1);
+            pip.style.backgroundColor = i < level ? activeDef.color : new Color(0.2f, 0.2f, 0.25f);
+            if (i < level) Border(pip, Color.Lerp(activeDef.color, Color.white, 0.3f), 1);
             pipRow.Add(pip);
         }
         body.Add(pipRow);
 
         if (maxed)
         {
-            body.Add(Lbl("MAXED", 14, new Color(0.4f, 0.8f, 0.3f), FontStyle.Bold));
+            body.Add(Lbl("MAXED", 13, new Color(0.4f, 0.8f, 0.3f), FontStyle.Bold));
         }
         else
         {
-            var costLabel = Lbl($"Cost: {cost}", 16, canAfford ? new Color(0.8f, 0.6f, 1f) : new Color(0.6f, 0.3f, 0.3f), FontStyle.Bold);
-            body.Add(costLabel);
+            body.Add(Lbl($"Cost: {cost}", 14,
+                canAfford ? new Color(0.8f, 0.6f, 1f) : new Color(0.6f, 0.3f, 0.3f), FontStyle.Bold));
 
             if (canAfford)
             {
-                var buyBtn = Lbl("[ BUY ]", 16, new Color(0.5f, 1f, 0.5f), FontStyle.Bold);
-                buyBtn.style.marginTop = 6;
-                buyBtn.style.cursor = StyleKeyword.Auto;
-                // Capture def by value for closure
-                var capturedDef = def;
-                card.RegisterCallback<ClickEvent>(_ =>
+                var buyBtn = Lbl("[ BUY ]", 14, new Color(0.5f, 1f, 0.5f), FontStyle.Bold);
+                buyBtn.style.marginTop = 4;
+                body.Add(buyBtn);
+
+                var capturedDef = activeDef;
+                container.RegisterCallback<ClickEvent>(_ =>
                 {
                     if (MetaProgression.TryBuyUpgrade(capturedDef))
                     {
                         RefreshCurrency();
-                        // Rebuild panel
                         panelContent.Clear();
                         BuildUpgradePanel();
                     }
                 });
-                body.Add(buyBtn);
             }
         }
 
-        card.Add(body);
+        // ── SWITCH ROW: inactive path ──
+        var switchRow = new VisualElement();
+        switchRow.style.flexDirection = FlexDirection.Row;
+        switchRow.style.alignItems = Align.Center;
+        switchRow.style.marginTop = 8;
+        switchRow.style.paddingTop = 6;
+        switchRow.style.borderTopColor = new Color(0.25f, 0.25f, 0.3f);
+        switchRow.style.borderTopWidth = 1;
 
-        // Hover
-        card.RegisterCallback<MouseEnterEvent>(_ =>
+        // Inactive path name + its current level
+        string inactiveLevelStr = inactiveLevel > 0 ? $" Lv{inactiveLevel}" : "";
+        var inactiveName = Lbl($"{inactiveDef.name}{inactiveLevelStr}", 12, new Color(0.55f, 0.55f, 0.6f));
+        inactiveName.style.flexGrow = 1;
+        switchRow.Add(inactiveName);
+
+        var switchBtn = Lbl("[ SWITCH ]", 11, new Color(0.6f, 0.6f, 0.7f), FontStyle.Bold);
+        switchBtn.style.marginLeft = 6;
+        switchRow.Add(switchBtn);
+
+        var capturedSlot = slot;
+        switchRow.RegisterCallback<ClickEvent>(evt =>
         {
-            card.style.backgroundColor = CardBgHover;
-            Border(card, def.color, 3);
+            evt.StopPropagation();
+            MetaProgression.SwitchPath(capturedSlot);
+            panelContent.Clear();
+            BuildUpgradePanel();
         });
-        card.RegisterCallback<MouseLeaveEvent>(_ =>
+        switchRow.RegisterCallback<MouseEnterEvent>(_ =>
         {
-            card.style.backgroundColor = CardBg;
-            Border(card, maxed ? new Color(0.4f, 0.8f, 0.3f) : new Color(0.3f, 0.3f, 0.35f), 2);
+            switchBtn.style.color = Color.white;
+            inactiveName.style.color = new Color(0.8f, 0.8f, 0.85f);
+        });
+        switchRow.RegisterCallback<MouseLeaveEvent>(_ =>
+        {
+            switchBtn.style.color = new Color(0.6f, 0.6f, 0.7f);
+            inactiveName.style.color = new Color(0.55f, 0.55f, 0.6f);
         });
 
-        return card;
+        body.Add(switchRow);
+        container.Add(body);
+
+        // Hover on whole card
+        container.RegisterCallback<MouseEnterEvent>(_ => container.style.backgroundColor = CardBgHover);
+        container.RegisterCallback<MouseLeaveEvent>(_ => container.style.backgroundColor = CardBg);
+
+        return container;
     }
 
     // ─── ELEMENT PANEL (Element Scholar) ────────────────────────
@@ -479,20 +515,69 @@ public class HubUI : MonoBehaviour
 
     void BuildStatsPanel()
     {
-        var stats = new (string label, string value)[]
+        var statsList = new List<(string label, string value)>
         {
             ("Runs Completed", MetaProgression.RunsCompleted.ToString()),
             ("Best Floor", MetaProgression.BestFloor.ToString()),
             ("Rune Essence", MetaProgression.Currency.ToString()),
-            ("Max HP Bonus", $"+{MetaProgression.MaxHPBonus}"),
-            ("Damage Bonus", $"+{(MetaProgression.DamageMultiplier - 1f) * 100:F0}%"),
-            ("Speed Bonus", $"+{(MetaProgression.SpeedMultiplier - 1f) * 100:F0}%"),
-            ("Crit Chance", $"{MetaProgression.CritChance * 100:F0}%"),
-            ("Extra Dash Charges", MetaProgression.ExtraDashCharges.ToString()),
-            ("Starting Gold", MetaProgression.StartingGold.ToString()),
-            ("Potions/Floor", MetaProgression.PotionsPerFloor.ToString()),
-            ("Rune Rerolls", MetaProgression.Rerolls.ToString()),
         };
+
+        // Show stats for chosen paths only
+        string hp = MetaProgression.GetChosenPath("maxhp");
+        if (hp == "B" && MetaProgression.SecondWindCharges > 0)
+            statsList.Add(("Second Wind", $"{MetaProgression.SecondWindCharges} floor(s)"));
+        else if (MetaProgression.MaxHPBonus > 0)
+            statsList.Add(("Max HP Bonus", $"+{MetaProgression.MaxHPBonus}"));
+
+        string dmg = MetaProgression.GetChosenPath("damage");
+        if (dmg == "B" && MetaProgression.SpellMasteryLevel > 0)
+            statsList.Add(("Spell Mastery", $"+{(MetaProgression.SpellMasteryBonus - 1f) * 100:F0}% same-elem"));
+        else if (MetaProgression.BaseDamageLevel > 0)
+            statsList.Add(("Damage Bonus", $"+{(MetaProgression.DamageMultiplier - 1f) * 100:F0}%"));
+
+        string spd = MetaProgression.GetChosenPath("speed");
+        if (spd == "B" && MetaProgression.PhaseStepLevel > 0)
+            statsList.Add(("Phase Step", $"+{MetaProgression.PhaseStepDuration:F1}s i-frames"));
+        else if (MetaProgression.SpeedBonusLevel > 0)
+            statsList.Add(("Speed Bonus", $"+{(MetaProgression.SpeedMultiplier - 1f) * 100:F0}%"));
+
+        string dash = MetaProgression.GetChosenPath("dash");
+        if (dash == "B" && MetaProgression.BlinkStrikeLevel > 0)
+            statsList.Add(("Blink Strike", $"{MetaProgression.BlinkStrikeDamage} dmg"));
+        else if (MetaProgression.ExtraDashCharges > 0)
+            statsList.Add(("Extra Dash Charges", MetaProgression.ExtraDashCharges.ToString()));
+
+        string gold = MetaProgression.GetChosenPath("gold");
+        if (gold == "B" && MetaProgression.HagglerLevel > 0)
+            statsList.Add(("Haggler", $"-{(1f - MetaProgression.HagglerDiscount) * 100:F0}% prices"));
+        else if (MetaProgression.StartingGold > 0)
+            statsList.Add(("Starting Gold", MetaProgression.StartingGold.ToString()));
+
+        string crit = MetaProgression.GetChosenPath("crit");
+        if (crit == "B" && MetaProgression.ElemMasteryLevel > 0)
+            statsList.Add(("Reaction Damage", $"+{(MetaProgression.ReactionDamageBonus - 1f) * 100:F0}%"));
+        else if (MetaProgression.CritChanceLevel > 0)
+            statsList.Add(("Crit Chance", $"{MetaProgression.CritChance * 100:F0}%"));
+
+        string pot = MetaProgression.GetChosenPath("potion");
+        if (pot == "B" && MetaProgression.BloodMageLevel > 0)
+            statsList.Add(("Blood Mage", $"{MetaProgression.BloodMageChance * 100:F0}% kill heal"));
+        else if (MetaProgression.PotionsPerFloor > 0)
+            statsList.Add(("Potions/Floor", MetaProgression.PotionsPerFloor.ToString()));
+
+        string reroll = MetaProgression.GetChosenPath("reroll");
+        if (reroll == "B" && MetaProgression.LuckyFindLevel > 0)
+            statsList.Add(("Lucky Find", $"{MetaProgression.LuckyFindChance * 100:F0}% relic chance"));
+        else if (MetaProgression.Rerolls > 0)
+            statsList.Add(("Rune Rerolls", MetaProgression.Rerolls.ToString()));
+
+        string relic = MetaProgression.GetChosenPath("relic");
+        if (relic == "B" && MetaProgression.HasCursedHeirloom)
+            statsList.Add(("Cursed Heirloom", $"Cursed Relic + {MetaProgression.CursedHeirloomGold}g"));
+        else if (MetaProgression.HasStartingRelic)
+            statsList.Add(("Starting Relic", "Random relic"));
+
+        var stats = statsList.ToArray();
 
         foreach (var (label, value) in stats)
         {
@@ -523,6 +608,7 @@ public class HubUI : MonoBehaviour
         var bonusList = new VisualElement();
         bonusList.style.marginBottom = 24;
 
+        // Path A bonuses
         if (MetaProgression.MaxHPBonus > 0)
             bonusList.Add(Lbl($"  +{MetaProgression.MaxHPBonus} Max HP", 16, new Color(0.9f, 0.3f, 0.3f)));
         if (MetaProgression.BaseDamageLevel > 0)
@@ -533,6 +619,25 @@ public class HubUI : MonoBehaviour
             bonusList.Add(Lbl($"  {MetaProgression.StartingGold} Starting Gold", 16, new Color(1f, 0.85f, 0.2f)));
         if (MetaProgression.HasStartingRelic)
             bonusList.Add(Lbl("  Random Starting Relic", 16, new Color(0.8f, 0.6f, 0.2f)));
+        // Path B bonuses
+        if (MetaProgression.SecondWindCharges > 0)
+            bonusList.Add(Lbl($"  Second Wind: {MetaProgression.SecondWindCharges} floor(s)", 16, new Color(0.9f, 0.4f, 0.4f)));
+        if (MetaProgression.SpellMasteryLevel > 0)
+            bonusList.Add(Lbl($"  +{(MetaProgression.SpellMasteryBonus - 1f) * 100:F0}% Same-Element Combo", 16, new Color(1f, 0.7f, 0.2f)));
+        if (MetaProgression.PhaseStepLevel > 0)
+            bonusList.Add(Lbl($"  +{MetaProgression.PhaseStepDuration:F1}s Dash i-frames", 16, new Color(0.4f, 0.6f, 1f)));
+        if (MetaProgression.BlinkStrikeDamage > 0)
+            bonusList.Add(Lbl($"  Blink Strike: {MetaProgression.BlinkStrikeDamage} dmg", 16, new Color(0.7f, 0.3f, 0.9f)));
+        if (MetaProgression.HagglerLevel > 0)
+            bonusList.Add(Lbl($"  -{(1f - MetaProgression.HagglerDiscount) * 100:F0}% Shop Prices", 16, new Color(0.9f, 0.75f, 0.3f)));
+        if (MetaProgression.ElemMasteryLevel > 0)
+            bonusList.Add(Lbl($"  +{(MetaProgression.ReactionDamageBonus - 1f) * 100:F0}% Reaction Damage", 16, new Color(1f, 0.5f, 0.7f)));
+        if (MetaProgression.BloodMageLevel > 0)
+            bonusList.Add(Lbl($"  {MetaProgression.BloodMageChance * 100:F0}% Kill Heal", 16, new Color(0.5f, 0.9f, 0.3f)));
+        if (MetaProgression.LuckyFindLevel > 0)
+            bonusList.Add(Lbl($"  {MetaProgression.LuckyFindChance * 100:F0}% Bonus Relic Chance", 16, new Color(0.7f, 0.5f, 1f)));
+        if (MetaProgression.HasCursedHeirloom)
+            bonusList.Add(Lbl($"  Cursed Relic + {MetaProgression.CursedHeirloomGold}g", 16, new Color(0.6f, 0.3f, 0.5f)));
 
         panelContent.Add(bonusList);
 

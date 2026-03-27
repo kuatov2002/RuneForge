@@ -56,7 +56,8 @@ public class SpellCaster : MonoBehaviour
             equippedElements[i] = startingElements[i];
 
         for (int i = 0; i < 4; i++)
-            charges[i] = equippedElements[i] != null ? equippedElements[i].maxCharges : 4;
+            charges[i] = equippedElements[i] != null
+                ? equippedElements[i].maxCharges + RunUpgradeSystem.RunExtraCharges : 4;
 
         // Start with first two elements as orbs
         if (equippedElements[0] != null) rightOrb = equippedElements[0];
@@ -74,7 +75,7 @@ public class SpellCaster : MonoBehaviour
     {
         if (slotIndex < 0 || slotIndex >= 4) return;
         equippedElements[slotIndex] = newElement;
-        charges[slotIndex] = newElement.maxCharges;
+        charges[slotIndex] = newElement.maxCharges + RunUpgradeSystem.RunExtraCharges;
         overheatTimers[slotIndex] = 0;
 
         // If replaced element was an active orb, update it
@@ -97,14 +98,16 @@ public class SpellCaster : MonoBehaviour
     {
         if (slot < 0 || slot >= 4 || equippedElements[slot] == null) return;
         charges[slot] = 0;
-        overheatTimers[slot] = equippedElements[slot].overheatRechargeTime;
+        overheatTimers[slot] = equippedElements[slot].overheatRechargeTime * RunUpgradeSystem.RunRechargeMultiplier;
     }
 
     /// <summary>Get overheat recharge progress (0 = overheated, 1 = ready).</summary>
     public float GetOverheatProgress(int slot)
     {
         if (slot < 0 || slot >= 4 || overheatTimers[slot] <= 0) return 1f;
-        float maxTime = equippedElements[slot] != null ? equippedElements[slot].overheatRechargeTime : OverheatRechargeDefault;
+        float maxTime = (equippedElements[slot] != null
+            ? equippedElements[slot].overheatRechargeTime : OverheatRechargeDefault)
+            * RunUpgradeSystem.RunRechargeMultiplier;
         return 1f - (overheatTimers[slot] / maxTime);
     }
 
@@ -152,8 +155,9 @@ public class SpellCaster : MonoBehaviour
                 overheatTimers[i] -= Time.deltaTime;
                 if (overheatTimers[i] <= 0)
                 {
-                    // Fully recharge
-                    charges[i] = equippedElements[i] != null ? equippedElements[i].maxCharges : 4;
+                    // Fully recharge (include run upgrade bonus)
+                    charges[i] = equippedElements[i] != null
+                        ? equippedElements[i].maxCharges + RunUpgradeSystem.RunExtraCharges : 4;
                     overheatTimers[i] = 0;
                     OnOrbsChanged?.Invoke();
                 }
@@ -226,6 +230,10 @@ public class SpellCaster : MonoBehaviour
         UpdateComboMultiplier();
         float dmgMult = damageBonusMult * comboMultiplier * MetaProgression.DamageMultiplier;
 
+        // Spell Mastery: bonus for same-element combos
+        if (leftOrb.elementType == rightOrb.elementType)
+            dmgMult *= MetaProgression.SpellMasteryBonus;
+
         // Momentum bonus
         var momentum = GetComponent<MomentumSystem>();
         if (momentum != null) dmgMult *= momentum.DamageMultiplier;
@@ -297,8 +305,8 @@ public class SpellCaster : MonoBehaviour
 
         if (charges[slot] <= 0)
         {
-            // Overheat!
-            float rechargeTime = elem.overheatRechargeTime;
+            // Overheat! Apply run upgrade recharge reduction
+            float rechargeTime = elem.overheatRechargeTime * RunUpgradeSystem.RunRechargeMultiplier;
             overheatTimers[slot] = rechargeTime;
             OnOrbsChanged?.Invoke();
         }

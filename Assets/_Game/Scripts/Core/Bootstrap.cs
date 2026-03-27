@@ -153,15 +153,29 @@ public class Bootstrap : MonoBehaviour
             goldSystem.Init(MetaProgression.StartingGold);
         hud.SetGold(goldSystem != null ? goldSystem.Gold : 0);
 
-        // Starting relic from meta-progression
+        // Starting relic from meta-progression (Path A: random relic, Path B: cursed relic + gold)
         if (MetaProgression.HasStartingRelic && allRelics.Length > 0)
         {
-            var randomRelic = allRelics[Random.Range(0, allRelics.Length)];
-            if (!relicMgr.HasRelic(randomRelic.relicType))
+            var candidates = new System.Collections.Generic.List<RelicSO>();
+            foreach (var r in allRelics) if (!r.isCursed && !relicMgr.HasRelic(r.relicType)) candidates.Add(r);
+            if (candidates.Count > 0)
             {
-                relicMgr.AddRelic(randomRelic);
+                relicMgr.AddRelic(candidates[Random.Range(0, candidates.Count)]);
                 hud.RefreshRelics(relicMgr.OwnedRelics);
             }
+        }
+        else if (MetaProgression.HasCursedHeirloom && allRelics.Length > 0)
+        {
+            var cursedCandidates = new System.Collections.Generic.List<RelicSO>();
+            foreach (var r in allRelics) if (r.isCursed && !relicMgr.HasRelic(r.relicType)) cursedCandidates.Add(r);
+            if (cursedCandidates.Count > 0)
+            {
+                relicMgr.AddRelic(cursedCandidates[Random.Range(0, cursedCandidates.Count)]);
+                hud.RefreshRelics(relicMgr.OwnedRelics);
+            }
+            // Bonus gold from Cursed Heirloom
+            if (goldSystem != null)
+                goldSystem.AddGold(MetaProgression.CursedHeirloomGold);
         }
 
         // Apply selected loadout (starting spell + passive)
@@ -200,18 +214,27 @@ public class Bootstrap : MonoBehaviour
 
     void ApplyMetaProgressionToPlayer()
     {
-        // HP bonus
+        // Path A: HP bonus
         int baseHP = 8 + MetaProgression.MaxHPBonus;
         playerHealth.maxHP = baseHP;
         playerHealth.currentHP = baseHP;
 
-        // Speed bonus
+        // Path B: Second Wind (survive lethal hit)
+        playerHealth.secondWindCharges = MetaProgression.SecondWindCharges;
+
+        // Path A: Speed bonus
         playerCtrl.moveSpeed = 6f * MetaProgression.SpeedMultiplier;
 
-        // Extra dash charges
+        // Path A: Extra dash charges
         playerCtrl.SetExtraDashCharges(MetaProgression.ExtraDashCharges);
 
-        // Potions
+        // Path B: Phase Step (extra dash i-frames)
+        playerCtrl.phaseStepBonus = MetaProgression.PhaseStepDuration;
+
+        // Path B: Blink Strike (dash through enemies deals damage)
+        playerCtrl.blinkStrikeDamage = MetaProgression.BlinkStrikeDamage;
+
+        // Path A: Potions
         playerCtrl.SetPotions(MetaProgression.PotionsPerFloor);
     }
 
@@ -388,17 +411,24 @@ public class Bootstrap : MonoBehaviour
 
     void CreateSpellData()
     {
-        // Base elements (unlocked from start)
-        fireElem = CreateElement("Fire", ElementType.Fire, 6, new Color(1f, 0.4f, 0.1f));
-        waterElem = CreateElement("Water", ElementType.Water, 4, new Color(0.3f, 0.7f, 1f));
-        earthElem = CreateElement("Earth", ElementType.Earth, 5, new Color(0.6f, 0.4f, 0.2f));
-        airElem = CreateElement("Air", ElementType.Air, 3, new Color(0.8f, 0.9f, 1f));
+        // Base elements (unlocked from start) — each has unique charges & recharge rhythm
+        fireElem = CreateElement("Fire", ElementType.Fire, 6, new Color(1f, 0.4f, 0.1f),
+            charges: 3, rechargeTime: 3.5f);   // Fast burst, frequent overheat
+        waterElem = CreateElement("Water", ElementType.Water, 4, new Color(0.3f, 0.7f, 1f),
+            charges: 5, rechargeTime: 6f);      // Deep pool, slow recovery
+        earthElem = CreateElement("Earth", ElementType.Earth, 5, new Color(0.6f, 0.4f, 0.2f),
+            charges: 4, rechargeTime: 5f);      // Balanced baseline
+        airElem = CreateElement("Air", ElementType.Air, 3, new Color(0.8f, 0.9f, 1f),
+            charges: 6, rechargeTime: 4f);      // Many light casts, quick recovery
         baseElements = new[] { fireElem, waterElem, earthElem, airElem };
 
-        // Advanced elements (unlockable mid-run)
-        lightningElem = CreateElement("Lightning", ElementType.Lightning, 7, new Color(1f, 1f, 0.3f));
-        poisonElem = CreateElement("Poison", ElementType.Poison, 3, new Color(0.2f, 0.9f, 0.1f));
-        voidElem = CreateElement("Void", ElementType.Void, 8, new Color(0.6f, 0.1f, 0.9f));
+        // Advanced elements (unlockable mid-run) — powerful but resource-hungry
+        lightningElem = CreateElement("Lightning", ElementType.Lightning, 7, new Color(1f, 1f, 0.3f),
+            charges: 2, rechargeTime: 4f);      // Very limited, devastating per-cast
+        poisonElem = CreateElement("Poison", ElementType.Poison, 3, new Color(0.2f, 0.9f, 0.1f),
+            charges: 4, rechargeTime: 7f);      // Normal pool, punishing overheat
+        voidElem = CreateElement("Void", ElementType.Void, 8, new Color(0.6f, 0.1f, 0.9f),
+            charges: 2, rechargeTime: 8f);      // Extremely limited, each cast is a commitment
 
         allElements = new[] { fireElem, waterElem, earthElem, airElem, lightningElem, poisonElem, voidElem };
 
@@ -453,10 +483,12 @@ public class Bootstrap : MonoBehaviour
         return r;
     }
 
-    static ElementSO CreateElement(string name, ElementType type, int dmg, Color col)
+    static ElementSO CreateElement(string name, ElementType type, int dmg, Color col,
+        int charges = 4, float rechargeTime = 5f)
     {
         var e = ScriptableObject.CreateInstance<ElementSO>();
         e.elementName = name; e.elementType = type; e.baseDamage = dmg; e.color = col;
+        e.maxCharges = charges; e.overheatRechargeTime = rechargeTime;
         return e;
     }
 
@@ -616,6 +648,10 @@ public class Bootstrap : MonoBehaviour
 
             if (playerCtrl != null)
                 playerCtrl.RefillPotions(MetaProgression.PotionsPerFloor);
+
+            // Second Wind resets each floor
+            if (playerHealth != null)
+                playerHealth.secondWindCharges = MetaProgression.SecondWindCharges;
         }
 
         BuildCurrentRoom();
@@ -2399,6 +2435,21 @@ public class Bootstrap : MonoBehaviour
             Destroy(rewardPickup);
             rewardPickup = null;
         }
+
+        // Lucky Find: chance to grant a bonus relic on room clear
+        if (MetaProgression.LuckyFindChance > 0 && Random.value < MetaProgression.LuckyFindChance
+            && relicMgr != null && allRelics != null)
+        {
+            var candidates = new System.Collections.Generic.List<RelicSO>();
+            foreach (var r in allRelics)
+                if (!r.isCursed && !relicMgr.HasRelic(r.relicType)) candidates.Add(r);
+            if (candidates.Count > 0)
+            {
+                relicMgr.AddRelic(candidates[Random.Range(0, candidates.Count)]);
+                if (hud != null) hud.RefreshRelics(relicMgr.OwnedRelics);
+            }
+        }
+
         ShowRuneSelection();
     }
 
@@ -2423,6 +2474,13 @@ public class Bootstrap : MonoBehaviour
         // Momentum system: track kill streak
         var momentum = player != null ? player.GetComponent<MomentumSystem>() : null;
         if (momentum != null) momentum.OnEnemyKilled();
+
+        // Blood Mage: chance to heal 1 HP on kill
+        if (MetaProgression.BloodMageChance > 0 && playerHealth != null && !playerHealth.IsDead)
+        {
+            if (Random.value < MetaProgression.BloodMageChance)
+                playerHealth.Heal(1);
+        }
 
         enemies.Remove(enemy);
         enemiesAlive--;
