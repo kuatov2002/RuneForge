@@ -26,6 +26,13 @@ public class GameHUD : MonoBehaviour
     VisualElement orbLeftIndicator, orbRightIndicator;
     VisualElement chargeBar; // shows charge progress when holding LMB
 
+    // Combo preview tooltip
+    VisualElement comboPreviewContainer;
+    VisualElement previewOrbLeft, previewOrbRight;
+    Label previewNameLabel;
+    Label previewStatsLabel;
+    int hoveredSlot = -1;
+
     // Upgrade selection overlay
     VisualElement upgradeOverlay;
     VisualElement upgradePanel;
@@ -504,6 +511,50 @@ public class GameHUD : MonoBehaviour
         bottomArea.style.alignItems = Align.Center;
         bottomArea.style.paddingBottom = 16;
 
+        // Combo preview tooltip (shown on hover/key-hold)
+        comboPreviewContainer = new VisualElement();
+        comboPreviewContainer.pickingMode = PickingMode.Ignore;
+        comboPreviewContainer.style.flexDirection = FlexDirection.Row;
+        comboPreviewContainer.style.alignItems = Align.Center;
+        comboPreviewContainer.style.backgroundColor = new Color(0.08f, 0.08f, 0.14f, 0.85f);
+        Radius(comboPreviewContainer, 8);
+        Pad(comboPreviewContainer, 6, 12);
+        comboPreviewContainer.style.marginBottom = 6;
+        comboPreviewContainer.style.display = DisplayStyle.None;
+
+        previewOrbLeft = new VisualElement();
+        previewOrbLeft.style.width = 16;
+        previewOrbLeft.style.height = 16;
+        Radius(previewOrbLeft, 8);
+        comboPreviewContainer.Add(previewOrbLeft);
+
+        var previewPlus = Lbl("+", 14, Dim);
+        previewPlus.style.marginLeft = 4;
+        previewPlus.style.marginRight = 4;
+        comboPreviewContainer.Add(previewPlus);
+
+        previewOrbRight = new VisualElement();
+        previewOrbRight.style.width = 16;
+        previewOrbRight.style.height = 16;
+        Radius(previewOrbRight, 8);
+        comboPreviewContainer.Add(previewOrbRight);
+
+        var previewSpacer = new VisualElement();
+        previewSpacer.style.width = 10;
+        comboPreviewContainer.Add(previewSpacer);
+
+        previewNameLabel = Lbl("", 18, new Color(1f, 1f, 1f, 0.8f), FontStyle.Bold);
+        comboPreviewContainer.Add(previewNameLabel);
+
+        var previewSpacer2 = new VisualElement();
+        previewSpacer2.style.width = 10;
+        comboPreviewContainer.Add(previewSpacer2);
+
+        previewStatsLabel = Lbl("", 14, Dim);
+        comboPreviewContainer.Add(previewStatsLabel);
+
+        bottomArea.Add(comboPreviewContainer);
+
         // Combo name
         comboNameLabel = Lbl("", 24, Color.white, FontStyle.Bold);
         comboNameLabel.style.marginBottom = 8;
@@ -582,6 +633,12 @@ public class GameHUD : MonoBehaviour
             chargeFill.style.backgroundColor = new Color(0.3f, 0.1f, 0.1f, 0.5f);
             Radius(chargeFill, 10);
             slot.Add(chargeFill);
+
+            // Hover preview callbacks
+            int slotIdx = i;
+            slot.pickingMode = PickingMode.Position; // Enable mouse events for hover
+            slot.RegisterCallback<MouseEnterEvent>(_ => { hoveredSlot = slotIdx; RefreshComboPreview(); });
+            slot.RegisterCallback<MouseLeaveEvent>(_ => { if (hoveredSlot == slotIdx) { hoveredSlot = -1; RefreshComboPreview(); } });
 
             elementSlots[i] = slot;
             elementHotbar.Add(slot);
@@ -724,6 +781,35 @@ public class GameHUD : MonoBehaviour
     {
         if (comboNameLabel != null)
             comboNameLabel.text = name;
+    }
+
+    // ── Combo Preview ──
+
+    void RefreshComboPreview()
+    {
+        if (hoveredSlot < 0 || caster == null)
+        {
+            comboPreviewContainer.style.display = DisplayStyle.None;
+            return;
+        }
+
+        var def = caster.PreviewPush(hoveredSlot);
+        if (def == null)
+        {
+            comboPreviewContainer.style.display = DisplayStyle.None;
+            return;
+        }
+
+        comboPreviewContainer.style.display = DisplayStyle.Flex;
+
+        // Preview orbs: left = current rightOrb (will become left), right = hovered element
+        Color leftColor = caster.rightOrb != null ? caster.rightOrb.color : Color.gray;
+        Color rightColor = caster.GetSlotColor(hoveredSlot);
+        previewOrbLeft.style.backgroundColor = leftColor;
+        previewOrbRight.style.backgroundColor = rightColor;
+
+        previewNameLabel.text = def.comboName;
+        previewStatsLabel.text = $"{def.baseDamage:F0} dmg | {def.radius:F1}m | {def.cooldown:F1}s cd";
     }
 
     // ── HP ──
@@ -1731,6 +1817,34 @@ public class GameHUD : MonoBehaviour
 
             // Refresh element charges each frame
             RefreshComboDisplay();
+        }
+
+        // Keyboard combo preview (digit key held → show preview)
+        if (caster != null)
+        {
+            var kb = UnityEngine.InputSystem.Keyboard.current;
+            if (kb != null)
+            {
+                int keySlot = -1;
+                if (kb.digit1Key.isPressed) keySlot = 0;
+                else if (kb.digit2Key.isPressed) keySlot = 1;
+                else if (kb.digit3Key.isPressed) keySlot = 2;
+                else if (kb.digit4Key.isPressed) keySlot = 3;
+
+                // Only override if no mouse hover is active
+                if (keySlot >= 0 && hoveredSlot < 0)
+                {
+                    hoveredSlot = keySlot;
+                    RefreshComboPreview();
+                }
+                else if (keySlot < 0 && hoveredSlot >= 0)
+                {
+                    // Key released and no mouse hover — check if mouse is still on a slot
+                    // If not, hide preview
+                    hoveredSlot = -1;
+                    RefreshComboPreview();
+                }
+            }
         }
 
         // Dash cooldown

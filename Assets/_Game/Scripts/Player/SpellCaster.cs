@@ -14,8 +14,10 @@ public class SpellCaster : MonoBehaviour
 
     // ── Overheat system ──
     int[] charges;        // current charges per element slot
-    float[] overheatTimers; // >0 means overheated, counting down
+    float[] overheatTimers; // >0 means recharging, counting down
+    bool[] overheatPenalty; // true = in initial penalty phase (no charges yet)
     const float OverheatRechargeDefault = 5f;
+    const float OverheatPenaltyTime = 2.5f; // dead time before recharge starts
 
     // ── Charge shot ──
     float chargeHoldTime;
@@ -47,6 +49,7 @@ public class SpellCaster : MonoBehaviour
     {
         charges = new int[4];
         overheatTimers = new float[4];
+        overheatPenalty = new bool[4];
     }
 
     /// <summary>Initialize with starting elements.</summary>
@@ -90,25 +93,41 @@ public class SpellCaster : MonoBehaviour
     /// <summary>Get current charges for element slot.</summary>
     public int GetCharges(int slot) => slot >= 0 && slot < 4 ? charges[slot] : 0;
 
-    /// <summary>Is element slot overheated?</summary>
-    public bool IsOverheated(int slot) => slot >= 0 && slot < 4 && overheatTimers[slot] > 0;
+    /// <summary>Is element slot overheated (no charges)?</summary>
+    public bool IsOverheated(int slot) => slot >= 0 && slot < 4 && charges[slot] <= 0 && overheatTimers[slot] > 0;
 
-    /// <summary>Force-overheat an element slot (e.g. boss mechanic). Sets charges to 0 and starts overheat timer.</summary>
+    /// <summary>Force-overheat an element slot (e.g. boss mechanic). Sets charges to 0 and starts penalty + trickle.</summary>
     public void ForceOverheat(int slot)
     {
         if (slot < 0 || slot >= 4 || equippedElements[slot] == null) return;
         charges[slot] = 0;
-        overheatTimers[slot] = equippedElements[slot].overheatRechargeTime * RunUpgradeSystem.RunRechargeMultiplier;
+        overheatPenalty[slot] = true;
+        overheatTimers[slot] = OverheatPenaltyTime;
     }
 
-    /// <summary>Get overheat recharge progress (0 = overheated, 1 = ready).</summary>
+    /// <summary>Get overheat recharge progress (0 = empty, 1 = fully charged).</summary>
     public float GetOverheatProgress(int slot)
     {
-        if (slot < 0 || slot >= 4 || overheatTimers[slot] <= 0) return 1f;
-        float maxTime = (equippedElements[slot] != null
-            ? equippedElements[slot].overheatRechargeTime : OverheatRechargeDefault)
-            * RunUpgradeSystem.RunRechargeMultiplier;
-        return 1f - (overheatTimers[slot] / maxTime);
+        if (slot < 0 || slot >= 4) return 1f;
+        int maxTotal = equippedElements[slot] != null
+            ? equippedElements[slot].maxCharges + RunUpgradeSystem.RunExtraCharges : 4;
+        if (charges[slot] >= maxTotal) return 1f;
+
+        // During penalty: bar stays at 0
+        if (overheatPenalty[slot]) return 0f;
+
+        // Trickle phase: charge-based progress with smooth fill for current charge
+        float baseProgress = (float)charges[slot] / maxTotal;
+        if (overheatTimers[slot] > 0)
+        {
+            float totalTime = (equippedElements[slot] != null
+                ? equippedElements[slot].overheatRechargeTime : OverheatRechargeDefault)
+                * RunUpgradeSystem.RunRechargeMultiplier;
+            float perCharge = totalTime / maxTotal;
+            float fill = 1f - (overheatTimers[slot] / perCharge);
+            baseProgress += fill / maxTotal;
+        }
+        return Mathf.Clamp01(baseProgress);
     }
 
     /// <summary>Is the player currently charging a shot?</summary>
@@ -147,7 +166,7 @@ public class SpellCaster : MonoBehaviour
         if (kb.digit3Key.wasPressedThisFrame) PushElement(2);
         if (kb.digit4Key.wasPressedThisFrame) PushElement(3);
 
-        // ── Overheat recharge ──
+        // ── Overheat: 2.5s penalty → trickle (1 charge per interval) ──
         for (int i = 0; i < 4; i++)
         {
             if (overheatTimers[i] > 0)
@@ -155,10 +174,26 @@ public class SpellCaster : MonoBehaviour
                 overheatTimers[i] -= Time.deltaTime;
                 if (overheatTimers[i] <= 0)
                 {
-                    // Fully recharge (include run upgrade bonus)
-                    charges[i] = equippedElements[i] != null
+                    int maxTotal = equippedElements[i] != null
                         ? equippedElements[i].maxCharges + RunUpgradeSystem.RunExtraCharges : 4;
-                    overheatTimers[i] = 0;
+                    float totalTime = (equippedElements[i] != null
+                        ? equippedElements[i].overheatRechargeTime : OverheatRechargeDefault)
+                        * RunUpgradeSystem.RunRechargeMultiplier;
+                    float perCharge = totalTime / maxTotal;
+
+                    if (overheatPenalty[i])
+                    {
+                        // Penalty ended — restore first charge, start trickle
+                        overheatPenalty[i] = false;
+                        charges[i] = 1;
+                        overheatTimers[i] = charges[i] < maxTotal ? perCharge : 0;
+                    }
+                    else
+                    {
+                        // Trickle — restore next charge
+                        charges[i]++;
+                        overheatTimers[i] = charges[i] < maxTotal ? perCharge : 0;
+                    }
                     OnOrbsChanged?.Invoke();
                 }
             }
@@ -200,6 +235,27 @@ public class SpellCaster : MonoBehaviour
         }
     }
 
+    /// <summary>Preview what combo would result from pushing a given slot, without actually changing state.</summary>
+    public ComboSpellDef PreviewPush(int slotIndex)
+    {
+        if (slotIndex < 0 || slotIndex >= 4) return null;
+        var elem = equippedElements[slotIndex];
+        if (elem == null) return null;
+        if (IsOverheated(slotIndex)) return null;
+        // Simulate push: new right = elem, new left = current right
+        ElementType newLeft = rightOrb != null ? rightOrb.elementType : elem.elementType;
+        ElementType newRight = elem.elementType;
+        return ComboSpellRegistry.GetCombo(newLeft, newRight);
+    }
+
+    /// <summary>Get the color of an element in a given slot (for preview UI).</summary>
+    public Color GetSlotColor(int slotIndex)
+    {
+        if (slotIndex < 0 || slotIndex >= 4 || equippedElements[slotIndex] == null)
+            return Color.gray;
+        return equippedElements[slotIndex].color;
+    }
+
     void PushElement(int slotIndex)
     {
         if (slotIndex < 0 || slotIndex >= 4) return;
@@ -233,9 +289,14 @@ public class SpellCaster : MonoBehaviour
         if (def == null) return;
 
         // Consume charges (Overcharge mutation: 3 charges when charged)
-        int chargeCost = charged ? SpellMutationSystem.ModifyChargedCost(2) : 1;
-        ConsumeCharges(leftOrb, chargeCost);
-        ConsumeCharges(rightOrb, chargeCost);
+        // Echo Charge: every 4th cast is free
+        bool freeCast = RunUpgradeSystem.ShouldSkipChargeCost();
+        if (!freeCast)
+        {
+            int chargeCost = charged ? SpellMutationSystem.ModifyChargedCost(2) : 1;
+            ConsumeCharges(leftOrb, chargeCost);
+            ConsumeCharges(rightOrb, chargeCost);
+        }
 
         // Calculate damage with bonuses
         UpdateComboMultiplier();
@@ -299,6 +360,13 @@ public class SpellCaster : MonoBehaviour
         TrackElementUsage(leftOrb.elementType);
         TrackElementUsage(rightOrb.elementType);
 
+        // Spell Rush: +25% move speed for 2s after casting
+        if (RunUpgradeSystem.HasSpellRush)
+        {
+            var ctrl = GetComponent<PlayerController>();
+            if (ctrl != null) ctrl.ApplySpeedBuff(0.25f, 2f);
+        }
+
         SFXSystem.Play(SFXSystem.SFXType.Cast, transform.position);
     }
 
@@ -306,7 +374,7 @@ public class SpellCaster : MonoBehaviour
     {
         if (elem == null) return false;
         int slot = GetElementSlot(elem);
-        return slot >= 0 && overheatTimers[slot] > 0;
+        return slot >= 0 && charges[slot] <= 0 && overheatTimers[slot] > 0;
     }
 
     void ConsumeCharges(ElementSO elem, int cost)
@@ -319,9 +387,9 @@ public class SpellCaster : MonoBehaviour
 
         if (charges[slot] <= 0)
         {
-            // Overheat! Apply run upgrade recharge reduction
-            float rechargeTime = elem.overheatRechargeTime * RunUpgradeSystem.RunRechargeMultiplier;
-            overheatTimers[slot] = rechargeTime;
+            // Start overheat: always restart penalty, even if trickle was in progress
+            overheatPenalty[slot] = true;
+            overheatTimers[slot] = OverheatPenaltyTime;
             OnOrbsChanged?.Invoke();
         }
     }

@@ -78,11 +78,16 @@ public class PlayerController : MonoBehaviour
         if (kb.dKey.isPressed) input.x += 1;
         input = input.normalized;
 
-        // Apply momentum speed bonus to movement
+        // Spell Rush buff tick
+        if (spellRushTimer > 0) spellRushTimer -= Time.deltaTime;
+
+        // Apply momentum speed bonus + spell rush buff to movement
         float effectiveSpeed = moveSpeed;
         var momentumSys = GetComponent<MomentumSystem>();
         if (momentumSys != null)
             effectiveSpeed *= (1f + momentumSys.SpeedBonus);
+        if (spellRushTimer > 0)
+            effectiveSpeed *= (1f + spellRushMultiplier);
 
         Vector3 vel = new Vector3(input.x, 0, input.y) * effectiveSpeed;
         rb.linearVelocity = new Vector3(vel.x, rb.linearVelocity.y, vel.z);
@@ -158,11 +163,46 @@ public class PlayerController : MonoBehaviour
                 }
             }
 
+            // Dash Strike upgrade: AoE damage at dash endpoint
+            if (RunUpgradeSystem.HasDashStrike)
+            {
+                Vector3 dashEnd = dashFrom + dashDir * dashDistance;
+                var dashHits = Physics.OverlapSphere(dashEnd, 1.5f);
+                foreach (var dh in dashHits)
+                {
+                    if (dh.GetComponent<PlayerController>() != null) continue;
+                    var hp = dh.GetComponent<Health>();
+                    if (hp != null && !hp.IsDead)
+                    {
+                        // Use last spell's base damage * 0.5
+                        var casterComp = GetComponent<SpellCaster>();
+                        float dmg = 5f; // fallback
+                        if (casterComp != null && casterComp.CurrentComboDef != null)
+                            dmg = casterComp.CurrentComboDef.baseDamage * 0.5f;
+                        hp.TakeDamage(Mathf.Max(1, Mathf.RoundToInt(dmg)));
+                    }
+                }
+                GameFeel.SpawnHitParticles(dashFrom + dashDir * dashDistance, new Color(0.2f, 0.85f, 0.9f));
+                if (TopDownCamera.Instance != null)
+                    TopDownCamera.Instance.AddTrauma(0.08f);
+            }
+
             // Dash fire relic
             var relicMgr = GetComponent<RelicManager>();
             if (relicMgr != null)
                 relicMgr.OnDash(dashFrom, dashFrom + dashDir * dashDistance);
         }
+    }
+
+    // Spell Rush speed buff
+    float spellRushTimer;
+    float spellRushMultiplier;
+
+    /// <summary>Apply temporary speed buff from Spell Rush upgrade.</summary>
+    public void ApplySpeedBuff(float mult, float duration)
+    {
+        spellRushMultiplier = mult;
+        spellRushTimer = duration;
     }
 
     // Potions

@@ -2493,6 +2493,12 @@ public class Bootstrap : MonoBehaviour
                 playerHealth.Heal(1);
         }
 
+        // Siphon Shield upgrade: kills grant 1s immunity
+        if (RunUpgradeSystem.HasSiphon && playerHealth != null && !playerHealth.IsDead)
+        {
+            playerHealth.GrantImmunity(1f);
+        }
+
         if (enemiesAlive <= 0)
         {
             // Challenge room: wave-by-wave

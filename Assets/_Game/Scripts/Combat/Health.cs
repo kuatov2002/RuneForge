@@ -52,6 +52,12 @@ public class Health : MonoBehaviour
     const float HitRecoveryDuration = 0.5f;
     public bool IsInHitRecovery => hitRecoveryTimer > 0;
 
+    /// <summary>Grant temporary damage immunity (used by Siphon Shield upgrade).</summary>
+    public void GrantImmunity(float duration)
+    {
+        hitRecoveryTimer = Mathf.Max(hitRecoveryTimer, duration);
+    }
+
     public void TakeDamage(float amount)
     {
         if (isDead) return;

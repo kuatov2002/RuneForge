@@ -133,5 +133,28 @@ public static class ComboSpellFactory
                 break;
         }
 
+        // ── Behavior upgrade hooks ──
+
+        // Afterburn: leave a burning DoT zone at impact
+        if (RunUpgradeSystem.HasAfterburn)
+            RunUpgradeSystem.SpawnAfterburnZone(targetPos);
+
+        // Ricochet: bounce damage to 1 nearby enemy
+        if (RunUpgradeSystem.HasRicochet)
+        {
+            // Find the primary hit target to exclude from bounce
+            var primary = Physics.OverlapSphere(targetPos, radius > 0 ? radius : 1f);
+            GameObject exclude = null;
+            float closestDist = float.MaxValue;
+            foreach (var h in primary)
+            {
+                if (h.GetComponent<PlayerController>() != null) continue;
+                var hp = h.GetComponent<Health>();
+                if (hp == null || hp.IsDead) continue;
+                float d = (h.transform.position - targetPos).sqrMagnitude;
+                if (d < closestDist) { closestDist = d; exclude = h.gameObject; }
+            }
+            RunUpgradeSystem.BounceToNearestEnemy(targetPos, dmg * 0.5f, 5f, exclude);
+        }
     }
 }
