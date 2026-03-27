@@ -5,13 +5,13 @@ using Object = UnityEngine.Object;
 /// <summary>
 /// Kill streak momentum system.
 /// Killing enemies without taking damage builds a multiplier.
-/// Taking damage resets it.
+/// Taking damage drops one tier.
 /// Multiplier: x1.0 → x1.15 → x1.3 → x1.5 → x2.0
-/// No 3D visuals — displayed purely in UI (GameHUD).
 /// </summary>
 public class MomentumSystem : MonoBehaviour
 {
     public event Action<int, float> OnMomentumChanged; // (tier, multiplier)
+    public event Action<int> OnMomentumLost; // (new tier) — fired specifically on tier drop for UI feedback
 
     int killStreak;
     int tier; // 0-4
@@ -23,7 +23,7 @@ public class MomentumSystem : MonoBehaviour
     static readonly float[] TierSpeedBonus = { 0f, 0.05f, 0.08f, 0.12f, 0.15f };
 
     public static readonly Color[] TierColors = {
-        Color.clear,
+        new Color(0.3f, 0.3f, 0.3f),
         new Color(1f, 1f, 0.5f),
         new Color(1f, 0.8f, 0.2f),
         new Color(1f, 0.5f, 0.1f),
@@ -46,14 +46,13 @@ public class MomentumSystem : MonoBehaviour
     void OnPlayerDamaged(int amount, Vector3 pos, bool killed)
     {
         if (killed) return;
-        // Drop 1 tier instead of full reset — high tiers should be reachable
         DropMomentumTier();
     }
 
     public void OnEnemyKilled()
     {
         killStreak++;
-        decayTimer = 7f; // was 5f — more time to maintain streaks
+        decayTimer = 7f;
 
         int newTier = 0;
         for (int i = TierThresholds.Length - 1; i >= 0; i--)
@@ -77,6 +76,9 @@ public class MomentumSystem : MonoBehaviour
     void DropMomentumTier()
     {
         if (tier == 0 && killStreak == 0) return;
+
+        int oldTier = tier;
+
         // Halve kill streak instead of zeroing — keeps momentum partially
         killStreak = killStreak / 2;
 
@@ -84,21 +86,19 @@ public class MomentumSystem : MonoBehaviour
         for (int i = TierThresholds.Length - 1; i >= 0; i--)
             if (killStreak >= TierThresholds[i]) { newTier = i; break; }
 
-        if (newTier != tier || tier == 0)
-        {
-            tier = newTier;
-            multiplier = TierMultipliers[tier];
-            OnMomentumChanged?.Invoke(tier, multiplier);
-        }
-    }
-
-    void ResetMomentum()
-    {
-        if (tier == 0 && killStreak == 0) return;
-        killStreak = 0;
-        tier = 0;
-        multiplier = 1f;
+        tier = newTier;
+        multiplier = TierMultipliers[tier];
         OnMomentumChanged?.Invoke(tier, multiplier);
+
+        // Feedback for losing momentum
+        if (oldTier > newTier)
+        {
+            OnMomentumLost?.Invoke(tier);
+            SFXSystem.Play(SFXSystem.SFXType.PlayerHit, transform.position, 0.2f);
+
+            // Brief red flash on momentum loss
+            GameFeel.ScreenFlash(new Color(1f, 0.2f, 0.1f, 0.3f), 0.1f);
+        }
     }
 
     void Update()
@@ -109,7 +109,7 @@ public class MomentumSystem : MonoBehaviour
         if (decayTimer <= 0)
         {
             killStreak = Mathf.Max(0, killStreak - 1);
-            decayTimer = 3f; // was 2f — slower decay
+            decayTimer = 3f;
 
             int newTier = 0;
             for (int i = TierThresholds.Length - 1; i >= 0; i--)
@@ -117,9 +117,13 @@ public class MomentumSystem : MonoBehaviour
 
             if (newTier != tier)
             {
+                int oldTier = tier;
                 tier = newTier;
                 multiplier = TierMultipliers[tier];
                 OnMomentumChanged?.Invoke(tier, multiplier);
+
+                if (oldTier > newTier)
+                    OnMomentumLost?.Invoke(tier);
             }
         }
     }

@@ -32,10 +32,16 @@ public class GameFeel : MonoBehaviour
 
     // ─── HITSTOP ────────────────────────────────────────────────
 
-    /// <summary>Freeze time for a brief moment (30-50ms typical).</summary>
+    /// <summary>Freeze time for a brief moment (30-50ms typical). Longer hitstop wins.</summary>
     public void Hitstop(float duration = 0.04f)
     {
-        if (_inHitstop) return; // don't stack
+        if (_inHitstop)
+        {
+            // Keep the longer hitstop
+            if (duration > _hitstopTimer)
+                _hitstopTimer = duration;
+            return;
+        }
         _savedTimeScale = Time.timeScale;
         Time.timeScale = 0f;
         _hitstopTimer = duration;
@@ -166,21 +172,22 @@ public class GameFeel : MonoBehaviour
 
     // ─── SCREEN FLASH ──────────────────────────────────────────
 
-    /// <summary>Flash a color overlay on screen (used for spell reactions).</summary>
+    /// <summary>Flash a color overlay on screen (used for spell reactions).
+    /// Shows a small camera-space quad that fades out instead of covering the whole screen.</summary>
     public static void ScreenFlash(Color color, float duration = 0.15f)
     {
-        // Create a temporary screen overlay via a world-space quad near camera
         if (Camera.main == null) return;
         var flash = GameObject.CreatePrimitive(PrimitiveType.Quad);
         Object.Destroy(flash.GetComponent<MeshCollider>());
         flash.name = "ScreenFlash";
-        flash.transform.SetParent(Camera.main.transform);
-        flash.transform.localPosition = new Vector3(0, 0, 0.5f);
-        flash.transform.localScale = new Vector3(30f, 30f, 1f);
+        flash.transform.SetParent(Camera.main.transform, false);
+        flash.transform.localPosition = new Vector3(0, 0, 0.3f);
+        // Much smaller — noticeable tint, not a blinding full-screen overlay
+        flash.transform.localScale = new Vector3(8f, 8f, 1f);
         flash.transform.localRotation = Quaternion.identity;
         Color flashCol = color;
-        flashCol.a = 0.25f;
-        flash.GetComponent<Renderer>().material = ShaderCache.NewEmissive(flashCol, 2f);
+        flashCol.a = Mathf.Clamp(color.a, 0.1f, 0.15f);
+        flash.GetComponent<Renderer>().material = ShaderCache.NewEmissive(flashCol, 1f);
         flash.AddComponent<FlashShrink>().Init(duration);
     }
 

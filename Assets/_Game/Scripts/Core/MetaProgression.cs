@@ -241,9 +241,10 @@ public static class MetaProgression
     /// <summary>Award meta-currency on death based on progress (rooms cleared, floor reached).</summary>
     public static int AwardDeathCurrency(int floor, int room, int enemiesKilled)
     {
-        // Base: 10 per floor reached + 2 per room cleared + 1 per 3 enemies killed
-        int reward = floor * 10 + room * 2 + enemiesKilled / 3;
-        reward = Mathf.Max(reward, 5); // Minimum 5 even for early deaths
+        // Base: 15 per floor reached + 3 per room cleared + 1 per 2 enemies killed
+        // Increased to make early runs feel meaningful
+        int reward = floor * 15 + room * 3 + enemiesKilled / 2;
+        reward = Mathf.Max(reward, 15); // Minimum 15 even for early deaths
         reward = Mathf.CeilToInt(reward * AscensionSystem.CurrencyMultiplier);
         Currency += reward;
         return reward;
@@ -368,9 +369,32 @@ public static class MetaProgression
 
     // ─── RESET (debug) ─────────────────────────────────────────
 
+    static readonly string[] AllKeys = {
+        KEY_CURRENCY, KEY_RUNS_COMPLETED, KEY_BEST_FLOOR,
+        KEY_MAX_HP_BONUS, KEY_BASE_DAMAGE, KEY_DASH_CHARGES,
+        KEY_SPEED_BONUS, KEY_STARTING_GOLD, KEY_POTION_SLOT,
+        KEY_CRIT_CHANCE, KEY_REROLLS, KEY_STARTING_RELIC,
+        KEY_SELECTED_LOADOUT
+    };
+
     public static void ResetAll()
     {
-        PlayerPrefs.DeleteAll();
+        // Only delete game-specific keys, not all PlayerPrefs
+        foreach (var key in AllKeys)
+            PlayerPrefs.DeleteKey(key);
+
+        // Delete element unlocks
+        foreach (var name in new[] { "Lightning", "Poison", "Void" })
+            PlayerPrefs.DeleteKey(KEY_ELEMENT_UNLOCK + name);
+
+        // Delete loadout unlocks
+        foreach (var loadout in AllLoadouts)
+            PlayerPrefs.DeleteKey(KEY_LOADOUT_UNLOCK + loadout.id);
+
+        // Delete combo discoveries
+        foreach (var id in AllComboIds)
+            PlayerPrefs.DeleteKey(KEY_COMBO_DISCOVERED + id);
+
         PlayerPrefs.Save();
     }
 }

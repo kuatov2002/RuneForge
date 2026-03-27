@@ -155,13 +155,28 @@ public class Health : MonoBehaviour
         OnHPChanged?.Invoke(currentHP, maxHP);
     }
 
+    // Store pre-freeze emission colors so we can restore them
+    Color[] preFreezeEmission;
+
     /// <summary>Freeze enemy completely (Deep Freeze spell).</summary>
     public void ApplyFreeze(float duration)
     {
+        bool wasAlreadyFrozen = freezeTimer > 0;
         freezeTimer = Mathf.Max(freezeTimer, duration);
 
-        // Visual: blue tint
+        // Store original emission colors before freeze (only on first freeze)
         var renderers = GetComponentsInChildren<Renderer>();
+        if (!wasAlreadyFrozen)
+        {
+            preFreezeEmission = new Color[renderers.Length];
+            for (int i = 0; i < renderers.Length; i++)
+            {
+                if (renderers[i] != null && renderers[i].material != null)
+                    preFreezeEmission[i] = renderers[i].material.GetColor("_EmissionColor");
+            }
+        }
+
+        // Visual: blue tint
         foreach (var r in renderers)
         {
             if (r != null && r.material != null)
@@ -202,13 +217,19 @@ public class Health : MonoBehaviour
             freezeTimer -= Time.deltaTime;
             if (freezeTimer <= 0)
             {
-                // Remove blue tint
+                // Restore pre-freeze emission colors (not just black)
                 var renderers = GetComponentsInChildren<Renderer>();
-                foreach (var r in renderers)
+                for (int i = 0; i < renderers.Length; i++)
                 {
-                    if (r != null && r.material != null)
-                        r.material.SetColor("_EmissionColor", Color.black);
+                    if (renderers[i] != null && renderers[i].material != null)
+                    {
+                        Color restore = (preFreezeEmission != null && i < preFreezeEmission.Length)
+                            ? preFreezeEmission[i]
+                            : Color.black;
+                        renderers[i].material.SetColor("_EmissionColor", restore);
+                    }
                 }
+                preFreezeEmission = null;
             }
         }
 
@@ -228,6 +249,13 @@ public class Health : MonoBehaviour
         freezeTimer = 0;
         stunTimer = 0;
         magmaSlowTimer = 0;
+        hitRecoveryTimer = 0;
+        preFreezeEmission = null;
+
+        // Ensure all renderers are visible
+        var renderers = GetComponentsInChildren<Renderer>();
+        foreach (var r in renderers) if (r != null) r.enabled = true;
+
         OnHPChanged?.Invoke(currentHP, maxHP);
     }
 }

@@ -411,6 +411,7 @@ public class LichBoss : MonoBehaviour
         stateTimer = 2.5f;
         voidPullRadius = 8f;
         voidPullForce = 5f;
+        voidPullDamageTick = 0.5f;
 
         // Create void zone at player position
         Vector3 zonePos = target.position;
@@ -428,6 +429,8 @@ public class LichBoss : MonoBehaviour
         passiveOrbTimer = 0.5f;
     }
 
+    float voidPullDamageTick;
+
     void VoidPullUpdate()
     {
         stateTimer -= Time.deltaTime;
@@ -436,27 +439,35 @@ public class LichBoss : MonoBehaviour
         {
             Vector3 zoneCenter = voidZone.transform.position;
 
-            // Pull player toward center
-            var player = FindAnyObjectByType<PlayerController>();
-            if (player != null && !player.isInvulnerable)
+            // Pull player toward center (use cached target, not FindAnyObjectByType)
+            if (target != null)
             {
-                Vector3 toCenter = zoneCenter - player.transform.position;
-                toCenter.y = 0;
-                float dist = toCenter.magnitude;
-                if (dist < voidPullRadius && dist > 0.5f)
+                var player = target.GetComponent<PlayerController>();
+                if (player != null && !player.isInvulnerable)
                 {
-                    float pullStrength = voidPullForce * (1f - dist / voidPullRadius);
-                    var prb = player.GetComponent<Rigidbody>();
-                    if (prb != null)
-                        prb.MovePosition(player.transform.position + toCenter.normalized * pullStrength * Time.deltaTime);
-                }
+                    Vector3 toCenter = zoneCenter - player.transform.position;
+                    toCenter.y = 0;
+                    float dist = toCenter.magnitude;
+                    if (dist < voidPullRadius && dist > 0.5f)
+                    {
+                        float pullStrength = voidPullForce * (1f - dist / voidPullRadius);
+                        var prb = player.GetComponent<Rigidbody>();
+                        if (prb != null)
+                            prb.MovePosition(player.transform.position + toCenter.normalized * pullStrength * Time.deltaTime);
+                    }
 
-                // Damage if in center
-                if (dist < 1.5f)
-                {
-                    var hp = player.GetComponent<Health>();
-                    if (hp != null && !hp.IsDead)
-                        hp.TakeDamage(orbDamage * Time.deltaTime * 3f);
+                    // Tick-based damage if in center (1 damage per 0.5s, not per-frame)
+                    if (dist < 1.5f)
+                    {
+                        voidPullDamageTick -= Time.deltaTime;
+                        if (voidPullDamageTick <= 0f)
+                        {
+                            voidPullDamageTick = 0.5f;
+                            var hp = player.GetComponent<Health>();
+                            if (hp != null && !hp.IsDead)
+                                hp.TakeDamage(orbDamage);
+                        }
+                    }
                 }
             }
 
@@ -523,19 +534,41 @@ public class LichBoss : MonoBehaviour
     // --- PHASE 2 ---
     void EnterPhase2()
     {
-        if (GameFeel.Instance != null) GameFeel.Instance.Hitstop(0.08f);
-        if (TopDownCamera.Instance != null) TopDownCamera.Instance.AddTrauma(0.6f);
-        SFXSystem.Play(SFXSystem.SFXType.Explosion, transform.position);
+        // Brief immunity window during phase transition (gives player breathing room)
+        isTeleporting = true;
+        teleportImmuneTimer = 1.5f;
 
+        // Dramatic hitstop + camera shake
+        if (GameFeel.Instance != null) GameFeel.Instance.Hitstop(0.15f);
+        if (TopDownCamera.Instance != null) TopDownCamera.Instance.AddTrauma(0.8f);
+        SFXSystem.Play(SFXSystem.SFXType.BossIntro, transform.position);
+        SFXSystem.Play(SFXSystem.SFXType.Explosion, transform.position);
+        GameFeel.ScreenFlash(new Color(0.5f, 0f, 0.8f), 0.4f);
+
+        // Color shift
         baseColor = new Color(0.4f, 0.05f, 0.6f);
         foreach (var r in renderers)
-            if (r != null) r.material.color = baseColor;
+            if (r != null)
+            {
+                r.material.color = baseColor;
+                r.material.SetColor("_EmissionColor", new Color(0.6f, 0f, 1f) * 3f);
+            }
+
+        // Shockwave VFX ring
+        var ring = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
+        Object.Destroy(ring.GetComponent<CapsuleCollider>());
+        ring.transform.position = transform.position + Vector3.up * 0.1f;
+        ring.transform.localScale = new Vector3(0.5f, 0.02f, 0.5f);
+        ring.GetComponent<Renderer>().material = ShaderCache.NewEmissive(new Color(0.5f, 0f, 0.8f), 5f);
+        ring.AddComponent<DeathRingEffect>().Init(8f, 0.8f);
 
         orbSpeed *= 1.3f;
         orbHomingTurn *= 1.2f;
 
-        // Immediate teleport chain
-        StartTeleportChain();
+        // After immunity ends, start aggressive teleport chain
+        state = State.Recover;
+        stateTimer = 1.5f;
+        actionCooldown = 0.3f;
     }
 
     // --- ORB FIRING ---

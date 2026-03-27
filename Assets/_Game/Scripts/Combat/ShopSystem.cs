@@ -37,7 +37,7 @@ public static class ShopSystem
                 type = ShopItemType.Relic,
                 name = relic.relicName,
                 description = relic.description,
-                price = 80 + floor * 20,
+                price = 60 + floor * 15,
                 color = relic.color,
                 relic = relic
             });
@@ -55,7 +55,7 @@ public static class ShopSystem
                     type = ShopItemType.Mutation,
                     name = choices[0].name,
                     description = choices[0].description,
-                    price = 120 + floor * 15,
+                    price = 80 + floor * 15,
                     color = choices[0].color,
                     mutation = choices[0]
                 });
@@ -68,7 +68,7 @@ public static class ShopSystem
             type = ShopItemType.Potion,
             name = "Healing Potion",
             description = "+1 potion for this floor",
-            price = 40 + floor * 5,
+            price = 30 + floor * 5,
             color = new Color(0.3f, 0.9f, 0.4f)
         });
 
@@ -110,7 +110,7 @@ public static class ShopSystem
                     type = ShopItemType.Relic,
                     name = relic2.relicName,
                     description = relic2.description,
-                    price = 100 + floor * 25,
+                    price = 75 + floor * 15,
                     color = relic2.color,
                     relic = relic2
                 });

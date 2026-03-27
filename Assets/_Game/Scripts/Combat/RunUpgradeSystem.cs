@@ -26,9 +26,23 @@ public static class RunUpgradeSystem
         UpgradeType.RechargeDown,
     };
 
-    /// <summary>Generate random upgrade choices.</summary>
+    // Track extra charges and recharge bonuses per-run (not on ScriptableObject)
+    static int runExtraCharges;
+    static float runRechargeMultiplier = 1f;
+
+    public static int RunExtraCharges => runExtraCharges;
+    public static float RunRechargeMultiplier => runRechargeMultiplier;
+
+    public static void ResetRunUpgrades()
+    {
+        runExtraCharges = 0;
+        runRechargeMultiplier = 1f;
+    }
+
+    /// <summary>Generate random upgrade choices (no duplicates).</summary>
     public static UpgradeType[] GenerateChoices(int count = 3)
     {
+        count = Mathf.Min(count, AllUpgrades.Length);
         var choices = new UpgradeType[count];
         var used = new System.Collections.Generic.HashSet<int>();
 
@@ -36,7 +50,7 @@ public static class RunUpgradeSystem
         {
             int idx;
             do { idx = Random.Range(0, AllUpgrades.Length); }
-            while (used.Contains(idx) && used.Count < AllUpgrades.Length);
+            while (used.Contains(idx));
             used.Add(idx);
             choices[i] = AllUpgrades[idx];
         }
@@ -49,26 +63,23 @@ public static class RunUpgradeSystem
         switch (upgrade)
         {
             case UpgradeType.DamageUp:
-                caster.damageBonusMult += 0.15f;
+                caster.damageBonusMult = Mathf.Min(caster.damageBonusMult + 0.15f, 3f); // cap at 3x
                 break;
             case UpgradeType.CooldownDown:
                 caster.cooldownBonusMult = Mathf.Max(0.3f, caster.cooldownBonusMult - 0.15f);
                 break;
             case UpgradeType.DurationUp:
-                caster.durationBonusMult += 0.20f;
+                caster.durationBonusMult = Mathf.Min(caster.durationBonusMult + 0.20f, 3f);
                 break;
             case UpgradeType.RadiusUp:
-                caster.radiusBonusMult += 0.20f;
+                caster.radiusBonusMult = Mathf.Min(caster.radiusBonusMult + 0.20f, 3f);
                 break;
             case UpgradeType.ChargesUp:
-                for (int i = 0; i < 4; i++)
-                    if (caster.equippedElements[i] != null)
-                        caster.equippedElements[i].maxCharges += 1;
+                // Store extra charges as run-level data, not on ScriptableObject
+                runExtraCharges++;
                 break;
             case UpgradeType.RechargeDown:
-                for (int i = 0; i < 4; i++)
-                    if (caster.equippedElements[i] != null)
-                        caster.equippedElements[i].overheatRechargeTime *= 0.8f;
+                runRechargeMultiplier = Mathf.Max(0.3f, runRechargeMultiplier * 0.8f);
                 break;
         }
     }
@@ -84,7 +95,9 @@ public static class RunUpgradeSystem
         _ => "???"
     };
 
-    public static string GetDescription(UpgradeType type) => type switch
+    public static string GetDescription(UpgradeType type) => GetDescriptionBase(type);
+
+    static string GetDescriptionBase(UpgradeType type) => type switch
     {
         UpgradeType.DamageUp => "All spells deal 15% more damage",
         UpgradeType.CooldownDown => "All spell cooldowns reduced by 15%",
@@ -94,6 +107,22 @@ public static class RunUpgradeSystem
         UpgradeType.RechargeDown => "Overheated elements recharge 20% faster",
         _ => ""
     };
+
+    /// <summary>Get description with current stats when a caster is available.</summary>
+    public static string GetDetailedDescription(UpgradeType type, SpellCaster caster)
+    {
+        if (caster == null) return GetDescriptionBase(type);
+        return type switch
+        {
+            UpgradeType.DamageUp => $"All spells deal 15% more damage (current: {caster.damageBonusMult:F2}x)",
+            UpgradeType.CooldownDown => $"Cooldowns -15% (current: {caster.cooldownBonusMult:F2}x)",
+            UpgradeType.DurationUp => $"Duration +20% (current: {caster.durationBonusMult:F2}x)",
+            UpgradeType.RadiusUp => $"Radius +20% (current: {caster.radiusBonusMult:F2}x)",
+            UpgradeType.ChargesUp => $"+1 charge per element (current bonus: +{runExtraCharges})",
+            UpgradeType.RechargeDown => $"Recharge -20% (current: {runRechargeMultiplier:F2}x)",
+            _ => ""
+        };
+    }
 
     public static Color GetColor(UpgradeType type) => type switch
     {

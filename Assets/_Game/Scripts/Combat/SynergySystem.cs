@@ -29,8 +29,15 @@ public class SynergySystem : MonoBehaviour
     List<SynergyType> activeSynergies = new();
     float conductorTimer;
 
+    // Scale synergy damage with floor progression
+    int currentFloor = 1;
+
     public bool HasSynergy(SynergyType type) => activeSynergies.Contains(type);
     public List<SynergyType> ActiveSynergies => activeSynergies;
+
+    public void SetFloor(int floor) { currentFloor = floor; }
+
+    float ScaledDamage(float base_dmg) => base_dmg + (currentFloor - 1) * 2f;
 
     public void AddSynergy(SynergyType type)
     {
@@ -70,7 +77,7 @@ public class SynergySystem : MonoBehaviour
         // Ignition: Fire kills leave burning ground
         if (HasSynergy(SynergyType.Ignition) && killingElement == ElementType.Fire)
         {
-            MagmaSpell.Cast(deathPos, 3f, 2f, 3f, false);
+            MagmaSpell.Cast(deathPos, 3f, ScaledDamage(2f), 3f, false);
         }
 
         // Frostbite: Water kills freeze nearby
@@ -86,9 +93,10 @@ public class SynergySystem : MonoBehaviour
             }
         }
 
-        // Tremor: Earth kills mini-quake
+        // Tremor: Earth kills mini-quake (damage scales with floor)
         if (HasSynergy(SynergyType.Tremor) && killingElement == ElementType.Earth)
         {
+            float tremDmg = ScaledDamage(5f);
             Collider[] nearby = Physics.OverlapSphere(deathPos, 3f);
             foreach (var c in nearby)
             {
@@ -96,12 +104,58 @@ public class SynergySystem : MonoBehaviour
                 var hp = c.GetComponent<Health>();
                 if (hp != null && !hp.IsDead)
                 {
-                    hp.TakeDamage(5);
+                    hp.TakeDamage(tremDmg);
                     hp.ApplyStun(0.5f);
                 }
             }
             if (TopDownCamera.Instance != null)
                 TopDownCamera.Instance.AddTrauma(0.15f);
+        }
+
+        // Venomous: Poison kills spread poison to nearby enemies
+        if (HasSynergy(SynergyType.Venomous) && killingElement == ElementType.Poison)
+        {
+            Collider[] nearby = Physics.OverlapSphere(deathPos, 4f);
+            foreach (var c in nearby)
+            {
+                if (c.GetComponent<PlayerController>() != null) continue;
+                var hp = c.GetComponent<Health>();
+                if (hp == null || hp.IsDead) continue;
+                // Deal poison tick damage and apply slow
+                hp.TakeDamage(ScaledDamage(2f), ElementType.Poison);
+                hp.ApplyMagmaSlow(); // reuse slow as poison debuff visual
+            }
+
+            // Green spread VFX
+            var vfx = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
+            Object.Destroy(vfx.GetComponent<CapsuleCollider>());
+            vfx.transform.position = deathPos + Vector3.up * 0.05f;
+            vfx.transform.localScale = new Vector3(0.5f, 0.02f, 0.5f);
+            vfx.GetComponent<Renderer>().material = ShaderCache.NewEmissive(new Color(0.2f, 0.9f, 0.1f), 3f);
+            vfx.AddComponent<DeathRingEffect>().Init(4f, 0.4f);
+        }
+
+        // Entropy: Void kills weaken nearby enemies (reduce their damage output)
+        if (HasSynergy(SynergyType.Entropy) && killingElement == ElementType.Void)
+        {
+            Collider[] nearby = Physics.OverlapSphere(deathPos, 4f);
+            foreach (var c in nearby)
+            {
+                if (c.GetComponent<PlayerController>() != null) continue;
+                var hp = c.GetComponent<Health>();
+                if (hp == null || hp.IsDead) continue;
+                // Apply stun as "weakening" effect + some damage
+                hp.TakeDamage(ScaledDamage(3f), ElementType.Void);
+                hp.ApplyStun(1f);
+            }
+
+            // Purple implode VFX
+            var vfx = GameObject.CreatePrimitive(PrimitiveType.Sphere);
+            Object.Destroy(vfx.GetComponent<SphereCollider>());
+            vfx.transform.position = deathPos + Vector3.up * 0.5f;
+            vfx.transform.localScale = Vector3.one * 4f;
+            vfx.GetComponent<Renderer>().material = ShaderCache.NewEmissive(new Color(0.6f, 0.1f, 0.9f), 2f);
+            vfx.AddComponent<ComboShrinkVFX>().Init(0.3f);
         }
     }
 
@@ -145,10 +199,10 @@ public class SynergySystem : MonoBehaviour
             description = "Earth kills create a mini-quake damaging and stunning nearby",
             color = new Color(0.6f, 0.4f, 0.2f) },
         new SynergyDef { type = SynergyType.Venomous, name = "Venomous",
-            description = "Poison damage spreads to nearby enemies on kill",
+            description = "Poison kills spread poison to nearby enemies",
             color = new Color(0.2f, 0.9f, 0.1f) },
         new SynergyDef { type = SynergyType.Entropy, name = "Entropy",
-            description = "Void kills weaken nearby enemies, reducing their damage",
+            description = "Void kills stun and damage nearby enemies",
             color = new Color(0.6f, 0.1f, 0.9f) },
     };
 }

@@ -62,6 +62,19 @@ public class GameHUD : MonoBehaviour
     VisualElement dashCDContainer;
     VisualElement dashCDFill;
 
+    // Encounter objective
+    Label encounterObjectiveLabel;
+
+    // Variety bonus
+    Label varietyBonusLabel;
+
+    // Gold gain popup
+    Label goldGainLabel;
+    float goldGainTimer;
+
+    // Synergy bar
+    VisualElement synergyBar;
+
     // Pause menu
     VisualElement pauseOverlay;
     bool isPaused;
@@ -206,6 +219,17 @@ public class GameHUD : MonoBehaviour
         topBar.Add(rightCol);
         root.Add(topBar);
 
+        // ── Encounter objective ──
+        encounterObjectiveLabel = Lbl("", 20, new Color(1f, 0.85f, 0.2f), FontStyle.Bold);
+        encounterObjectiveLabel.pickingMode = PickingMode.Ignore;
+        encounterObjectiveLabel.style.position = Position.Absolute;
+        encounterObjectiveLabel.style.top = 60;
+        encounterObjectiveLabel.style.left = 0;
+        encounterObjectiveLabel.style.right = 0;
+        encounterObjectiveLabel.style.unityTextAlign = TextAnchor.MiddleCenter;
+        encounterObjectiveLabel.style.display = DisplayStyle.None;
+        root.Add(encounterObjectiveLabel);
+
         // ── Gold display ──
         var goldRow = new VisualElement();
         goldRow.pickingMode = PickingMode.Ignore;
@@ -224,6 +248,12 @@ public class GameHUD : MonoBehaviour
 
         goldLabel = Lbl("0", 20, new Color(1f, 0.9f, 0.3f), FontStyle.Bold);
         goldRow.Add(goldLabel);
+
+        goldGainLabel = Lbl("", 16, new Color(1f, 1f, 0.5f), FontStyle.Bold);
+        goldGainLabel.style.marginLeft = 8;
+        goldGainLabel.style.display = DisplayStyle.None;
+        goldRow.Add(goldGainLabel);
+
         root.Add(goldRow);
 
         // ── Relic bar ──
@@ -233,6 +263,21 @@ public class GameHUD : MonoBehaviour
         relicBar.style.paddingLeft = 20;
         relicBar.style.paddingTop = 4;
         root.Add(relicBar);
+
+        // ── Synergy bar ──
+        synergyBar = new VisualElement();
+        synergyBar.pickingMode = PickingMode.Ignore;
+        synergyBar.style.flexDirection = FlexDirection.Row;
+        synergyBar.style.paddingLeft = 20;
+        synergyBar.style.paddingTop = 2;
+        root.Add(synergyBar);
+
+        // ── Variety bonus indicator ──
+        varietyBonusLabel = Lbl("", 14, new Color(0.6f, 0.9f, 1f), FontStyle.Bold);
+        varietyBonusLabel.pickingMode = PickingMode.Ignore;
+        varietyBonusLabel.style.paddingLeft = 20;
+        varietyBonusLabel.style.display = DisplayStyle.None;
+        root.Add(varietyBonusLabel);
 
         // ── Boss HP bar ──
         bossHPContainer = new VisualElement();
@@ -260,6 +305,18 @@ public class GameHUD : MonoBehaviour
         bossHPFill.style.backgroundColor = new Color(0.85f, 0.15f, 0.15f);
         Radius(bossHPFill, 4);
         bossBarBg.Add(bossHPFill);
+
+        // Phase-2 marker at 50%
+        var phaseMarker = new VisualElement();
+        phaseMarker.pickingMode = PickingMode.Ignore;
+        phaseMarker.style.position = Position.Absolute;
+        phaseMarker.style.left = new StyleLength(Length.Percent(50));
+        phaseMarker.style.top = 0;
+        phaseMarker.style.bottom = 0;
+        phaseMarker.style.width = 2;
+        phaseMarker.style.backgroundColor = new Color(1f, 1f, 1f, 0.6f);
+        bossBarBg.Add(phaseMarker);
+
         bossHPContainer.Add(bossBarBg);
         root.Add(bossHPContainer);
 
@@ -369,14 +426,14 @@ public class GameHUD : MonoBehaviour
         volumeRow.Add(volumeSlider);
         pauseOverlay.Add(volumeRow);
 
-        var hubBtn = new Button(() =>
-        {
-            ResumeGame();
-            OnReturnToHub?.Invoke();
-        });
+        // Hub return with confirmation
+        var hubConfirmRow = new VisualElement();
+        hubConfirmRow.style.alignItems = Align.Center;
+        hubConfirmRow.style.marginTop = 16;
+
+        var hubBtn = new Button();
         hubBtn.text = "Return to Hub";
         hubBtn.style.fontSize = 20;
-        hubBtn.style.marginTop = 16;
         hubBtn.style.paddingTop = 8;
         hubBtn.style.paddingBottom = 8;
         hubBtn.style.paddingLeft = 30;
@@ -384,7 +441,38 @@ public class GameHUD : MonoBehaviour
         hubBtn.style.color = Color.white;
         hubBtn.style.backgroundColor = new Color(0.5f, 0.2f, 0.2f);
         Radius(hubBtn, 8);
-        pauseOverlay.Add(hubBtn);
+
+        var confirmLabel = Lbl("Are you sure? Your run progress will be lost!", 14, new Color(1f, 0.5f, 0.3f));
+        confirmLabel.style.marginTop = 8;
+        confirmLabel.style.display = DisplayStyle.None;
+
+        var confirmBtn = new Button(() =>
+        {
+            ResumeGame();
+            OnReturnToHub?.Invoke();
+        });
+        confirmBtn.text = "Yes, abandon run";
+        confirmBtn.style.fontSize = 16;
+        confirmBtn.style.marginTop = 6;
+        confirmBtn.style.paddingTop = 6;
+        confirmBtn.style.paddingBottom = 6;
+        confirmBtn.style.paddingLeft = 20;
+        confirmBtn.style.paddingRight = 20;
+        confirmBtn.style.color = Color.white;
+        confirmBtn.style.backgroundColor = new Color(0.6f, 0.15f, 0.15f);
+        confirmBtn.style.display = DisplayStyle.None;
+        Radius(confirmBtn, 6);
+
+        hubBtn.clicked += () =>
+        {
+            confirmLabel.style.display = DisplayStyle.Flex;
+            confirmBtn.style.display = DisplayStyle.Flex;
+        };
+
+        hubConfirmRow.Add(hubBtn);
+        hubConfirmRow.Add(confirmLabel);
+        hubConfirmRow.Add(confirmBtn);
+        pauseOverlay.Add(hubConfirmRow);
 
         root.Add(pauseOverlay);
 
@@ -1611,6 +1699,107 @@ public class GameHUD : MonoBehaviour
                 }
             }
         }
+
+        // Gold gain popup fade
+        if (goldGainTimer > 0)
+        {
+            goldGainTimer -= Time.deltaTime;
+            goldGainLabel.style.opacity = Mathf.Clamp01(goldGainTimer / 0.5f);
+            if (goldGainTimer <= 0)
+                goldGainLabel.style.display = DisplayStyle.None;
+        }
+
+        // Variety bonus display
+        if (caster != null && varietyBonusLabel != null)
+        {
+            float combo = caster.comboMultiplier;
+            if (combo > 1.01f)
+            {
+                varietyBonusLabel.text = combo >= 1.25f
+                    ? $"VARIETY x{combo:F2} — Excellent!"
+                    : $"VARIETY x{combo:F2} — Good";
+                varietyBonusLabel.style.color = combo >= 1.25f
+                    ? new Color(0.4f, 1f, 0.6f)
+                    : new Color(0.6f, 0.9f, 1f);
+                varietyBonusLabel.style.display = DisplayStyle.Flex;
+            }
+            else
+            {
+                varietyBonusLabel.style.display = DisplayStyle.None;
+            }
+        }
+    }
+
+    // ── Encounter Objective ──
+
+    /// <summary>Update encounter objective display. Call from room controller each frame.</summary>
+    public void SetEncounterObjective(string text, Color color)
+    {
+        if (encounterObjectiveLabel == null) return;
+        if (string.IsNullOrEmpty(text))
+        {
+            encounterObjectiveLabel.style.display = DisplayStyle.None;
+            return;
+        }
+        encounterObjectiveLabel.text = text;
+        encounterObjectiveLabel.style.color = color;
+        encounterObjectiveLabel.style.display = DisplayStyle.Flex;
+    }
+
+    /// <summary>Show gold gain popup (+N).</summary>
+    public void ShowGoldGain(int amount)
+    {
+        if (goldGainLabel == null) return;
+        goldGainLabel.text = $"+{amount}";
+        goldGainLabel.style.display = DisplayStyle.Flex;
+        goldGainLabel.style.opacity = 1f;
+        goldGainTimer = 1.5f;
+    }
+
+    /// <summary>Update the death overlay with actual progress info.</summary>
+    public void ShowDeath(int floor, int room, int metaCurrencyEarned)
+    {
+        deathOverlay.style.display = DisplayStyle.Flex;
+        if (deathWaveLabel != null)
+            deathWaveLabel.text = $"Reached Floor {floor}, Room {room}  |  +{metaCurrencyEarned} Rune Essence";
+    }
+
+    /// <summary>Refresh synergy bar to show active synergies.</summary>
+    public void RefreshSynergies(System.Collections.Generic.List<SynergyType> synergies)
+    {
+        if (synergyBar == null) return;
+        synergyBar.Clear();
+
+        if (synergies == null || synergies.Count == 0) return;
+
+        var lbl = Lbl("Synergies: ", 12, Dim);
+        synergyBar.Add(lbl);
+
+        foreach (var syn in synergies)
+        {
+            foreach (var def in SynergySystem.AllSynergies)
+            {
+                if (def.type == syn)
+                {
+                    var pip = Pill(def.name, def.color, Color.white);
+                    synergyBar.Add(pip);
+                    break;
+                }
+            }
+        }
+    }
+
+    /// <summary>Update boss HP bar with phase-2 marker.</summary>
+    public void SetBossHP(string name, float hpPercent, bool phase2 = false)
+    {
+        if (bossHPContainer == null) return;
+        bossHPContainer.style.display = DisplayStyle.Flex;
+        bossNameLabel.text = phase2 ? $"{name} — PHASE 2" : name;
+        bossNameLabel.style.color = phase2 ? new Color(0.8f, 0.2f, 1f) : new Color(1f, 0.3f, 0.3f);
+        bossHPFill.style.width = new StyleLength(Length.Percent(Mathf.Clamp01(hpPercent) * 100));
+        bossHPFill.style.backgroundColor = phase2
+            ? new Color(0.6f, 0.15f, 0.8f)
+            : new Color(0.85f, 0.15f, 0.15f);
     }
 
     void SpawnDamageNumber(int amount, Vector3 worldPos, bool killed)

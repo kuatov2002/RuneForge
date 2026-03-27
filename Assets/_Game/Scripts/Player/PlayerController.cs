@@ -70,7 +70,13 @@ public class PlayerController : MonoBehaviour
         if (kb.dKey.isPressed) input.x += 1;
         input = input.normalized;
 
-        Vector3 vel = new Vector3(input.x, 0, input.y) * moveSpeed;
+        // Apply momentum speed bonus to movement
+        float effectiveSpeed = moveSpeed;
+        var momentumSys = GetComponent<MomentumSystem>();
+        if (momentumSys != null)
+            effectiveSpeed *= (1f + momentumSys.SpeedBonus);
+
+        Vector3 vel = new Vector3(input.x, 0, input.y) * effectiveSpeed;
         rb.linearVelocity = new Vector3(vel.x, rb.linearVelocity.y, vel.z);
 
         // Aim toward mouse
@@ -111,24 +117,31 @@ public class PlayerController : MonoBehaviour
             }
         }
 
-        // Dash
+        // Dash — dash in movement direction (WASD), or forward if no input
         if (mouse != null && mouse.rightButton.wasPressedThisFrame && currentDashCharges > 0)
         {
             Vector3 dashFrom = transform.position;
+            Vector3 dashDir = input.sqrMagnitude > 0.01f
+                ? new Vector3(input.x, 0, input.y).normalized
+                : transform.forward;
             isDashing = true;
             isInvulnerable = true;
             dashTimer = DashDuration;
             currentDashCharges--;
-            if (currentDashCharges < maxDashCharges && chargeRechargeTimer <= 0)
-                chargeRechargeTimer = dashCooldown;
-            rb.linearVelocity = transform.forward * (dashDistance / DashDuration);
+            chargeRechargeTimer = dashCooldown;
+            rb.linearVelocity = dashDir * (dashDistance / DashDuration);
             Invoke(nameof(EndIFrames), IFrameDuration);
             SFXSystem.Play(SFXSystem.SFXType.Dash, transform.position);
+
+            // Apply momentum speed bonus
+            var momentum = GetComponent<MomentumSystem>();
+            if (momentum != null)
+                rb.linearVelocity *= (1f + momentum.SpeedBonus);
 
             // Dash fire relic
             var relicMgr = GetComponent<RelicManager>();
             if (relicMgr != null)
-                relicMgr.OnDash(dashFrom, dashFrom + transform.forward * dashDistance);
+                relicMgr.OnDash(dashFrom, dashFrom + dashDir * dashDistance);
         }
     }
 

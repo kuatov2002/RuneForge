@@ -26,7 +26,7 @@ public class SpellCaster : MonoBehaviour
     // ── Combo bonus (variety tracking) ──
     ElementType[] recentElements = new ElementType[6];
     int recentIndex;
-    float comboMultiplier = 1f;
+    [HideInInspector] public float comboMultiplier = 1f;
 
     // ── Cooldown ──
     float cooldownTimer;
@@ -230,6 +230,10 @@ public class SpellCaster : MonoBehaviour
         var momentum = GetComponent<MomentumSystem>();
         if (momentum != null) dmgMult *= momentum.DamageMultiplier;
 
+        // Conductor synergy bonus (+50% after Lightning cast)
+        var synergySys = GetComponent<SynergySystem>();
+        if (synergySys != null) dmgMult *= synergySys.GetDamageMultiplier();
+
         // Crit chance
         if (UnityEngine.Random.value < MetaProgression.CritChance)
             dmgMult *= 2f;
@@ -257,12 +261,17 @@ public class SpellCaster : MonoBehaviour
         // Fire the combo spell
         ComboSpellFactory.Cast(def, transform.position, targetPos, dmgMult, charged);
 
-        // Chain Cast mutation: 20% chance to auto-cast again for free
+        // Chain Cast mutation: 20% chance to auto-cast at current cursor (not stale position)
         if (SpellMutationSystem.HasMutation(SpellMutationSystem.MutationType.ChainCast)
             && UnityEngine.Random.value < 0.2f)
         {
-            ComboSpellFactory.Cast(def, transform.position, targetPos, dmgMult * 0.7f, false);
+            Vector3 chainTarget = GetCursorWorldPosition();
+            ComboSpellFactory.Cast(def, transform.position, chainTarget, dmgMult * 0.7f, false);
         }
+
+        // Notify synergy system of cast
+        if (synergySys != null)
+            synergySys.OnSpellCast(leftOrb.elementType);
 
         // Track element variety
         TrackElementUsage(leftOrb.elementType);
@@ -351,12 +360,23 @@ public class SpellCaster : MonoBehaviour
             OnComboNameChanged?.Invoke(def.comboName);
     }
 
+    // Cached UIDocuments to avoid per-frame FindObjectsByType
+    UIDocument[] _cachedUIDocs;
+    float _uiDocCacheTimer;
+
     /// <summary>Check if the mouse pointer is over any UI element.</summary>
     bool IsPointerOverUI()
     {
+        // Refresh cache every 2 seconds instead of every frame
+        _uiDocCacheTimer -= Time.deltaTime;
+        if (_cachedUIDocs == null || _uiDocCacheTimer <= 0f)
+        {
+            _cachedUIDocs = FindObjectsByType<UIDocument>(FindObjectsSortMode.None);
+            _uiDocCacheTimer = 2f;
+        }
+
         // Check UIElements (UIDocument panels)
-        var uiDocs = FindObjectsByType<UIDocument>(FindObjectsSortMode.None);
-        foreach (var doc in uiDocs)
+        foreach (var doc in _cachedUIDocs)
         {
             if (doc == null || doc.rootVisualElement == null) continue;
             var panel = doc.rootVisualElement.panel;

@@ -57,7 +57,16 @@ public class HubUI : MonoBehaviour
     void OnStationEnter(HubInteractable station)
     {
         currentStation = station;
-        interactHint.text = $"Press E — {station.stationId}";
+        string displayName = station.stationId switch
+        {
+            "RunPortal" => "Enter the Dungeon",
+            "Forge Master" => "Forge Master — Upgrades",
+            "Element Scholar" => "Element Scholar — Unlock Elements",
+            "Chronicle" => "Chronicle — Stats & Records",
+            "Codex" => "Synergy Codex — Discoveries",
+            _ => station.stationId
+        };
+        interactHint.text = $"Press E — {displayName}";
         interactHint.style.display = DisplayStyle.Flex;
     }
 

@@ -14,7 +14,8 @@ public class GoldSystem : MonoBehaviour
     int _gold;
     public int Gold => _gold;
 
-    public event Action<int> OnGoldChanged;
+    public event Action<int> OnGoldChanged;      // new total
+    public event Action<int> OnGoldGained;       // delta amount (for floating text)
 
     void Awake() { Instance = this; }
 
@@ -29,6 +30,7 @@ public class GoldSystem : MonoBehaviour
         if (amount <= 0) return;
         _gold += amount;
         OnGoldChanged?.Invoke(_gold);
+        OnGoldGained?.Invoke(amount);
     }
 
     public bool TrySpend(int amount)
@@ -93,9 +95,9 @@ public class GoldSystem : MonoBehaviour
     public static int CalculateEnemyDrop(int wave, bool isBoss)
     {
         if (isBoss) return 30 + wave * 5;
-        // Regular enemies: 2-8 gold, scaling with wave
-        int baseGold = Random.Range(2, 5);
-        int waveBonus = Mathf.FloorToInt(wave * 0.5f);
+        // Regular enemies: 4-8 gold base, scaling with wave (increased from 2-4)
+        int baseGold = Random.Range(4, 9); // Random.Range(int,int) excludes max, so 4-8
+        int waveBonus = Mathf.FloorToInt(wave * 0.8f);
         return baseGold + waveBonus;
     }
 }
@@ -141,11 +143,14 @@ public class GoldPickup : MonoBehaviour
             if (GoldSystem.Instance != null)
                 GoldSystem.Instance.AddGold(amount);
             SFXSystem.Play(SFXSystem.SFXType.GoldPickup, transform.position);
+            GameFeel.SpawnPickupBurst(transform.position, new Color(1f, 0.85f, 0.2f));
             Destroy(gameObject);
             return;
         }
 
-        // Always move toward player (magnet behavior)
+        // Magnet range: only pull when within 8 units (not infinite range)
+        if (dist > 8f) return;
+
         float speed = Mathf.Lerp(14f, 5f, Mathf.Clamp01(dist / 6f));
         transform.position += toPlayer.normalized * speed * Time.deltaTime;
     }
@@ -156,6 +161,8 @@ public class GoldPickup : MonoBehaviour
 
         if (GoldSystem.Instance != null)
             GoldSystem.Instance.AddGold(amount);
+        SFXSystem.Play(SFXSystem.SFXType.GoldPickup, transform.position);
+        GameFeel.SpawnPickupBurst(transform.position, new Color(1f, 0.85f, 0.2f));
         Destroy(gameObject);
     }
 }
