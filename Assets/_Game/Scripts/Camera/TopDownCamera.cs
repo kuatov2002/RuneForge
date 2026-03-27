@@ -4,8 +4,8 @@ using UnityEngine.InputSystem;
 public class TopDownCamera : MonoBehaviour
 {
     public Transform target;
-    public float distance = 14f;
-    public float pitch = 60f; // degrees from horizontal
+    public float distance = 10f;
+    public float pitch = 50f; // degrees from horizontal
     public float cursorOffsetMax = 2f;
     public float smoothSpeed = 8f;
 

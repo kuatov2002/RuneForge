@@ -1759,6 +1759,7 @@ public class Bootstrap : MonoBehaviour
             scaledHP = Mathf.CeilToInt(scaledHP * 1.3f);
 
         var health = enemy.AddComponent<Health>(); health.maxHP = scaledHP; health.currentHP = scaledHP;
+        health.ApplyStun(1.2f); // spawn grace period — enemies wait before attacking
         enemy.AddComponent<EnemyHealthBar>();
         var enemyRef = enemy;
         health.OnDeath += () => OnEnemyDeath(enemyRef);

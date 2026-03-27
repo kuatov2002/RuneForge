@@ -20,12 +20,11 @@ public static class RoomBuilder
         wallMat = ShaderCache.NewStone(wallCol);
         pillarMat = ShaderCache.NewStone(pillarCol);
 
-        // Determine room shape: 40% rect, 30% L-shape, 20% arena, 10% cross
+        // Determine room shape: 55% rect, 30% arena, 15% cross (L-shape removed — bad enemy spawns)
         float roll = Random.value;
         RoomShape shape;
-        if (roll < 0.40f) shape = RoomShape.Rectangle;
-        else if (roll < 0.70f) shape = RoomShape.LShape;
-        else if (roll < 0.90f) shape = RoomShape.Arena;
+        if (roll < 0.55f) shape = RoomShape.Rectangle;
+        else if (roll < 0.85f) shape = RoomShape.Arena;
         else shape = RoomShape.Cross;
 
         float halfW = width * 0.5f;
