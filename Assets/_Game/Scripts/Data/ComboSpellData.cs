@@ -79,7 +79,7 @@ public static class ComboSpellRegistry
         {
             comboType = ComboType.Inferno, comboName = "Inferno",
             description = "Fireball that explodes on impact",
-            baseDamage = 14, radius = 2.5f, cooldown = 0.9f, // was 18 dmg, 0.8 CD — too dominant
+            baseDamage = 12, radius = 2.5f, cooldown = 0.9f, // nerfed for reaction balance
             chargedDamageMultiplier = 2f, chargedRadiusMultiplier = 1.3f,
             color = new Color(1f, 0.3f, 0f)
         });
@@ -87,21 +87,21 @@ public static class ComboSpellRegistry
         {
             comboType = ComboType.DeepFreeze, comboName = "Deep Freeze",
             description = "Piercing ice spike that freezes enemies",
-            baseDamage = 4, radius = 2.5f, duration = 2.5f, cooldown = 0.9f, // was 3 dmg, 2.2 radius, 2s — buffed
+            baseDamage = 3, radius = 2.5f, duration = 2.5f, cooldown = 0.9f, // nerfed for reaction balance
             color = new Color(0.3f, 0.7f, 1f)
         });
         Register(ElementType.Earth, ElementType.Earth, new ComboSpellDef
         {
             comboType = ComboType.Bulwark, comboName = "Bulwark",
             description = "Fortress wall, recast to shatter",
-            baseDamage = 5, radius = 0, duration = 5f, cooldown = 1f, // was 0 dmg, 4s, 1.2 CD — now useful
+            baseDamage = 4, radius = 0, duration = 5f, cooldown = 1f, // nerfed for reaction balance
             color = new Color(0.6f, 0.4f, 0.2f)
         });
         Register(ElementType.Air, ElementType.Air, new ComboSpellDef
         {
             comboType = ComboType.Ascend, comboName = "Wind Slash",
             description = "Piercing wind blade, charged = 3 blades",
-            baseDamage = 6, radius = 2f, cooldown = 0.7f, // was 0 dmg dash — now offensive
+            baseDamage = 5, radius = 2f, cooldown = 0.7f, // nerfed for reaction balance
             color = new Color(0.8f, 0.9f, 1f)
         });
 
@@ -111,42 +111,42 @@ public static class ComboSpellRegistry
         {
             comboType = ComboType.Steam, comboName = "Steam",
             description = "Steam cloud, ignitable by Fire",
-            baseDamage = 3, radius = 2.5f, duration = 4f, cooldown = 0.7f, // was 2 dps, 2m, 3.5s — buffed
+            baseDamage = 2.5f, radius = 2.5f, duration = 4f, cooldown = 0.7f, // nerfed for reaction balance
             color = new Color(0.8f, 0.8f, 0.9f)
         });
         Register(ElementType.Fire, ElementType.Earth, new ComboSpellDef
         {
             comboType = ComboType.Magma, comboName = "Magma",
             description = "Lava pool: slow + DoT",
-            baseDamage = 4, radius = 2.5f, duration = 4.5f, cooldown = 0.8f, // was 3 dps, 2m, 4s — buffed
+            baseDamage = 3.5f, radius = 2.5f, duration = 4.5f, cooldown = 0.8f, // nerfed for reaction balance
             color = new Color(1f, 0.5f, 0f)
         });
         Register(ElementType.Fire, ElementType.Air, new ComboSpellDef
         {
             comboType = ComboType.Wildfire, comboName = "Wildfire",
             description = "Fire chains between enemies",
-            baseDamage = 9, radius = 3.5f, cooldown = 0.7f, // was 8 dmg, 3m — slight buff
+            baseDamage = 7.5f, radius = 3.5f, cooldown = 0.7f, // nerfed for reaction balance
             color = new Color(1f, 0.6f, 0.1f)
         });
         Register(ElementType.Water, ElementType.Earth, new ComboSpellDef
         {
             comboType = ComboType.Permafrost, comboName = "Permafrost",
             description = "Ice floor, enemies slide",
-            baseDamage = 2, radius = 3.5f, duration = 4f, cooldown = 0.8f, // was 1 dps, 3m, 3.5s — significantly buffed
+            baseDamage = 1.5f, radius = 3.5f, duration = 4f, cooldown = 0.8f, // nerfed for reaction balance
             color = new Color(0.5f, 0.8f, 0.9f)
         });
         Register(ElementType.Water, ElementType.Air, new ComboSpellDef
         {
             comboType = ComboType.Geyser, comboName = "Geyser",
             description = "Water bomb launches enemies",
-            baseDamage = 12, radius = 2.2f, cooldown = 0.8f, // was 10 dmg, 1.8m — buffed back (hard to land arc)
+            baseDamage = 10, radius = 2.2f, cooldown = 0.8f, // nerfed for reaction balance
             color = new Color(0.2f, 0.5f, 1f)
         });
         Register(ElementType.Earth, ElementType.Air, new ComboSpellDef
         {
             comboType = ComboType.Rubble, comboName = "Rubble",
             description = "Boulder that spawns rock rain",
-            baseDamage = 6, radius = 3f, duration = 1.8f, cooldown = 0.8f, // was 5 dmg, 2.5m, 1.5s — buffed
+            baseDamage = 5, radius = 3f, duration = 1.8f, cooldown = 0.8f, // nerfed for reaction balance
             color = new Color(0.5f, 0.4f, 0.3f)
         });
 
@@ -155,35 +155,35 @@ public static class ComboSpellRegistry
         {
             comboType = ComboType.LightningStrike, comboName = "Lightning Strike",
             description = "Bolt from the sky",
-            baseDamage = 16, radius = 1.5f, cooldown = 0.7f,
+            baseDamage = 13, radius = 1.5f, cooldown = 0.7f,
             color = new Color(1f, 1f, 0.3f)
         });
         Register(ElementType.Lightning, ElementType.Fire, new ComboSpellDef
         {
             comboType = ComboType.Thunderstorm, comboName = "Thunderstorm",
             description = "Fire and lightning rain",
-            baseDamage = 6, radius = 3f, duration = 2f, cooldown = 0.9f,
+            baseDamage = 5, radius = 3f, duration = 2f, cooldown = 0.9f,
             color = new Color(1f, 0.7f, 0.2f)
         });
         Register(ElementType.Lightning, ElementType.Water, new ComboSpellDef
         {
             comboType = ComboType.FrostShock, comboName = "Frost Shock",
             description = "Freezes and stuns",
-            baseDamage = 10, radius = 2.5f, duration = 1.5f, cooldown = 0.8f,
+            baseDamage = 8, radius = 2.5f, duration = 1.5f, cooldown = 0.8f,
             color = new Color(0.5f, 0.8f, 1f)
         });
         Register(ElementType.Lightning, ElementType.Earth, new ComboSpellDef
         {
             comboType = ComboType.Earthquake, comboName = "Earthquake",
             description = "Ground tremor with stun",
-            baseDamage = 12, radius = 3.5f, duration = 0.8f, cooldown = 1f,
+            baseDamage = 10, radius = 3.5f, duration = 0.8f, cooldown = 1f,
             color = new Color(0.7f, 0.6f, 0.2f)
         });
         Register(ElementType.Lightning, ElementType.Air, new ComboSpellDef
         {
             comboType = ComboType.Cyclone, comboName = "Cyclone",
             description = "Whirlwind pulling enemies",
-            baseDamage = 4, radius = 2.5f, duration = 2.5f, cooldown = 0.9f,
+            baseDamage = 3.5f, radius = 2.5f, duration = 2.5f, cooldown = 0.9f,
             color = new Color(0.7f, 0.9f, 1f)
         });
 
@@ -192,42 +192,42 @@ public static class ComboSpellRegistry
         {
             comboType = ComboType.Plague, comboName = "Plague",
             description = "Spreading poison cloud",
-            baseDamage = 2, radius = 3f, duration = 4f, cooldown = 0.9f,
+            baseDamage = 1.5f, radius = 3f, duration = 4f, cooldown = 0.9f,
             color = new Color(0.2f, 0.9f, 0.1f)
         });
         Register(ElementType.Poison, ElementType.Fire, new ComboSpellDef
         {
             comboType = ComboType.Detonate, comboName = "Detonate",
             description = "Toxic explosion",
-            baseDamage = 14, radius = 2f, cooldown = 0.7f,
+            baseDamage = 12, radius = 2f, cooldown = 0.7f,
             color = new Color(0.8f, 0.5f, 0.1f)
         });
         Register(ElementType.Poison, ElementType.Water, new ComboSpellDef
         {
             comboType = ComboType.ToxicFrost, comboName = "Toxic Frost",
             description = "Slow + poison zone",
-            baseDamage = 2, radius = 2.5f, duration = 3f, cooldown = 0.8f,
+            baseDamage = 1.5f, radius = 2.5f, duration = 3f, cooldown = 0.8f,
             color = new Color(0.3f, 0.8f, 0.6f)
         });
         Register(ElementType.Poison, ElementType.Earth, new ComboSpellDef
         {
             comboType = ComboType.Quicksand, comboName = "Quicksand",
             description = "Trapping poisonous ground",
-            baseDamage = 3, radius = 2.5f, duration = 3f, cooldown = 0.8f,
+            baseDamage = 2.5f, radius = 2.5f, duration = 3f, cooldown = 0.8f,
             color = new Color(0.4f, 0.5f, 0.2f)
         });
         Register(ElementType.Poison, ElementType.Air, new ComboSpellDef
         {
             comboType = ComboType.Miasma, comboName = "Miasma",
             description = "Poisonous wind",
-            baseDamage = 3, radius = 3.5f, duration = 2.5f, cooldown = 0.8f,
+            baseDamage = 2.5f, radius = 3.5f, duration = 2.5f, cooldown = 0.8f,
             color = new Color(0.4f, 0.7f, 0.2f)
         });
         Register(ElementType.Poison, ElementType.Lightning, new ComboSpellDef
         {
             comboType = ComboType.PlagueSpark, comboName = "Plague Spark",
             description = "Lightning chains through enemies",
-            baseDamage = 8, radius = 3.5f, cooldown = 0.7f,
+            baseDamage = 7, radius = 3.5f, cooldown = 0.7f,
             color = new Color(0.5f, 0.9f, 0.2f)
         });
 
@@ -236,49 +236,49 @@ public static class ComboSpellRegistry
         {
             comboType = ComboType.Collapse, comboName = "Collapse",
             description = "Reality collapses inward",
-            baseDamage = 20, radius = 2.5f, cooldown = 0.9f,
+            baseDamage = 17, radius = 2.5f, cooldown = 0.9f,
             color = new Color(0.5f, 0.1f, 0.8f)
         });
         Register(ElementType.Void, ElementType.Fire, new ComboSpellDef
         {
             comboType = ComboType.Implode, comboName = "Implode",
             description = "Pulls enemies in, then damages",
-            baseDamage = 12, radius = 2.5f, cooldown = 0.8f,
+            baseDamage = 10, radius = 2.5f, cooldown = 0.8f,
             color = new Color(0.7f, 0.2f, 0.6f)
         });
         Register(ElementType.Void, ElementType.Water, new ComboSpellDef
         {
             comboType = ComboType.Rift, comboName = "Rift",
             description = "Rift that slows and damages",
-            baseDamage = 6, radius = 2f, duration = 2.5f, cooldown = 0.8f,
+            baseDamage = 5, radius = 2f, duration = 2.5f, cooldown = 0.8f,
             color = new Color(0.4f, 0.3f, 0.8f)
         });
         Register(ElementType.Void, ElementType.Earth, new ComboSpellDef
         {
             comboType = ComboType.Gravity, comboName = "Gravity",
             description = "Gravity crush",
-            baseDamage = 15, radius = 2f, cooldown = 0.8f,
+            baseDamage = 12, radius = 2f, cooldown = 0.8f,
             color = new Color(0.4f, 0.2f, 0.5f)
         });
         Register(ElementType.Void, ElementType.Air, new ComboSpellDef
         {
             comboType = ComboType.Vacuum, comboName = "Vacuum",
             description = "Pulls enemies toward a point",
-            baseDamage = 4, radius = 3.5f, duration = 1.5f, cooldown = 0.8f,
+            baseDamage = 3.5f, radius = 3.5f, duration = 1.5f, cooldown = 0.8f,
             color = new Color(0.5f, 0.4f, 0.8f)
         });
         Register(ElementType.Void, ElementType.Lightning, new ComboSpellDef
         {
             comboType = ComboType.RiftShock, comboName = "Rift Shock",
             description = "Stuns nearby enemies",
-            baseDamage = 9, radius = 3f, duration = 1.5f, cooldown = 0.8f,
+            baseDamage = 7.5f, radius = 3f, duration = 1.5f, cooldown = 0.8f,
             color = new Color(0.7f, 0.3f, 1f)
         });
         Register(ElementType.Void, ElementType.Poison, new ComboSpellDef
         {
             comboType = ComboType.Corruption, comboName = "Corruption",
             description = "Spreading void corruption",
-            baseDamage = 5, radius = 3f, duration = 3f, cooldown = 0.8f,
+            baseDamage = 4, radius = 3f, duration = 3f, cooldown = 0.8f,
             color = new Color(0.4f, 0.1f, 0.7f)
         });
     }

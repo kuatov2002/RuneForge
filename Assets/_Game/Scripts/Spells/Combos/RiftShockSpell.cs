@@ -109,7 +109,7 @@ public static class RiftShockSpell
             var hp = h.GetComponent<Health>();
             if (hp != null && !hp.IsDead)
             {
-                hp.TakeDamage(damage);
+                hp.TakeDamage(damage, ComboSpellFactory.CurrentCastElement ?? ElementType.Fire);
                 hp.ApplyStun(stunDur);
                 GameFeel.ApplyKnockback(h.transform, center, damage * 0.25f);
             }

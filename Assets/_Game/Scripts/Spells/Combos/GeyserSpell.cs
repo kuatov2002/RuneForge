@@ -49,7 +49,7 @@ public static class GeyserSpell
             var hp = h.GetComponent<Health>();
             if (hp == null || hp.IsDead) continue;
 
-            hp.TakeDamage(damage);
+            hp.TakeDamage(damage, ComboSpellFactory.CurrentCastElement ?? ElementType.Fire);
 
             // Launch enemy upward
             var erb = h.GetComponent<Rigidbody>();

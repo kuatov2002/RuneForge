@@ -89,7 +89,7 @@ public static class CorruptionSpell
             if (h.GetComponent<PlayerController>() != null) continue;
             var hp = h.GetComponent<Health>();
             if (hp != null && !hp.IsDead)
-                hp.TakeDamage(damage * 0.5f);
+                hp.TakeDamage(damage * 0.5f, ComboSpellFactory.CurrentCastElement ?? ElementType.Fire);
         }
 
         var zoneGO = new GameObject("CorruptionZone");
@@ -276,9 +276,11 @@ public class CorruptionZone : MonoBehaviour
     float _tickTimer;
     float _pulseTimer;
     Renderer _discRenderer;
+    ElementType _spellElement = ElementType.Fire;
 
     public void Init(float dps, float radius, Renderer discRenderer)
     {
+        _spellElement = ComboSpellFactory.CurrentCastElement ?? ElementType.Fire;
         _dps = dps;
         _radius = radius;
         _discRenderer = discRenderer;
@@ -316,7 +318,7 @@ public class CorruptionZone : MonoBehaviour
         _tickTimer -= Time.deltaTime;
         if (_tickTimer > 0) return;
         _tickTimer = 0.5f;
-        hp.TakeDamage(_dps * 0.5f); // Half DPS per tick at 0.5s intervals
+        hp.TakeDamage(_dps * 0.5f, _spellElement); // Half DPS per tick at 0.5s intervals
     }
 
     void OnTriggerExit(Collider other)

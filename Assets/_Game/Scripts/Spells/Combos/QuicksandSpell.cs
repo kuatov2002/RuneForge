@@ -181,9 +181,11 @@ public class QuicksandZone : MonoBehaviour
     float _stunTimer;
     float _pulseTimer;
     Renderer _pulseRenderer;
+    ElementType _spellElement = ElementType.Fire;
 
     public void Init(float dps, float duration, Renderer pulseRenderer)
     {
+        _spellElement = ComboSpellFactory.CurrentCastElement ?? ElementType.Fire;
         _dps = dps;
         _duration = duration;
         _pulseRenderer = pulseRenderer;
@@ -229,6 +231,6 @@ public class QuicksandZone : MonoBehaviour
         _tickTimer -= Time.deltaTime;
         if (_tickTimer > 0) return;
         _tickTimer = 0.5f;
-        hp.TakeDamage(_dps * 0.5f);
+        hp.TakeDamage(_dps * 0.5f, _spellElement);
     }
 }

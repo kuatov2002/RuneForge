@@ -184,9 +184,11 @@ public class VacuumVortexZone : MonoBehaviour
     float _pullStrength;
     Transform _core;
     float _pulseTimer;
+    ElementType _spellElement = ElementType.Fire;
 
     public void Init(float damage, float radius, float duration, bool charged, Transform core)
     {
+        _spellElement = ComboSpellFactory.CurrentCastElement ?? ElementType.Fire;
         _dps = damage;
         _radius = radius;
         _duration = duration;
@@ -225,6 +227,6 @@ public class VacuumVortexZone : MonoBehaviour
         _tickTimer -= Time.deltaTime;
         if (_tickTimer > 0) return;
         _tickTimer = 0.5f;
-        hp.TakeDamage(_dps);
+        hp.TakeDamage(_dps, _spellElement);
     }
 }

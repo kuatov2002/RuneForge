@@ -190,9 +190,11 @@ public class MiasmaCloudBehavior : MonoBehaviour
     float _tickTimer;
     float _seekTimer;
     Transform _target;
+    ElementType _spellElement = ElementType.Fire;
 
     public void Init(float dps, float radius, float duration, float moveSpeed)
     {
+        _spellElement = ComboSpellFactory.CurrentCastElement ?? ElementType.Fire;
         _dps = dps;
         _radius = radius;
         _duration = duration;
@@ -258,6 +260,6 @@ public class MiasmaCloudBehavior : MonoBehaviour
         _tickTimer -= Time.deltaTime;
         if (_tickTimer > 0) return;
         _tickTimer = 0.5f;
-        hp.TakeDamage(_dps * 0.5f);
+        hp.TakeDamage(_dps * 0.5f, _spellElement);
     }
 }

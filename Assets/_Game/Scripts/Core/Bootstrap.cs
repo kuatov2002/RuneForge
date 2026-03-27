@@ -180,6 +180,7 @@ public class Bootstrap : MonoBehaviour
 
         // Subscribe spell reaction feedback
         SpellInteractionSystem.OnReaction += OnSpellReaction;
+        ElementalStatus.OnReaction += OnSpellReaction;
 
         // Tutorial hints (first run only)
         if (PlayerPrefs.GetInt("TutorialShown", 0) == 0)
@@ -1779,6 +1780,10 @@ public class Bootstrap : MonoBehaviour
         var elemData = enemy.AddComponent<EnemyElementData>();
         elemData.AssignRandomWeakness(baseElements);
 
+        // Elemental status system
+        enemy.AddComponent<ElementalStatus>();
+        enemy.AddComponent<ElementalStatusVisuals>();
+
         // Track damage numbers
         if (hud != null) hud.TrackEnemyDamage(health);
     }
@@ -2081,6 +2086,8 @@ public class Bootstrap : MonoBehaviour
         var rb = e.AddComponent<Rigidbody>(); rb.useGravity = false; rb.isKinematic = true;
         var hp = e.AddComponent<Health>(); hp.maxHP = 80; hp.currentHP = 80;
         e.AddComponent<EnemyHealthBar>();
+        e.AddComponent<ElementalStatus>();
+        e.AddComponent<ElementalStatusVisuals>();
         e.AddComponent<WardenBoss>();
         var enemyRef = e;
         hp.OnDeath += () => OnBossDeath(enemyRef);
@@ -2108,6 +2115,8 @@ public class Bootstrap : MonoBehaviour
         var rb = e.AddComponent<Rigidbody>(); rb.useGravity = false; rb.isKinematic = true;
         var hp = e.AddComponent<Health>(); hp.maxHP = 110; hp.currentHP = 110;
         e.AddComponent<EnemyHealthBar>();
+        e.AddComponent<ElementalStatus>();
+        e.AddComponent<ElementalStatusVisuals>();
         e.AddComponent<SwarmQueenBoss>();
         var enemyRef = e;
         hp.OnDeath += () => OnBossDeath(enemyRef);
@@ -2139,6 +2148,8 @@ public class Bootstrap : MonoBehaviour
         var rb = e.AddComponent<Rigidbody>(); rb.useGravity = false; rb.isKinematic = true;
         var hp = e.AddComponent<Health>(); hp.maxHP = 140; hp.currentHP = 140;
         e.AddComponent<EnemyHealthBar>();
+        e.AddComponent<ElementalStatus>();
+        e.AddComponent<ElementalStatusVisuals>();
         e.AddComponent<MirrorKnightBoss>();
         var enemyRef = e;
         hp.OnDeath += () => OnBossDeath(enemyRef);
@@ -2168,6 +2179,8 @@ public class Bootstrap : MonoBehaviour
         var rb = e.AddComponent<Rigidbody>(); rb.useGravity = false; rb.isKinematic = true;
         var hp = e.AddComponent<Health>(); hp.maxHP = 180; hp.currentHP = 180;
         e.AddComponent<EnemyHealthBar>();
+        e.AddComponent<ElementalStatus>();
+        e.AddComponent<ElementalStatusVisuals>();
         e.AddComponent<LichBoss>();
         var enemyRef = e;
         hp.OnDeath += () => OnBossDeath(enemyRef);
@@ -2194,6 +2207,8 @@ public class Bootstrap : MonoBehaviour
         var rb = e.AddComponent<Rigidbody>(); rb.useGravity = false; rb.isKinematic = true;
         var hp = e.AddComponent<Health>(); hp.maxHP = 220; hp.currentHP = 220;
         e.AddComponent<EnemyHealthBar>();
+        e.AddComponent<ElementalStatus>();
+        e.AddComponent<ElementalStatusVisuals>();
         e.AddComponent<RunebreakerBoss>();
         var enemyRef = e;
         hp.OnDeath += () => OnBossDeath(enemyRef);
@@ -2538,6 +2553,7 @@ public class Bootstrap : MonoBehaviour
         isPlayerDead = false;
         if (SFXSystem.Instance != null) SFXSystem.Instance.StopMusic();
         SpellInteractionSystem.OnReaction -= OnSpellReaction;
+        ElementalStatus.OnReaction -= OnSpellReaction;
         CleanupRun();
         EnterHub();
     }
@@ -2552,11 +2568,16 @@ public class Bootstrap : MonoBehaviour
         // Codex discovery
         Codex.DiscoverReaction(name, pos, color);
 
-        // Screen flash
-        GameFeel.ScreenFlash(color, 0.12f);
+        // Shockwave ring at reaction point (localized, not full-screen)
+        var ring = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
+        Destroy(ring.GetComponent<CapsuleCollider>());
+        ring.transform.position = pos + Vector3.up * 0.1f;
+        ring.transform.localScale = new Vector3(0.3f, 0.02f, 0.3f);
+        ring.GetComponent<Renderer>().material = ShaderCache.NewEmissive(color, 5f);
+        ring.AddComponent<DeathRingEffect>().Init(4f, 0.3f);
 
         // Hit particles at reaction point
-        GameFeel.SpawnHitParticles(pos + Vector3.up * 0.3f, color, 1.5f);
+        GameFeel.SpawnHitParticles(pos + Vector3.up * 0.3f, color, 2f);
 
         // Sound
         SFXSystem.Play(SFXSystem.SFXType.Reaction, pos);

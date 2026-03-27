@@ -17,7 +17,7 @@ public static class GenericComboSpell
             var hp = h.GetComponent<Health>();
             if (hp != null && !hp.IsDead)
             {
-                hp.TakeDamage(damage);
+                hp.TakeDamage(damage, ComboSpellFactory.CurrentCastElement ?? ElementType.Fire);
 
                 if (def.duration > 0)
                     hp.ApplyStun(Mathf.Min(def.duration, 2f));

@@ -99,6 +99,7 @@ public class ImplodeVortex : MonoBehaviour
     float _pullDuration = 0.5f;
     float _timer;
     bool _exploded;
+    ElementType _spellElement = ElementType.Fire;
 
     // VFX references
     ParticleSystem _swirlPS;
@@ -106,6 +107,7 @@ public class ImplodeVortex : MonoBehaviour
 
     public void Init(Vector3 center, float damage, float radius, bool charged)
     {
+        _spellElement = ComboSpellFactory.CurrentCastElement ?? ElementType.Fire;
         _center = center;
         _damage = damage;
         _radius = radius;
@@ -222,7 +224,7 @@ public class ImplodeVortex : MonoBehaviour
             var hp = h.GetComponent<Health>();
             if (hp != null && !hp.IsDead)
             {
-                hp.TakeDamage(_damage);
+                hp.TakeDamage(_damage, _spellElement);
                 GameFeel.ApplyKnockback(h.transform, _center, _damage * 0.4f);
             }
         }

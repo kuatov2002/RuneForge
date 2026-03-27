@@ -151,9 +151,11 @@ public class PlagueSparkProjectile : MonoBehaviour
     float _maxDist = 20f;
     Vector3 _startPos;
     bool _hit;
+    ElementType _spellElement = ElementType.Fire;
 
     public void Init(Vector3 dir, float damage, float radius, int maxChains)
     {
+        _spellElement = ComboSpellFactory.CurrentCastElement ?? ElementType.Fire;
         _dir = dir.normalized;
         _damage = damage;
         _radius = radius;
@@ -201,7 +203,7 @@ public class PlagueSparkProjectile : MonoBehaviour
         Vector3 pos = firstTarget.position;
 
         // Damage first target
-        firstHP.TakeDamage(_damage);
+        firstHP.TakeDamage(_damage, _spellElement);
         ApplyPoisonDoT(firstTarget.gameObject);
         SFXSystem.Play(SFXSystem.SFXType.Hit, pos);
 
@@ -249,7 +251,7 @@ public class PlagueSparkProjectile : MonoBehaviour
             var bestHP = best.GetComponent<Health>();
             if (bestHP != null && !bestHP.IsDead)
             {
-                bestHP.TakeDamage(chainDamage);
+                bestHP.TakeDamage(chainDamage, _spellElement);
                 ApplyPoisonDoT(best.gameObject);
             }
 
@@ -282,7 +284,7 @@ public class PlagueSparkProjectile : MonoBehaviour
             var hp = h.GetComponent<Health>();
             if (hp != null && !hp.IsDead)
             {
-                hp.TakeDamage(_damage * 0.5f);
+                hp.TakeDamage(_damage * 0.5f, _spellElement);
             }
         }
 
@@ -342,9 +344,11 @@ public class PlagueSparkProjectile : MonoBehaviour
 public class PoisonDoT : MonoBehaviour
 {
     float _dps, _timer, _tickTimer;
+    ElementType _spellElement = ElementType.Fire;
 
     public void Init(float dps, float duration)
     {
+        _spellElement = ComboSpellFactory.CurrentCastElement ?? ElementType.Fire;
         _dps = dps;
         _timer = duration;
     }
@@ -357,6 +361,6 @@ public class PoisonDoT : MonoBehaviour
         if (_tickTimer > 0) return;
         _tickTimer = 0.5f;
         var hp = GetComponent<Health>();
-        if (hp != null && !hp.IsDead) hp.TakeDamage(_dps * 0.5f);
+        if (hp != null && !hp.IsDead) hp.TakeDamage(_dps * 0.5f, _spellElement);
     }
 }

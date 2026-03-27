@@ -180,9 +180,11 @@ public class CycloneZone : MonoBehaviour
     float _elapsed;
     float _spinAngle;
     bool _expired;
+    ElementType _spellElement = ElementType.Fire;
 
     public void Init(float damage, float radius, float duration, bool charged)
     {
+        _spellElement = ComboSpellFactory.CurrentCastElement ?? ElementType.Fire;
         _damage = damage;
         _radius = radius;
         _duration = duration;
@@ -258,7 +260,7 @@ public class CycloneZone : MonoBehaviour
         if (_tickTimer > 0) return;
         _tickTimer = 0.5f;
 
-        hp.TakeDamage(_damage);
+        hp.TakeDamage(_damage, _spellElement);
     }
 
     Transform FindNearestEnemy()
@@ -294,7 +296,7 @@ public class CycloneZone : MonoBehaviour
             if (hp == null || hp.IsDead) continue;
 
             GameFeel.ApplyKnockback(h.transform, pos, burstForce);
-            hp.TakeDamage(_damage * 0.5f);
+            hp.TakeDamage(_damage * 0.5f, _spellElement);
         }
 
         // Burst VFX: particles spraying outward

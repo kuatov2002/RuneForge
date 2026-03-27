@@ -190,9 +190,11 @@ public class RiftZone : MonoBehaviour
     Transform _warpSphere;
     Renderer _discRenderer;
     float _pulseTimer;
+    ElementType _spellElement = ElementType.Fire;
 
     public void Init(float damage, float radius, float duration, Transform warpSphere, Renderer discRenderer)
     {
+        _spellElement = ComboSpellFactory.CurrentCastElement ?? ElementType.Fire;
         _dps = damage;
         _radius = radius;
         _duration = duration;
@@ -231,6 +233,6 @@ public class RiftZone : MonoBehaviour
         _tickTimer -= Time.deltaTime;
         if (_tickTimer > 0) return;
         _tickTimer = 0.5f;
-        hp.TakeDamage(_dps);
+        hp.TakeDamage(_dps, _spellElement);
     }
 }

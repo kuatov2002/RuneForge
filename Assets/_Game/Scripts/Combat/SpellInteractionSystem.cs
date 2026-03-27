@@ -135,7 +135,7 @@ public static class SpellInteractionSystem
                 hp.TakeDamage(damage * 0.5f);
         }
 
-        SteamSpell.Cast(pos, 2f, 2f, 3f, false);
+        SteamSpell.SpawnZone(pos, 2f, 2f, 3f, false);
 
         var burstGO = new GameObject("EvaporateBurst");
         burstGO.transform.position = pos + Vector3.up * 0.3f;

@@ -41,9 +41,11 @@ public class CollapseEffect : MonoBehaviour
     float _pullTimer;
     bool _pulling;
     float _pullDuration = 0.3f;
+    ElementType _spellElement = ElementType.Fire;
 
     public void Init(Vector3 center, float damage, float radius, float pullRadius, bool charged)
     {
+        _spellElement = ComboSpellFactory.CurrentCastElement ?? ElementType.Fire;
         _center = center;
         _damage = damage;
         _radius = radius;
@@ -201,7 +203,7 @@ public class CollapseEffect : MonoBehaviour
             var hp = h.GetComponent<Health>();
             if (hp != null && !hp.IsDead)
             {
-                hp.TakeDamage(_damage);
+                hp.TakeDamage(_damage, _spellElement);
                 GameFeel.ApplyKnockback(h.transform, _center, _damage * 0.2f);
             }
         }

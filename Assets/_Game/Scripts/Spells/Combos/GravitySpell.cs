@@ -87,7 +87,7 @@ public static class GravitySpell
             var hp = h.GetComponent<Health>();
             if (hp != null && !hp.IsDead)
             {
-                hp.TakeDamage(damage);
+                hp.TakeDamage(damage, ComboSpellFactory.CurrentCastElement ?? ElementType.Fire);
                 hp.ApplyStun(stunDuration);
 
                 // Visual slam: push enemy down briefly

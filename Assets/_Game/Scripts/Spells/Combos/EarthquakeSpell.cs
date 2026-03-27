@@ -141,9 +141,11 @@ public class EarthquakeShockwaveRing : MonoBehaviour
     float _currentRadius;
     GameObject _ringVisual;
     System.Collections.Generic.HashSet<int> _hitIds = new();
+    ElementType _spellElement = ElementType.Fire;
 
     public void Init(Vector3 center, float damage, float maxRadius, float stunDuration)
     {
+        _spellElement = ComboSpellFactory.CurrentCastElement ?? ElementType.Fire;
         _center = center;
         _damage = damage;
         _maxRadius = maxRadius;
@@ -204,7 +206,7 @@ public class EarthquakeShockwaveRing : MonoBehaviour
             float dist = Vector3.Distance(_center, h.transform.position);
             if (dist >= _currentRadius - bandWidth * 0.5f && dist <= _currentRadius + bandWidth * 0.5f)
             {
-                hp.TakeDamage(_damage);
+                hp.TakeDamage(_damage, _spellElement);
                 hp.ApplyStun(_stunDuration);
                 GameFeel.ApplyKnockback(h.transform, _center, _damage * 0.25f);
                 _hitIds.Add(id);

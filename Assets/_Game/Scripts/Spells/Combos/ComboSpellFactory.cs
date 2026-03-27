@@ -6,8 +6,12 @@ using UnityEngine;
 /// </summary>
 public static class ComboSpellFactory
 {
+    /// <summary>The element of the spell currently being cast. Set during Cast(), read by individual spells.</summary>
+    public static ElementType? CurrentCastElement;
+
     public static void Cast(ComboSpellDef def, Vector3 origin, Vector3 targetPos, float damageMult, bool charged)
     {
+        CurrentCastElement = ElementalStatusDefs.GetPrimaryElement(def.comboType);
         float dmg = def.baseDamage * damageMult;
         float radius = def.radius;
 
@@ -128,5 +132,6 @@ public static class ComboSpellFactory
                 GenericComboSpell.Cast(def, targetPos, dmg, radius, charged);
                 break;
         }
+
     }
 }

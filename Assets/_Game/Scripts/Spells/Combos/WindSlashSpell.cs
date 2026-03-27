@@ -76,9 +76,11 @@ public class WindBladeProjectile : MonoBehaviour
     float _maxDist = 16f;
     Vector3 _startPos;
     System.Collections.Generic.HashSet<int> _hitIds = new();
+    ElementType _spellElement = ElementType.Fire;
 
     public void Init(Vector3 dir, float speed, float damage)
     {
+        _spellElement = ComboSpellFactory.CurrentCastElement ?? ElementType.Fire;
         _dir = dir.normalized;
         _speed = speed;
         _damage = damage;
@@ -104,7 +106,7 @@ public class WindBladeProjectile : MonoBehaviour
         if (_hitIds.Contains(id)) return;
         _hitIds.Add(id);
 
-        hp.TakeDamage(_damage);
+        hp.TakeDamage(_damage, _spellElement);
 
         // Knockback sideways (perpendicular to blade travel)
         Vector3 perp = Vector3.Cross(_dir, Vector3.up).normalized;

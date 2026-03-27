@@ -63,9 +63,11 @@ public class RubbleStorm : MonoBehaviour
     int _wavesRemaining;
     float _interval;
     float _timer;
+    ElementType _spellElement = ElementType.Fire;
 
     public void Init(Vector3 center, float damage, float radius, int waves, float interval)
     {
+        _spellElement = ComboSpellFactory.CurrentCastElement ?? ElementType.Fire;
         _center = center;
         _damage = damage;
         _radius = radius;
@@ -121,7 +123,7 @@ public class RubbleStorm : MonoBehaviour
             var hp = h.GetComponent<Health>();
             if (hp != null && !hp.IsDead)
             {
-                hp.TakeDamage(_damage);
+                hp.TakeDamage(_damage, _spellElement);
                 hp.ApplyStun(0.5f);
             }
         }

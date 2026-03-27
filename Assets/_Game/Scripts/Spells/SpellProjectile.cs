@@ -87,7 +87,7 @@ public class SpellProjectile : MonoBehaviour
             if (lich != null && lich.IsImmune)
                 return;
 
-            health.TakeDamage(damage);
+            health.TakeDamage(damage, element != null ? element.elementType : ElementType.Fire);
             hitTargets.Add(other);
 
             // Wildfire chain: on hit, trigger chain reaction

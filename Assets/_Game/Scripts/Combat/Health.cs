@@ -33,6 +33,8 @@ public class Health : MonoBehaviour
         {
             if (stunTimer > 0 || freezeTimer > 0) return 0f;
             if (magmaSlowTimer > 0) return 0.3f;
+            var es = GetComponent<ElementalStatus>();
+            if (es != null) return es.GetSpeedMultiplier();
             return 1f;
         }
     }
@@ -127,7 +129,7 @@ public class Health : MonoBehaviour
         }
     }
 
-    /// <summary>Take damage with element type — checks weakness/immunity.</summary>
+    /// <summary>Take damage with element type — checks weakness/immunity and applies elemental status.</summary>
     public void TakeDamage(float amount, ElementType element)
     {
         var elemData = GetComponent<EnemyElementData>();
@@ -142,6 +144,16 @@ public class Health : MonoBehaviour
             }
             amount = elemData.ModifyDamage(amount, element);
         }
+
+        // Elemental status: apply status and check for reactions
+        var elemStatus = GetComponent<ElementalStatus>();
+        if (elemStatus != null)
+        {
+            float reactionMult = elemStatus.ApplyElement(element, amount);
+            amount *= reactionMult;
+            amount *= elemStatus.GetDamageAmplifier();
+        }
+
         TakeDamage(amount);
     }
 
@@ -171,7 +183,8 @@ public class Health : MonoBehaviour
             preFreezeEmission = new Color[renderers.Length];
             for (int i = 0; i < renderers.Length; i++)
             {
-                if (renderers[i] != null && renderers[i].material != null)
+                if (renderers[i] != null && renderers[i].material != null
+                    && renderers[i].material.HasProperty("_EmissionColor"))
                     preFreezeEmission[i] = renderers[i].material.GetColor("_EmissionColor");
             }
         }
@@ -179,7 +192,7 @@ public class Health : MonoBehaviour
         // Visual: blue tint
         foreach (var r in renderers)
         {
-            if (r != null && r.material != null)
+            if (r != null && r.material != null && r.material.HasProperty("_EmissionColor"))
                 r.material.SetColor("_EmissionColor", new Color(0.3f, 0.6f, 1f) * 2f);
         }
     }
@@ -221,7 +234,8 @@ public class Health : MonoBehaviour
                 var renderers = GetComponentsInChildren<Renderer>();
                 for (int i = 0; i < renderers.Length; i++)
                 {
-                    if (renderers[i] != null && renderers[i].material != null)
+                    if (renderers[i] != null && renderers[i].material != null
+                        && renderers[i].material.HasProperty("_EmissionColor"))
                     {
                         Color restore = (preFreezeEmission != null && i < preFreezeEmission.Length)
                             ? preFreezeEmission[i]
@@ -251,6 +265,7 @@ public class Health : MonoBehaviour
         magmaSlowTimer = 0;
         hitRecoveryTimer = 0;
         preFreezeEmission = null;
+        GetComponent<ElementalStatus>()?.ClearAll();
 
         // Ensure all renderers are visible
         var renderers = GetComponentsInChildren<Renderer>();

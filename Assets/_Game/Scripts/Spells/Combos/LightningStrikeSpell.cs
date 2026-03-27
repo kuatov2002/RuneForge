@@ -45,7 +45,7 @@ public static class LightningStrikeSpell
         var mainHP = mainTarget.GetComponent<Health>();
         if (mainHP != null && !mainHP.IsDead)
         {
-            mainHP.TakeDamage(damage);
+            mainHP.TakeDamage(damage, ComboSpellFactory.CurrentCastElement ?? ElementType.Fire);
             GameFeel.ApplyKnockback(mainTarget, center, damage * 0.2f);
         }
 
@@ -69,7 +69,7 @@ public static class LightningStrikeSpell
             var nextHP = nextTarget.GetComponent<Health>();
             if (nextHP != null && !nextHP.IsDead)
             {
-                nextHP.TakeDamage(chainDamage);
+                nextHP.TakeDamage(chainDamage, ComboSpellFactory.CurrentCastElement ?? ElementType.Fire);
                 GameFeel.ApplyKnockback(nextTarget, prevTarget.position, chainDamage * 0.15f);
             }
 

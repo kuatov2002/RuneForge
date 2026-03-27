@@ -173,9 +173,11 @@ public class ToxicFrostZone : MonoBehaviour
     float _dps;
     float _duration;
     float _tickTimer;
+    ElementType _spellElement = ElementType.Fire;
 
     public void Init(float dps, float duration)
     {
+        _spellElement = ComboSpellFactory.CurrentCastElement ?? ElementType.Fire;
         _dps = dps;
         _duration = duration;
     }
@@ -193,6 +195,6 @@ public class ToxicFrostZone : MonoBehaviour
         _tickTimer -= Time.deltaTime;
         if (_tickTimer > 0) return;
         _tickTimer = 0.5f;
-        hp.TakeDamage(_dps * 0.5f);
+        hp.TakeDamage(_dps * 0.5f, _spellElement);
     }
 }

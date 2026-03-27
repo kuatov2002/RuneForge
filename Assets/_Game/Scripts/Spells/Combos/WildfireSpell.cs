@@ -109,6 +109,7 @@ public class WildfireBoltBehavior : MonoBehaviour
     bool _hit;
     Transform _homingTarget;
     float _homingSpeed = 20f;
+    ElementType _spellElement = ElementType.Fire;
 
     // Track all targets hit across the chain
     static HashSet<int> _hitIds = new();
@@ -116,6 +117,7 @@ public class WildfireBoltBehavior : MonoBehaviour
 
     public void Init(Vector3 dir, float damage, float chainRadius, int chainsLeft)
     {
+        _spellElement = ComboSpellFactory.CurrentCastElement ?? ElementType.Fire;
         _dir = dir.normalized;
         _damage = damage;
         _chainRadius = chainRadius;
@@ -199,7 +201,7 @@ public class WildfireBoltBehavior : MonoBehaviour
 
         if (!_hitIds.Contains(id))
         {
-            hp.TakeDamage(_damage);
+            hp.TakeDamage(_damage, _spellElement);
             _hitIds.Add(id);
         }
 

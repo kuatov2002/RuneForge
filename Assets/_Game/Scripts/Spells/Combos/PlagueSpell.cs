@@ -153,9 +153,11 @@ public class PlagueCloudZone : MonoBehaviour
     float _tickTimer;
     SphereCollider _collider;
     Transform _visual;
+    ElementType _spellElement = ElementType.Fire;
 
     public void Init(float dps, float endRadius, float duration, SphereCollider col, Transform visual)
     {
+        _spellElement = ComboSpellFactory.CurrentCastElement ?? ElementType.Fire;
         _dps = dps;
         _startRadius = endRadius * 0.6f;
         _endRadius = endRadius;
@@ -192,6 +194,6 @@ public class PlagueCloudZone : MonoBehaviour
         _tickTimer -= Time.deltaTime;
         if (_tickTimer > 0) return;
         _tickTimer = 0.5f;
-        hp.TakeDamage(_dps * 0.5f);
+        hp.TakeDamage(_dps * 0.5f, _spellElement);
     }
 }

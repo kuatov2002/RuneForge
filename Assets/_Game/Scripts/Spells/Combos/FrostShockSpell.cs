@@ -165,9 +165,11 @@ public class FrostShockZone : MonoBehaviour
     float _radius;
     float _duration;
     float _tickTimer;
+    ElementType _spellElement = ElementType.Fire;
 
     public void Init(float damage, float radius, float duration)
     {
+        _spellElement = ComboSpellFactory.CurrentCastElement ?? ElementType.Fire;
         _damage = damage;
         _radius = radius;
         _duration = duration;
@@ -193,7 +195,7 @@ public class FrostShockZone : MonoBehaviour
         if (_tickTimer > 0) return;
         _tickTimer = 0.5f;
 
-        hp.TakeDamage(_damage);
+        hp.TakeDamage(_damage, _spellElement);
         SFXSystem.Play(SFXSystem.SFXType.Hit, other.transform.position);
     }
 }

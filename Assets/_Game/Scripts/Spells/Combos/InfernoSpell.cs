@@ -99,9 +99,11 @@ public class FireballProjectile : MonoBehaviour
     float _maxDist = 18f;
     Vector3 _startPos;
     bool _exploded;
+    ElementType _spellElement = ElementType.Fire;
 
     public void Init(Vector3 dir, float speed, float damage, float radius, bool charged)
     {
+        _spellElement = ComboSpellFactory.CurrentCastElement ?? ElementType.Fire;
         _dir = dir;
         _speed = speed;
         _damage = damage;
@@ -152,7 +154,7 @@ public class FireballProjectile : MonoBehaviour
             var hp = h.GetComponent<Health>();
             if (hp != null && !hp.IsDead)
             {
-                hp.TakeDamage(_damage);
+                hp.TakeDamage(_damage, _spellElement);
                 GameFeel.ApplyKnockback(h.transform, pos, _damage * 0.3f);
             }
         }

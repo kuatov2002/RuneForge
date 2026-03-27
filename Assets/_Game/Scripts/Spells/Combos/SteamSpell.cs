@@ -141,9 +141,11 @@ public class SteamCloudZone : MonoBehaviour
     bool _charged;
     float _tickTimer;
     float _explosionDamage;
+    ElementType _spellElement = ElementType.Fire;
 
     public void Init(float dps, float radius, float duration, bool charged)
     {
+        _spellElement = ComboSpellFactory.CurrentCastElement ?? ElementType.Fire;
         _dps = dps;
         _radius = radius;
         _duration = duration;
@@ -160,7 +162,7 @@ public class SteamCloudZone : MonoBehaviour
         if (other.GetComponent<PlayerController>() != null) return;
         var hp = other.GetComponent<Health>();
         if (hp != null && !hp.IsDead)
-            hp.TakeDamage(_dps);
+            hp.TakeDamage(_dps, _spellElement);
     }
 
     /// <summary>Called when a Fire spell hits the steam cloud.</summary>
@@ -175,7 +177,7 @@ public class SteamCloudZone : MonoBehaviour
             if (h.GetComponent<PlayerController>() != null) continue;
             var hp = h.GetComponent<Health>();
             if (hp != null && !hp.IsDead)
-                hp.TakeDamage(_explosionDamage);
+                hp.TakeDamage(_explosionDamage, _spellElement);
         }
 
         // Explosion VFX: orange-red particle burst replacing steam

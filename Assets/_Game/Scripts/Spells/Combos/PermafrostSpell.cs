@@ -180,9 +180,11 @@ public class PermafrostZone : MonoBehaviour
 {
     float _damage;
     float _tickTimer;
+    ElementType _spellElement = ElementType.Fire;
 
     public void Init(float damage, float duration)
     {
+        _spellElement = ComboSpellFactory.CurrentCastElement ?? ElementType.Fire;
         _damage = damage;
     }
 
@@ -208,6 +210,6 @@ public class PermafrostZone : MonoBehaviour
         _tickTimer -= Time.deltaTime;
         if (_tickTimer > 0) return;
         _tickTimer = 1f;
-        hp.TakeDamage(_damage);
+        hp.TakeDamage(_damage, _spellElement);
     }
 }

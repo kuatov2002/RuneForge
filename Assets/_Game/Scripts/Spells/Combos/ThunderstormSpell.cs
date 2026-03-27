@@ -119,9 +119,11 @@ public class ThunderstormZone : MonoBehaviour
     float _boltInterval;
     float _boltTimer;
     float _elapsed;
+    ElementType _spellElement = ElementType.Fire;
 
     public void Init(Vector3 center, float damage, float radius, float duration, float boltInterval)
     {
+        _spellElement = ComboSpellFactory.CurrentCastElement ?? ElementType.Fire;
         _center = center;
         _damage = damage;
         _radius = radius;
@@ -205,7 +207,7 @@ public class ThunderstormZone : MonoBehaviour
             var hp = h.GetComponent<Health>();
             if (hp != null && !hp.IsDead)
             {
-                hp.TakeDamage(_damage);
+                hp.TakeDamage(_damage, _spellElement);
                 hp.ApplyStun(0.3f);
             }
         }

@@ -102,7 +102,7 @@ public static class BulwarkSpell
             var hp = h.GetComponent<Health>();
             if (hp != null && !hp.IsDead)
             {
-                hp.TakeDamage(5);
+                hp.TakeDamage(5, ComboSpellFactory.CurrentCastElement ?? ElementType.Fire);
                 GameFeel.ApplyKnockback(h.transform, wallPos, 5f);
             }
         }
@@ -135,7 +135,7 @@ public static class BulwarkSpell
             Vector3 toEnemy = (h.transform.position - pos).normalized;
             if (Vector3.Dot(toEnemy, forward) > -0.3f) // Wide cone
             {
-                hp.TakeDamage(shatterDamage);
+                hp.TakeDamage(shatterDamage, ComboSpellFactory.CurrentCastElement ?? ElementType.Fire);
                 GameFeel.ApplyKnockback(h.transform, pos, 6f);
             }
         }
@@ -238,9 +238,11 @@ public class BulwarkFortress : MonoBehaviour
     float _width;
     bool _charged;
     float _spikeDamageTimer;
+    ElementType _spellElement = ElementType.Fire;
 
     public void Init(float targetHeight, float duration, Vector3 forward, float width, bool charged)
     {
+        _spellElement = ComboSpellFactory.CurrentCastElement ?? ElementType.Fire;
         _targetHeight = targetHeight;
         _duration = duration;
         _forward = forward;
@@ -282,7 +284,7 @@ public class BulwarkFortress : MonoBehaviour
                         if (h.GetComponent<PlayerController>() != null) continue;
                         var hp = h.GetComponent<Health>();
                         if (hp != null && !hp.IsDead)
-                            hp.TakeDamage(3);
+                            hp.TakeDamage(3, _spellElement);
                     }
                 }
             }

@@ -163,9 +163,11 @@ public class MagmaPoolZone : MonoBehaviour
     float _tickTimer;
     float _pulseTimer;
     Renderer _discRenderer;
+    ElementType _spellElement = ElementType.Fire;
 
     public void Init(float dps, float radius, float duration, Renderer discRenderer)
     {
+        _spellElement = ComboSpellFactory.CurrentCastElement ?? ElementType.Fire;
         _dps = dps;
         _radius = radius;
         _duration = duration;
@@ -201,6 +203,6 @@ public class MagmaPoolZone : MonoBehaviour
         _tickTimer -= Time.deltaTime;
         if (_tickTimer > 0) return;
         _tickTimer = 0.5f;
-        hp.TakeDamage(_dps);
+        hp.TakeDamage(_dps, _spellElement);
     }
 }
