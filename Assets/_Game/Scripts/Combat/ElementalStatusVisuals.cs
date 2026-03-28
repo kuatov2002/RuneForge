@@ -108,14 +108,24 @@ public class ElementalStatusVisuals : MonoBehaviour
         Object.Destroy(icon.GetComponent<SphereCollider>());
         icon.name = $"Status_{type}";
         icon.transform.SetParent(transform, false);
-        icon.transform.localScale = Vector3.one * 0.15f;
+        icon.transform.localScale = Vector3.one * 0.25f;
 
-        // Position: offset based on number of existing icons
-        float xOffset = (_icons.Count - 1) * 0.25f;
-        icon.transform.localPosition = new Vector3(xOffset, 1.8f, 0f);
+        // Position: offset based on number of existing icons, raised for visibility
+        float xOffset = (_icons.Count - 1) * 0.35f;
+        icon.transform.localPosition = new Vector3(xOffset, 2.1f, 0f);
 
         var color = ElementalStatusDefs.StatusColors[type];
-        icon.GetComponent<Renderer>().material = ShaderCache.NewEmissive(color, 4f);
+        icon.GetComponent<Renderer>().material = ShaderCache.NewEmissive(color, 5f);
+
+        // Trail for motion visibility
+        var trail = icon.AddComponent<TrailRenderer>();
+        trail.startWidth = 0.12f;
+        trail.endWidth = 0f;
+        trail.time = 0.3f;
+        trail.material = ShaderCache.NewEmissive(color, 2f);
+        trail.startColor = color;
+        Color trailEnd = color; trailEnd.a = 0;
+        trail.endColor = trailEnd;
 
         _icons[type] = icon;
 
@@ -140,8 +150,8 @@ public class ElementalStatusVisuals : MonoBehaviour
         foreach (var kvp in _icons)
         {
             if (kvp.Value == null) continue;
-            float xOffset = (i - (total - 1) * 0.5f) * 0.25f;
-            kvp.Value.transform.localPosition = new Vector3(xOffset, 1.8f, 0f);
+            float xOffset = (i - (total - 1) * 0.5f) * 0.35f;
+            kvp.Value.transform.localPosition = new Vector3(xOffset, 2.1f, 0f);
             i++;
         }
     }

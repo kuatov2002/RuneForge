@@ -20,6 +20,9 @@ public static class ShaderCache
     static Shader _poisonShader;
     static Shader _voidShader;
     static Shader _fireShader;
+    static Shader _dangerShader;
+    static Shader _playerZoneShader;
+    static Shader _buffShader;
 
     [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.BeforeSceneLoad)]
     static void Init()
@@ -50,6 +53,9 @@ public static class ShaderCache
         _poisonShader = LoadShader("ProceduralPoison");
         _voidShader = LoadShader("ProceduralVoid");
         _fireShader = LoadShader("ProceduralFire");
+        _dangerShader = LoadShader("ProceduralDanger");
+        _playerZoneShader = LoadShader("ProceduralPlayerZone");
+        _buffShader = LoadShader("ProceduralBuff");
     }
 
     static Shader LoadShader(string name)
@@ -212,6 +218,40 @@ public static class ShaderCache
         mat.SetFloat("_ScrollSpeed", 2f);
         mat.SetFloat("_NoiseScale", 4f);
         mat.SetFloat("_Intensity", 3f);
+        return mat;
+    }
+
+    public static Material NewDanger(Color color, float innerRadius = 0.3f, float outerRadius = 0.9f,
+        float stripeCount = 8f, float scrollSpeed = 2f)
+    {
+        var mat = MakeCustom(_dangerShader, color);
+        mat.SetFloat("_InnerRadius", innerRadius);
+        mat.SetFloat("_OuterRadius", outerRadius);
+        mat.SetFloat("_FillProgress", 0f);
+        mat.SetFloat("_StripeCount", stripeCount);
+        mat.SetFloat("_ScrollSpeed", scrollSpeed);
+        return mat;
+    }
+
+    public static Material NewPlayerZone(Color color, float radius = 1f, float edgeSoftness = 0.3f,
+        float pulseSpeed = 1.5f, float alpha = 0.3f)
+    {
+        var mat = MakeCustom(_playerZoneShader, color);
+        mat.SetFloat("_Radius", radius);
+        mat.SetFloat("_EdgeSoftness", edgeSoftness);
+        mat.SetFloat("_PulseSpeed", pulseSpeed);
+        mat.SetFloat("_Alpha", alpha);
+        return mat;
+    }
+
+    public static Material NewBuff(Color color, float radius = 0.8f, float dashCount = 8f,
+        float dashRatio = 0.5f, float rotateSpeed = 1f)
+    {
+        var mat = MakeCustom(_buffShader, color);
+        mat.SetFloat("_Radius", radius);
+        mat.SetFloat("_DashCount", dashCount);
+        mat.SetFloat("_DashRatio", dashRatio);
+        mat.SetFloat("_RotateSpeed", rotateSpeed);
         return mat;
     }
 }

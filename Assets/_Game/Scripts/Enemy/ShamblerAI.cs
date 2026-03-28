@@ -227,7 +227,7 @@ public class ShamblerAI : MonoBehaviour
                 Destroy(warn.GetComponent<CapsuleCollider>());
                 warn.transform.position = leapTarget + Vector3.up * 0.02f;
                 warn.transform.localScale = new Vector3(2f, 0.01f, 2f);
-                warn.GetComponent<Renderer>().material = ShaderCache.NewEmissive(new Color(1f, 0.2f, 0.1f, 0.5f), 2f);
+                warn.GetComponent<Renderer>().material = ShaderCache.NewDanger(new Color(1f, 0.2f, 0.1f), 0.1f, 0.5f, 6f, 3f);
                 Destroy(warn, 0.5f);
                 return;
             }
@@ -271,7 +271,7 @@ public class ShamblerAI : MonoBehaviour
                 Destroy(ring.GetComponent<CapsuleCollider>());
                 ring.transform.position = transform.position + Vector3.up * 0.05f;
                 ring.transform.localScale = new Vector3(0.5f, 0.02f, 0.5f);
-                ring.GetComponent<Renderer>().material = ShaderCache.NewEmissive(new Color(1f, 0.3f, 0.1f), 3f);
+                ring.GetComponent<Renderer>().material = ShaderCache.NewDanger(new Color(1f, 0.3f, 0.1f), 0.2f, 0.5f, 8f, 4f);
                 ring.AddComponent<DeathRingEffect>().Init(5f, 0.5f);
                 Collider[] slamHits = Physics.OverlapSphere(transform.position, 2.5f);
                 foreach (var h in slamHits)
@@ -348,7 +348,7 @@ public class ShamblerAI : MonoBehaviour
         pool.transform.position = center + Vector3.up * 0.02f;
         float diameter = PoisonPoolRadius * 2f;
         pool.transform.localScale = new Vector3(diameter, 0.015f, diameter);
-        pool.GetComponent<Renderer>().material = ShaderCache.NewEmissive(new Color(0.2f, 0.8f, 0.1f), 1.5f);
+        pool.GetComponent<Renderer>().material = ShaderCache.NewPoison(new Color(0.1f, 0.2f, 0.05f), 0.5f);
 
         // Bubbling particles
         var particleGO = new GameObject("PoisonBubbles");

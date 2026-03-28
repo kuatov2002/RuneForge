@@ -194,7 +194,7 @@ public class BruteAI : MonoBehaviour
             Destroy(warn.GetComponent<CapsuleCollider>());
             warn.transform.position = transform.position + Vector3.up * 0.02f;
             warn.transform.localScale = new Vector3(4f, 0.01f, 4f);
-            warn.GetComponent<Renderer>().material = ShaderCache.NewEmissive(new Color(1f, 0.3f, 0.1f, 0.3f), 1.5f);
+            warn.GetComponent<Renderer>().material = ShaderCache.NewDanger(new Color(1f, 0.3f, 0.1f), 0.1f, 0.5f, 6f, 3f);
             Destroy(warn, 0.7f);
             return;
         }
@@ -257,7 +257,7 @@ public class BruteAI : MonoBehaviour
         Destroy(ring.GetComponent<CapsuleCollider>());
         ring.transform.position = transform.position + Vector3.up * 0.05f;
         ring.transform.localScale = new Vector3(0.5f, 0.03f, 0.5f);
-        ring.GetComponent<Renderer>().material = ShaderCache.NewEmissive(new Color(0.8f, 0.3f, 0.1f), 3f);
+        ring.GetComponent<Renderer>().material = ShaderCache.NewDanger(new Color(0.8f, 0.3f, 0.1f), 0.2f, 0.5f, 8f, 4f);
         ring.AddComponent<DeathRingEffect>().Init(8f, 0.6f);
 
         // Damage in radius
@@ -312,7 +312,7 @@ public class BruteAI : MonoBehaviour
         hazard.transform.position = center + Vector3.up * 0.03f;
         float diameter = HazardRadius * 2f;
         hazard.transform.localScale = new Vector3(diameter, 0.02f, diameter);
-        hazard.GetComponent<Renderer>().material = ShaderCache.NewEmissive(new Color(0.8f, 0.15f, 0.05f), 1.5f);
+        hazard.GetComponent<Renderer>().material = ShaderCache.NewLava(new Color(0.4f, 0.08f, 0.02f));
 
         // Crack lines (4 radial strips for visual texture)
         for (int i = 0; i < 4; i++)
@@ -351,7 +351,7 @@ public class BruteAI : MonoBehaviour
         telegraphVFX.transform.position = midPoint + Vector3.up * 0.05f;
         telegraphVFX.transform.localScale = new Vector3(1.2f, 0.04f, distance);
         telegraphVFX.transform.rotation = Quaternion.LookRotation(chargeDir);
-        telegraphVFX.GetComponent<Renderer>().material = ShaderCache.NewEmissive(new Color(1f, 0.15f, 0.1f), 3f);
+        telegraphVFX.GetComponent<Renderer>().material = ShaderCache.NewDanger(new Color(1f, 0.15f, 0.1f), 0f, 0.5f, 10f, 4f);
         Destroy(telegraphVFX, WindupDuration + 0.1f);
     }
 

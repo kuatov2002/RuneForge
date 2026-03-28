@@ -158,8 +158,7 @@ public class EarthquakeShockwaveRing : MonoBehaviour
         _ringVisual.transform.localPosition = Vector3.up * 0.05f;
         _ringVisual.transform.localScale = new Vector3(0.1f, 0.04f, 0.1f);
 
-        Color ringColor = new Color(0.7f, 0.55f, 0.2f);
-        _ringVisual.GetComponent<Renderer>().material = ShaderCache.NewEmissive(ringColor, 4f);
+        _ringVisual.GetComponent<Renderer>().material = ShaderCache.NewPlayerZone(new Color(0.7f, 0.55f, 0.2f), 0.5f, 0.2f, 2f, 0.35f);
     }
 
     void Update()

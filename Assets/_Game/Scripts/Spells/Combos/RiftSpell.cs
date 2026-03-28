@@ -86,8 +86,7 @@ public static class RiftSpell
         disc.transform.SetParent(zoneGO.transform, false);
         disc.transform.localPosition = Vector3.zero;
         disc.transform.localScale = new Vector3(radius * 2, 0.03f, radius * 2);
-        disc.GetComponent<Renderer>().material = ShaderCache.NewMagic(
-            new Color(0.15f, 0.05f, 0.4f), 2f);
+        disc.GetComponent<Renderer>().material = ShaderCache.NewPlayerZone(new Color(0.4f, 0.15f, 0.8f), 0.5f, 0.3f, 2f, 0.3f);
 
         // Rotating transparent sphere inside (warped visual)
         var warpSphere = GameObject.CreatePrimitive(PrimitiveType.Sphere);

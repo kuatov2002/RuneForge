@@ -61,7 +61,7 @@ public static class QuicksandSpell
         disc.transform.SetParent(zoneGO.transform, false);
         disc.transform.localPosition = Vector3.zero;
         disc.transform.localScale = new Vector3(radius * 2f, 0.04f, radius * 2f);
-        disc.GetComponent<Renderer>().material = ShaderCache.NewLava(new Color(0.3f, 0.2f, 0.05f));
+        disc.GetComponent<Renderer>().material = ShaderCache.NewPlayerZone(new Color(0.6f, 0.45f, 0.15f), 0.5f, 0.3f, 1f, 0.3f);
 
         // Sinking particles — particles moving downward with decreasing scale.y
         var sinkGO = new GameObject("QuicksandSink");
@@ -155,7 +155,7 @@ public static class QuicksandSpell
         pulseDisc.transform.localPosition = Vector3.up * 0.05f;
         pulseDisc.transform.localScale = new Vector3(radius * 1.6f, 0.02f, radius * 1.6f);
         var pulseRend = pulseDisc.GetComponent<Renderer>();
-        pulseRend.material = ShaderCache.NewEmissive(new Color(0.3f, 0.25f, 0.08f), 1.5f);
+        pulseRend.material = ShaderCache.NewPlayerZone(new Color(0.5f, 0.4f, 0.12f), 0.4f, 0.2f, 0.8f, 0.2f);
 
         // Trigger collider
         var zoneCol = zoneGO.AddComponent<SphereCollider>();

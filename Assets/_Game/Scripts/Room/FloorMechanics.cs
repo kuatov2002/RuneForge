@@ -87,7 +87,7 @@ public static class FloorMechanics
         fog.transform.parent = roomGO.transform;
         fog.transform.localPosition = new Vector3(6, 0.3f, 6);
         fog.transform.localScale = new Vector3(14, 0.01f, 14);
-        fog.GetComponent<Renderer>().material = ShaderCache.NewEmissive(new Color(0.15f, 0.4f, 0.1f), 1f);
+        fog.GetComponent<Renderer>().material = ShaderCache.NewPoison(new Color(0.1f, 0.25f, 0.05f), 0.4f);
 
         var fogBehavior = fog.AddComponent<CorruptionFogBehavior>();
     }
@@ -186,7 +186,7 @@ public class ChaosTileBehavior : MonoBehaviour
             _timer = 0;
             _dangerous = !_dangerous;
             GetComponent<Renderer>().material = _dangerous
-                ? ShaderCache.NewEmissive(new Color(1f, 0.15f, 0.1f), 3f)
+                ? ShaderCache.NewDanger(new Color(1f, 0.15f, 0.1f), 0f, 0.5f, 6f, 3f)
                 : ShaderCache.NewEmissive(new Color(0.5f, 0.1f, 0.5f), 1f);
         }
     }

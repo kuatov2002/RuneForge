@@ -54,7 +54,7 @@ public static class MagmaSpell
         disc.transform.SetParent(poolGO.transform, false);
         disc.transform.localPosition = Vector3.zero;
         disc.transform.localScale = new Vector3(radius * 2, 0.04f, radius * 2);
-        disc.GetComponent<Renderer>().material = ShaderCache.NewLava(new Color(0.3f, 0.05f, 0f));
+        disc.GetComponent<Renderer>().material = ShaderCache.NewPlayerZone(new Color(1f, 0.4f, 0.1f), 0.5f, 0.3f, 1.5f, 0.3f);
 
         // Bubbling lava particles: continuous emission popping up from surface
         var bubbleGO = new GameObject("MagmaBubbles");

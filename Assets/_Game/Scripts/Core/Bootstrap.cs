@@ -1378,7 +1378,7 @@ public class Bootstrap : MonoBehaviour
             portal.name = "PressurePortal";
             portal.transform.position = FlankSpawnPos(i) + Vector3.up * 0.1f;
             portal.transform.localScale = new Vector3(1.2f, 0.03f, 1.2f);
-            portal.GetComponent<Renderer>().material = ShaderCache.NewEmissive(new Color(1f, 0.1f, 0.1f), 2f);
+            portal.GetComponent<Renderer>().material = ShaderCache.NewDanger(new Color(1f, 0.1f, 0.1f), 0.2f, 0.5f, 6f, 2f);
             portal.AddComponent<PressurePortalVFX>();
             pressurePortals.Add(portal);
         }

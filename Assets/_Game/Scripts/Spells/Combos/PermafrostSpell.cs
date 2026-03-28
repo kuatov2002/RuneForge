@@ -53,8 +53,7 @@ public static class PermafrostSpell
         disc.transform.SetParent(iceGO.transform, false);
         disc.transform.localPosition = Vector3.zero;
         disc.transform.localScale = new Vector3(radius * 2, 0.03f, radius * 2);
-        Color iceCol = new Color(0.6f, 0.88f, 0.95f);
-        disc.GetComponent<Renderer>().material = ShaderCache.NewIce(iceCol, 0.5f);
+        disc.GetComponent<Renderer>().material = ShaderCache.NewPlayerZone(new Color(0.5f, 0.85f, 1f), 0.5f, 0.3f, 1.5f, 0.3f);
 
         // Sparkle particles: tiny white sparkles above the ice surface
         var sparkleGO = new GameObject("PermafrostSparkles");

@@ -71,7 +71,7 @@ public static class RoomHazards
         lines.transform.parent = trap.transform;
         lines.transform.localPosition = new Vector3(0, -0.14f, 0);
         lines.transform.localScale = new Vector3(1.3f, 0.02f, 1.3f);
-        lines.GetComponent<Renderer>().material = ShaderCache.NewEmissive(new Color(0.8f, 0.2f, 0.1f), 1f);
+        lines.GetComponent<Renderer>().material = ShaderCache.NewDanger(new Color(0.8f, 0.2f, 0.1f), 0.1f, 0.5f, 4f, 1.5f);
 
         // Trigger
         var col = trap.AddComponent<BoxCollider>();
@@ -165,7 +165,7 @@ public static class RoomHazards
         pool.transform.position = new Vector3(pos.x, 0.02f, pos.z);
         float size = Random.Range(1.5f, 2.5f);
         pool.transform.localScale = new Vector3(size, 0.02f, size);
-        pool.GetComponent<Renderer>().material = ShaderCache.NewWater(new Color(0.3f, 0.5f, 0.8f), 0.7f);
+        pool.GetComponent<Renderer>().material = ShaderCache.NewWater(new Color(0.3f, 0.5f, 0.8f), 0.45f);
 
         var col = pool.AddComponent<SphereCollider>();
         col.isTrigger = true;
@@ -192,7 +192,7 @@ public static class RoomHazards
         grate.transform.parent = vent.transform;
         grate.transform.localPosition = new Vector3(0, -0.18f, 0);
         grate.transform.localScale = new Vector3(0.8f, 0.04f, 0.8f);
-        grate.GetComponent<Renderer>().material = ShaderCache.NewLit(new Color(0.3f, 0.2f, 0.15f));
+        grate.GetComponent<Renderer>().material = ShaderCache.NewLava(new Color(0.3f, 0.1f, 0.05f));
 
         var col = vent.AddComponent<BoxCollider>();
         col.isTrigger = true;

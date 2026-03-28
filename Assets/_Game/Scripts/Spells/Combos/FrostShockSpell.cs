@@ -64,8 +64,7 @@ public static class FrostShockSpell
         disc.transform.SetParent(zoneGO.transform, false);
         disc.transform.localPosition = Vector3.zero;
         disc.transform.localScale = new Vector3(radius * 2, 0.03f, radius * 2);
-        Color iceCol = new Color(0.4f, 0.8f, 0.95f);
-        disc.GetComponent<Renderer>().material = ShaderCache.NewIce(iceCol, 0.5f);
+        disc.GetComponent<Renderer>().material = ShaderCache.NewPlayerZone(new Color(0.4f, 0.75f, 1f), 0.5f, 0.3f, 1.5f, 0.3f);
 
         // Sparking yellow particles on top of ice
         var sparkGO = new GameObject("FrostShockSparks");

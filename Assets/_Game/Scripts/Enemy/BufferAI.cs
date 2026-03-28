@@ -245,12 +245,12 @@ public class BufferAI : MonoBehaviour
 
         if (buffed > 0)
         {
-            // War Cry VFX: expanding ring
+            // War Cry VFX: expanding buff ring
             var ring = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
             Object.Destroy(ring.GetComponent<CapsuleCollider>());
             ring.transform.position = transform.position + Vector3.up * 0.1f;
             ring.transform.localScale = new Vector3(0.5f, 0.02f, 0.5f);
-            ring.GetComponent<Renderer>().material = ShaderCache.NewEmissive(new Color(1f, 0.6f, 0.1f, 0.5f), 3f);
+            ring.GetComponent<Renderer>().material = ShaderCache.NewBuff(new Color(1f, 0.6f, 0.1f), 0.5f, 8f, 0.5f, 1.5f);
             ring.AddComponent<ExpandRingVFX>().Init(BuffRadius * 2, 0.5f);
 
             SFXSystem.Play(SFXSystem.SFXType.LevelUp, transform.position, 0.5f);
@@ -298,6 +298,8 @@ public class EnemyBuff : MonoBehaviour
     Renderer[] _renderers;
     Color[] _originalColors;
     bool _active;
+    GameObject _buffRing;
+    GameObject _buffLabel;
 
     public void ApplyBuff(float dmgMult, float spdMult, float duration)
     {
@@ -311,6 +313,29 @@ public class EnemyBuff : MonoBehaviour
             _originalColors = new Color[_renderers.Length];
             for (int i = 0; i < _renderers.Length; i++)
                 _originalColors[i] = _renderers[i].material.color;
+
+            // Buff ring under feet
+            _buffRing = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
+            Object.Destroy(_buffRing.GetComponent<CapsuleCollider>());
+            _buffRing.name = "BuffRing";
+            _buffRing.transform.SetParent(transform, false);
+            _buffRing.transform.localPosition = Vector3.up * 0.03f;
+            _buffRing.transform.localScale = new Vector3(1.2f, 0.01f, 1.2f);
+            _buffRing.GetComponent<Renderer>().material = ShaderCache.NewBuff(
+                new Color(1f, 0.6f, 0.1f), 0.5f, 8f, 0.5f, 1f);
+
+            // Floating "+PWR" label
+            _buffLabel = new GameObject("BuffLabel");
+            _buffLabel.transform.SetParent(transform, false);
+            _buffLabel.transform.localPosition = new Vector3(0, 2.2f, 0);
+            var labelMesh = _buffLabel.AddComponent<TextMesh>();
+            labelMesh.text = "+PWR";
+            labelMesh.fontSize = 24;
+            labelMesh.characterSize = 0.08f;
+            labelMesh.alignment = TextAlignment.Center;
+            labelMesh.anchor = TextAnchor.MiddleCenter;
+            labelMesh.color = new Color(1f, 0.7f, 0.2f);
+            _buffLabel.AddComponent<BillboardText>();
         }
         _active = true;
     }
@@ -325,9 +350,14 @@ public class EnemyBuff : MonoBehaviour
         {
             float pulse = 0.3f + Mathf.PingPong(Time.time * 3f, 0.3f);
             foreach (var r in _renderers)
-                if (r != null && r.gameObject.name != "Eye")
+                if (r != null && r.gameObject.name != "Eye" && r.gameObject.name != "BuffRing"
+                    && r.gameObject.name != "BuffAura")
                     r.material.color = Color.Lerp(r.material.color, new Color(1f, 0.6f, 0.1f), pulse * Time.deltaTime * 5f);
         }
+
+        // Float label up/down
+        if (_buffLabel != null)
+            _buffLabel.transform.localPosition = new Vector3(0, 2.2f + Mathf.Sin(Time.time * 2f) * 0.1f, 0);
 
         if (_timer <= 0)
         {
@@ -341,7 +371,19 @@ public class EnemyBuff : MonoBehaviour
                     if (_renderers[i] != null && i < _originalColors.Length)
                         _renderers[i].material.color = _originalColors[i];
             }
+            if (_buffRing != null) { Object.Destroy(_buffRing); _buffRing = null; }
+            if (_buffLabel != null) { Object.Destroy(_buffLabel); _buffLabel = null; }
         }
+    }
+}
+
+/// <summary>Faces camera at all times (for floating text labels).</summary>
+public class BillboardText : MonoBehaviour
+{
+    void LateUpdate()
+    {
+        if (Camera.main != null)
+            transform.rotation = Camera.main.transform.rotation;
     }
 }
 

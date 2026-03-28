@@ -101,8 +101,7 @@ public static class CorruptionSpell
         disc.transform.SetParent(zoneGO.transform, false);
         disc.transform.localPosition = Vector3.zero;
         disc.transform.localScale = new Vector3(radius * 2, 0.04f, radius * 2);
-        disc.GetComponent<Renderer>().material = ShaderCache.NewMagic(
-            new Color(0.25f, 0.1f, 0.4f), 2f);
+        disc.GetComponent<Renderer>().material = ShaderCache.NewPlayerZone(new Color(0.5f, 0.2f, 0.7f), 0.5f, 0.3f, 1.5f, 0.3f);
 
         // Corrupt particles rising from the ground
         var risingGO = new GameObject("CorruptionRisingParticles");

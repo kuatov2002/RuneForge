@@ -61,7 +61,7 @@ public static class ToxicFrostSpell
         disc.transform.SetParent(zoneGO.transform, false);
         disc.transform.localPosition = Vector3.zero;
         disc.transform.localScale = new Vector3(radius * 2f, 0.03f, radius * 2f);
-        disc.GetComponent<Renderer>().material = ShaderCache.NewIce(new Color(0.1f, 0.6f, 0.5f), 0.7f);
+        disc.GetComponent<Renderer>().material = ShaderCache.NewPlayerZone(new Color(0.2f, 0.7f, 0.6f), 0.5f, 0.3f, 1.5f, 0.3f);
 
         // Poison bubbles rising
         var bubbleGO = new GameObject("ToxicFrostBubbles");

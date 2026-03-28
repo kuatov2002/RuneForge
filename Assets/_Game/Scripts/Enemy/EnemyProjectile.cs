@@ -49,34 +49,39 @@ public class EnemyProjectile : MonoBehaviour
 
     public static GameObject Create(Vector3 pos, Vector3 dir, float speed, float damage, Color color, ElementSO elem = null)
     {
-        var go = GameObject.CreatePrimitive(PrimitiveType.Sphere);
+        var go = GameObject.CreatePrimitive(PrimitiveType.Cube);
         go.name = "EnemyProjectile";
         go.transform.position = pos + Vector3.up * 0.5f;
-        go.transform.localScale = Vector3.one * 0.2f;
+        go.transform.localScale = new Vector3(0.1f, 0.1f, 0.3f);
+        go.transform.rotation = Quaternion.LookRotation(dir);
         go.layer = 0;
 
-        var col = go.GetComponent<SphereCollider>();
-        col.isTrigger = true;
-        col.radius = 2f;
+        var boxCol = go.GetComponent<BoxCollider>();
+        Object.Destroy(boxCol);
+        var sphereCol = go.AddComponent<SphereCollider>();
+        sphereCol.isTrigger = true;
+        sphereCol.radius = 2f;
 
         var rb = go.AddComponent<Rigidbody>();
         rb.useGravity = false;
         rb.isKinematic = true;
 
-        // Enemy projectiles glow red-tinted for readability
-        Color emissiveColor = Color.Lerp(color, Color.red, 0.4f);
-        var mat = ShaderCache.NewEmissive(emissiveColor, 3f);
+        // Enemy projectiles: bright red emissive for danger readability
+        Color emissiveColor = Color.Lerp(color, Color.red, 0.5f);
+        var mat = ShaderCache.NewEmissive(emissiveColor, 4f);
         go.GetComponent<Renderer>().material = mat;
 
         var trail = go.AddComponent<TrailRenderer>();
-        trail.startWidth = 0.15f;
+        trail.startWidth = 0.25f;
         trail.endWidth = 0f;
-        trail.time = 0.2f;
-        var tMat = ShaderCache.NewLit(emissiveColor);
+        trail.time = 0.3f;
+        var tMat = ShaderCache.NewEmissive(emissiveColor, 2f);
         trail.material = tMat;
         trail.startColor = emissiveColor;
         Color endC = emissiveColor; endC.a = 0;
         trail.endColor = endC;
+
+        SFXSystem.Play(SFXSystem.SFXType.Hit, pos, 0.15f);
 
         var proj = go.AddComponent<EnemyProjectile>();
         proj.Setup(dir, speed, damage, elem);

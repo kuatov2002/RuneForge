@@ -57,15 +57,17 @@ public class GoldSystem : MonoBehaviour
         var go = new GameObject("GoldDrop");
         go.transform.position = position + Vector3.up * 0.3f;
 
-        // Visual: small golden sphere
-        var sphere = GameObject.CreatePrimitive(PrimitiveType.Sphere);
-        Object.Destroy(sphere.GetComponent<SphereCollider>());
-        sphere.name = "GoldOrb";
-        sphere.transform.parent = go.transform;
-        sphere.transform.localPosition = Vector3.zero;
-        float scale = Mathf.Lerp(0.12f, 0.25f, Mathf.Clamp01(amount / 20f));
-        sphere.transform.localScale = Vector3.one * scale;
-        sphere.GetComponent<Renderer>().material = ShaderCache.NewGold();
+        // Visual: golden cube rotated 45° (diamond shape)
+        var cube = GameObject.CreatePrimitive(PrimitiveType.Cube);
+        Object.Destroy(cube.GetComponent<BoxCollider>());
+        cube.name = "GoldGem";
+        cube.transform.parent = go.transform;
+        cube.transform.localPosition = Vector3.zero;
+        float scale = Mathf.Lerp(0.1f, 0.2f, Mathf.Clamp01(amount / 20f));
+        cube.transform.localScale = Vector3.one * scale;
+        cube.transform.localRotation = Quaternion.Euler(45f, 0f, 45f);
+        cube.GetComponent<Renderer>().material = ShaderCache.NewGold();
+        cube.AddComponent<GoldSpinBounce>();
 
         // Scatter impulse
         var rb = go.AddComponent<Rigidbody>();
@@ -166,5 +168,42 @@ public class GoldPickup : MonoBehaviour
         SFXSystem.Play(SFXSystem.SFXType.GoldPickup, transform.position);
         GameFeel.SpawnPickupBurst(transform.position, new Color(1f, 0.85f, 0.2f));
         Destroy(gameObject);
+    }
+}
+
+/// <summary>Spin and gentle bounce for gold gem visual.</summary>
+public class GoldSpinBounce : MonoBehaviour
+{
+    const float SpinSpeed = 90f;
+    const float BounceHeight = 0.1f;
+    const float BounceSpeed = 2f;
+    float _baseY;
+    bool _bouncing;
+
+    void Start()
+    {
+        _baseY = transform.localPosition.y;
+    }
+
+    void Update()
+    {
+        // Spin
+        transform.Rotate(0f, SpinSpeed * Time.deltaTime, 0f, Space.World);
+
+        // Bounce only after landing (parent Rigidbody goes kinematic)
+        var parentRb = transform.parent != null ? transform.parent.GetComponent<Rigidbody>() : null;
+        if (parentRb != null && parentRb.isKinematic && !_bouncing)
+        {
+            _bouncing = true;
+            _baseY = transform.localPosition.y;
+        }
+
+        if (_bouncing)
+        {
+            float y = _baseY + Mathf.Abs(Mathf.Sin(Time.time * BounceSpeed)) * BounceHeight;
+            var pos = transform.localPosition;
+            pos.y = y;
+            transform.localPosition = pos;
+        }
     }
 }
