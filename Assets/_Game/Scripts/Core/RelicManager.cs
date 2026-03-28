@@ -145,9 +145,9 @@ public class RelicManager : MonoBehaviour
         if (HasRelic(RelicType.CursedPower))
             dmg *= 1.75f;
 
-        // Blood Pact: +100% damage
+        // Blood Pact: +60% damage
         if (HasRelic(RelicType.BloodPact))
-            dmg *= 2f;
+            dmg *= 1.6f;
 
         // Chaos: +30% damage
         if (HasRelic(RelicType.Chaos))

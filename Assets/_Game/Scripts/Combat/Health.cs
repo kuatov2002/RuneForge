@@ -1,5 +1,6 @@
 using UnityEngine;
 using System;
+using Object = UnityEngine.Object;
 
 public class Health : MonoBehaviour
 {
@@ -20,6 +21,13 @@ public class Health : MonoBehaviour
 
     // Slow (Magma)
     float magmaSlowTimer;
+
+    // Stun VFX: orbiting stars
+    GameObject stunVFXRoot;
+
+    // Magma slow visual state
+    bool magmaSlowTinted;
+    Color[] preMagmaEmission;
 
     bool isDead;
 
@@ -49,7 +57,7 @@ public class Health : MonoBehaviour
 
     // Player hit recovery
     float hitRecoveryTimer;
-    const float HitRecoveryDuration = 0.5f;
+    const float HitRecoveryDuration = 0.3f;
     public bool IsInHitRecovery => hitRecoveryTimer > 0;
 
     /// <summary>Grant temporary damage immunity (used by Siphon Shield upgrade).</summary>
@@ -112,14 +120,14 @@ public class Health : MonoBehaviour
         {
             if (dmg >= 3)
                 GameFeel.Instance.Hitstop(dmg >= 8 ? 0.05f : 0.03f);
-            GameFeel.ApplyKnockback(transform, transform.position - transform.forward, dmg * 0.3f);
+            GameFeel.ApplyKnockback(transform, transform.position - transform.forward, dmg * 0.7f);
 
             // Hit impact particles on every enemy hit
             Color hitColor = Color.white;
             var renderers = GetComponentsInChildren<Renderer>();
             if (renderers.Length > 0 && renderers[0] != null)
                 hitColor = renderers[0].material.color;
-            GameFeel.SpawnHitParticles(transform.position + Vector3.up * 0.5f, hitColor, dmg >= 5 ? 1.3f : 0.8f);
+            GameFeel.SpawnHitParticles(transform.position + Vector3.up * 0.5f, hitColor, dmg >= 5 ? 1.3f : 0.8f, dmg);
         }
 
         // SFX
@@ -218,12 +226,50 @@ public class Health : MonoBehaviour
     public void ApplyStun(float duration)
     {
         stunTimer = Mathf.Max(stunTimer, duration);
+
+        // Spawn orbiting stars VFX if not already present
+        if (stunVFXRoot == null && GetComponent<PlayerController>() == null)
+        {
+            stunVFXRoot = new GameObject("StunStars");
+            stunVFXRoot.transform.SetParent(transform, false);
+            stunVFXRoot.transform.localPosition = new Vector3(0, 1.2f, 0);
+            for (int i = 0; i < 3; i++)
+            {
+                var star = GameObject.CreatePrimitive(PrimitiveType.Sphere);
+                Object.Destroy(star.GetComponent<SphereCollider>());
+                star.name = "StunStar";
+                star.transform.SetParent(stunVFXRoot.transform, false);
+                float angle = i * 120f * Mathf.Deg2Rad;
+                star.transform.localPosition = new Vector3(Mathf.Cos(angle) * 0.3f, 0, Mathf.Sin(angle) * 0.3f);
+                star.transform.localScale = Vector3.one * 0.08f;
+                star.GetComponent<Renderer>().material = ShaderCache.NewEmissive(new Color(1f, 0.9f, 0.2f), 4f);
+            }
+        }
     }
 
     /// <summary>Magma slow — very heavy, clears when leaving pool.</summary>
     public void ApplyMagmaSlow()
     {
         magmaSlowTimer = 0.3f; // Refreshed each physics tick while in pool
+
+        // Apply orange tint (like freeze does blue)
+        if (!magmaSlowTinted && GetComponent<PlayerController>() == null)
+        {
+            var renderers = GetComponentsInChildren<Renderer>();
+            preMagmaEmission = new Color[renderers.Length];
+            for (int i = 0; i < renderers.Length; i++)
+            {
+                if (renderers[i] != null && renderers[i].material != null
+                    && renderers[i].material.HasProperty("_EmissionColor"))
+                    preMagmaEmission[i] = renderers[i].material.GetColor("_EmissionColor");
+            }
+            foreach (var r in renderers)
+            {
+                if (r != null && r.material != null && r.material.HasProperty("_EmissionColor"))
+                    r.material.SetColor("_EmissionColor", new Color(1f, 0.5f, 0.1f) * 1.5f);
+            }
+            magmaSlowTinted = true;
+        }
     }
 
     void Update()
@@ -266,11 +312,42 @@ public class Health : MonoBehaviour
 
         // Stun
         if (stunTimer > 0)
+        {
             stunTimer -= Time.deltaTime;
+            // Rotate stun stars
+            if (stunVFXRoot != null)
+                stunVFXRoot.transform.Rotate(0, 360f * Time.deltaTime, 0);
+            // Cleanup when stun ends
+            if (stunTimer <= 0 && stunVFXRoot != null)
+            {
+                Object.Destroy(stunVFXRoot);
+                stunVFXRoot = null;
+            }
+        }
 
         // Magma slow
         if (magmaSlowTimer > 0)
+        {
             magmaSlowTimer -= Time.deltaTime;
+            // Restore colors when slow ends
+            if (magmaSlowTimer <= 0 && magmaSlowTinted)
+            {
+                var renderers = GetComponentsInChildren<Renderer>();
+                for (int i = 0; i < renderers.Length; i++)
+                {
+                    if (renderers[i] != null && renderers[i].material != null
+                        && renderers[i].material.HasProperty("_EmissionColor"))
+                    {
+                        Color restore = (preMagmaEmission != null && i < preMagmaEmission.Length)
+                            ? preMagmaEmission[i]
+                            : Color.black;
+                        renderers[i].material.SetColor("_EmissionColor", restore);
+                    }
+                }
+                preMagmaEmission = null;
+                magmaSlowTinted = false;
+            }
+        }
     }
 
     public void ResetHealth()
@@ -282,6 +359,9 @@ public class Health : MonoBehaviour
         magmaSlowTimer = 0;
         hitRecoveryTimer = 0;
         preFreezeEmission = null;
+        preMagmaEmission = null;
+        magmaSlowTinted = false;
+        if (stunVFXRoot != null) { Object.Destroy(stunVFXRoot); stunVFXRoot = null; }
         GetComponent<ElementalStatus>()?.ClearAll();
 
         // Ensure all renderers are visible

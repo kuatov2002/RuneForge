@@ -146,7 +146,7 @@ public static class ComboSpellRegistry
         {
             comboType = ComboType.Rubble, comboName = "Rubble",
             description = "Boulder that spawns rock rain",
-            baseDamage = 5, radius = 3f, duration = 1.8f, cooldown = 0.8f, // nerfed for reaction balance
+            baseDamage = 2.5f, radius = 3f, duration = 1.8f, cooldown = 0.8f, // halved for balance
             color = new Color(0.5f, 0.4f, 0.3f)
         });
 
@@ -236,7 +236,7 @@ public static class ComboSpellRegistry
         {
             comboType = ComboType.Collapse, comboName = "Collapse",
             description = "Reality collapses inward",
-            baseDamage = 17, radius = 2.5f, cooldown = 0.9f,
+            baseDamage = 12, radius = 2.5f, cooldown = 0.9f,
             color = new Color(0.5f, 0.1f, 0.8f)
         });
         Register(ElementType.Void, ElementType.Fire, new ComboSpellDef

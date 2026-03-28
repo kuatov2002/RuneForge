@@ -204,7 +204,7 @@ public class CollapseEffect : MonoBehaviour
             if (hp != null && !hp.IsDead)
             {
                 hp.TakeDamage(_damage, _spellElement);
-                GameFeel.ApplyKnockback(h.transform, _center, _damage * 0.2f);
+                GameFeel.ApplyKnockback(h.transform, _center, _damage * 1.0f);
             }
         }
 

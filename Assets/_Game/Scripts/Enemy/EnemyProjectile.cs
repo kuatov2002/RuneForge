@@ -63,17 +63,19 @@ public class EnemyProjectile : MonoBehaviour
         rb.useGravity = false;
         rb.isKinematic = true;
 
-        var mat = ShaderCache.NewEmissive(color, 2f);
+        // Enemy projectiles glow red-tinted for readability
+        Color emissiveColor = Color.Lerp(color, Color.red, 0.4f);
+        var mat = ShaderCache.NewEmissive(emissiveColor, 3f);
         go.GetComponent<Renderer>().material = mat;
 
         var trail = go.AddComponent<TrailRenderer>();
         trail.startWidth = 0.15f;
         trail.endWidth = 0f;
         trail.time = 0.2f;
-        var tMat = ShaderCache.NewLit(color);
+        var tMat = ShaderCache.NewLit(emissiveColor);
         trail.material = tMat;
-        trail.startColor = color;
-        Color endC = color; endC.a = 0;
+        trail.startColor = emissiveColor;
+        Color endC = emissiveColor; endC.a = 0;
         trail.endColor = endC;
 
         var proj = go.AddComponent<EnemyProjectile>();

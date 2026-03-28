@@ -343,7 +343,7 @@ public class Bootstrap : MonoBehaviour
             {
                 bossIntroActive = false;
                 hud.HideBossIntro();
-                if (cam != null) cam.ZoomTo(14f, 1f);
+                if (cam != null) cam.ZoomTo(10f, 1f);
                 SpawnBossWave(currentFloor);
             }
             return; // Don't process anything else during boss intro
@@ -452,8 +452,8 @@ public class Bootstrap : MonoBehaviour
             // Cursed relics
             CreateCursedRelic("Cursed Power", RelicType.CursedPower, "CURSED: +75% damage, take 1 extra damage per hit", new Color(0.5f, 0.1f, 0.3f)),
             CreateCursedRelic("Cursed Speed", RelicType.CursedSpeed, "CURSED: +40% move speed, -2 max HP", new Color(0.4f, 0.1f, 0.4f)),
-            CreateCursedRelic("Cursed Gold", RelicType.CursedGold, "CURSED: 3x gold drops, enemies +30% HP", new Color(0.6f, 0.5f, 0.1f)),
-            CreateCursedRelic("Blood Pact", RelicType.BloodPact, "CURSED: Spells cost 1 HP, +100% damage", new Color(0.6f, 0.05f, 0.05f)),
+            CreateCursedRelic("Cursed Gold", RelicType.CursedGold, "CURSED: 2x gold drops, enemies +30% HP", new Color(0.6f, 0.5f, 0.1f)),
+            CreateCursedRelic("Blood Pact", RelicType.BloodPact, "CURSED: Spells cost 1 HP, +60% damage", new Color(0.6f, 0.05f, 0.05f)),
             CreateCursedRelic("Chaos", RelicType.Chaos, "CURSED: Random element each cast, +30% damage", new Color(0.3f, 0.1f, 0.5f)),
 
             // Element-specific relics
@@ -1193,7 +1193,7 @@ public class Bootstrap : MonoBehaviour
         hud.ShowBossIntro(bossName, lore);
         SFXSystem.Play(SFXSystem.SFXType.BossIntro, player.transform.position);
 
-        if (cam != null) cam.ZoomTo(10f, 2f);
+        if (cam != null) cam.ZoomTo(8f, 0.5f);
     }
 
     // Keep SpawnWave as alias for first room
@@ -1941,28 +1941,39 @@ public class Bootstrap : MonoBehaviour
     {
         var e = new GameObject("Shambler"); Color c = new(0.75f, 0.15f, 0.15f);
         AddCapsuleCol(e, 1.2f, 0.35f, 0.6f);
-        // Hunched body - tilted torso
+        // Hunched body - heavily tilted torso, gorilla-like posture
         var body = GameObject.CreatePrimitive(PrimitiveType.Capsule);
         body.name = "Body"; Destroy(body.GetComponent<CapsuleCollider>());
-        body.transform.parent = e.transform; body.transform.localPosition = new Vector3(0, 0.4f, 0.1f);
-        body.transform.localScale = new Vector3(0.55f, 0.35f, 0.5f);
-        body.transform.localRotation = Quaternion.Euler(15, 0, 0); // hunched forward
+        body.transform.parent = e.transform; body.transform.localPosition = new Vector3(0, 0.35f, 0.15f);
+        body.transform.localScale = new Vector3(0.55f, 0.32f, 0.5f);
+        body.transform.localRotation = Quaternion.Euler(25, 0, 0); // heavily hunched forward
         body.GetComponent<Renderer>().material = MakeLit(c);
-        // Small head tucked forward
+        // Small head tucked very low and forward — almost touching ground
         var head = GameObject.CreatePrimitive(PrimitiveType.Sphere);
         head.name = "Head"; Destroy(head.GetComponent<SphereCollider>());
-        head.transform.parent = e.transform; head.transform.localPosition = new Vector3(0, 0.8f, 0.15f);
-        head.transform.localScale = new Vector3(0.3f, 0.28f, 0.3f);
+        head.transform.parent = e.transform; head.transform.localPosition = new Vector3(0, 0.7f, 0.25f);
+        head.transform.localScale = new Vector3(0.3f, 0.25f, 0.28f);
         head.GetComponent<Renderer>().material = MakeLit(c * 0.8f);
-        CreateEye(e.transform, new Vector3(-0.08f, 0.85f, 0.28f), new Color(1f, 0.3f, 0.1f));
-        CreateEye(e.transform, new Vector3(0.08f, 0.85f, 0.28f), new Color(1f, 0.3f, 0.1f));
-        // Asymmetric arms (one longer)
-        CreateArm(e.transform, new Vector3(-0.32f, 0.35f, 0.15f), c * 0.9f);
+        CreateEye(e.transform, new Vector3(-0.08f, 0.75f, 0.38f), new Color(1f, 0.3f, 0.1f));
+        CreateEye(e.transform, new Vector3(0.08f, 0.75f, 0.38f), new Color(1f, 0.3f, 0.1f));
+        // Asymmetric arms — one dragging on ground (gorilla), one shorter
+        CreateArm(e.transform, new Vector3(-0.32f, 0.3f, 0.15f), c * 0.9f);
         var longArm = GameObject.CreatePrimitive(PrimitiveType.Cube);
         longArm.name = "LongArm"; Destroy(longArm.GetComponent<BoxCollider>());
-        longArm.transform.parent = e.transform; longArm.transform.localPosition = new Vector3(0.32f, 0.3f, 0.15f);
-        longArm.transform.localScale = new Vector3(0.12f, 0.45f, 0.12f);
+        longArm.transform.parent = e.transform; longArm.transform.localPosition = new Vector3(0.32f, 0.2f, 0.2f);
+        longArm.transform.localScale = new Vector3(0.12f, 0.5f, 0.12f);
         longArm.GetComponent<Renderer>().material = MakeLit(c * 0.9f);
+        // Spines on back — distinct silhouette feature
+        for (int i = 0; i < 3; i++)
+        {
+            var spine = GameObject.CreatePrimitive(PrimitiveType.Cube);
+            spine.name = "Spine"; Destroy(spine.GetComponent<BoxCollider>());
+            spine.transform.parent = e.transform;
+            spine.transform.localPosition = new Vector3(0, 0.5f + i * 0.12f, -0.1f - i * 0.04f);
+            spine.transform.localScale = new Vector3(0.06f, 0.15f, 0.04f);
+            spine.transform.localRotation = Quaternion.Euler(-30, 0, 0);
+            spine.GetComponent<Renderer>().material = MakeLit(c * 0.6f);
+        }
         RegisterEnemy(e, 12 + wave * 3);
         var ai = e.AddComponent<ShamblerAI>(); ai.moveSpeed = 2.5f + wave * 0.15f; ai.baseColor = c; ai.floorLevel = currentFloor;
     }
@@ -1970,13 +1981,35 @@ public class Bootstrap : MonoBehaviour
     void SpawnArcher()
     {
         var e = new GameObject("Archer"); Color c = new(0.2f, 0.6f, 0.2f);
-        AddCapsuleCol(e, 1.2f, 0.3f, 0.6f); BuildBody(e.transform, c, 0.9f);
+        AddCapsuleCol(e, 1.2f, 0.25f, 0.6f);
+        // Tall, thin body — slender silhouette distinct from BuildBody capsule
+        var body = GameObject.CreatePrimitive(PrimitiveType.Capsule);
+        body.name = "Body"; Destroy(body.GetComponent<CapsuleCollider>());
+        body.transform.parent = e.transform; body.transform.localPosition = new Vector3(0, 0.45f, 0);
+        body.transform.localScale = new Vector3(0.35f, 0.38f, 0.3f);
+        body.GetComponent<Renderer>().material = MakeLit(c);
+        // Small hooded head
+        var head = GameObject.CreatePrimitive(PrimitiveType.Sphere);
+        head.name = "Head"; Destroy(head.GetComponent<SphereCollider>());
+        head.transform.parent = e.transform; head.transform.localPosition = new Vector3(0, 0.9f, 0.05f);
+        head.transform.localScale = new Vector3(0.28f, 0.26f, 0.3f);
+        head.GetComponent<Renderer>().material = MakeLit(c * 0.6f);
+        CreateEye(e.transform, new Vector3(-0.07f, 0.93f, 0.14f), new Color(1f, 0.3f, 0.1f));
+        CreateEye(e.transform, new Vector3(0.07f, 0.93f, 0.14f), new Color(1f, 0.3f, 0.1f));
+        // Bow arm — tall curved look
         var bow = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
         bow.name = "Bow"; Destroy(bow.GetComponent<CapsuleCollider>());
-        bow.transform.parent = e.transform; bow.transform.localPosition = new Vector3(0.3f, 0.6f, 0.15f);
-        bow.transform.localScale = new Vector3(0.04f, 0.25f, 0.04f);
+        bow.transform.parent = e.transform; bow.transform.localPosition = new Vector3(0.28f, 0.6f, 0.15f);
+        bow.transform.localScale = new Vector3(0.04f, 0.3f, 0.04f);
         bow.transform.localRotation = Quaternion.Euler(0, 0, -30);
         bow.GetComponent<Renderer>().material = MakeLit(new Color(0.4f, 0.25f, 0.1f));
+        // Quiver on back
+        var quiver = GameObject.CreatePrimitive(PrimitiveType.Cube);
+        quiver.name = "Quiver"; Destroy(quiver.GetComponent<BoxCollider>());
+        quiver.transform.parent = e.transform; quiver.transform.localPosition = new Vector3(-0.15f, 0.55f, -0.15f);
+        quiver.transform.localScale = new Vector3(0.08f, 0.3f, 0.08f);
+        quiver.transform.localRotation = Quaternion.Euler(-15, 0, 0);
+        quiver.GetComponent<Renderer>().material = MakeLit(new Color(0.4f, 0.25f, 0.1f));
         RegisterEnemy(e, 10 + wave * 2);
         var archerAI = e.AddComponent<ArcherAI>(); archerAI.baseColor = c; archerAI.floorLevel = currentFloor;
     }
@@ -2066,12 +2099,33 @@ public class Bootstrap : MonoBehaviour
     void SpawnShieldBearer()
     {
         var e = new GameObject("ShieldBearer"); Color c = new(0.3f, 0.35f, 0.5f);
-        AddCapsuleCol(e, 1.3f, 0.4f, 0.65f); BuildBody(e.transform, c, 1.1f);
+        AddCapsuleCol(e, 1.5f, 0.45f, 0.75f);
+        // Stocky wide body — wider than Brute, shorter
+        var body = GameObject.CreatePrimitive(PrimitiveType.Cube);
+        body.name = "Body"; Destroy(body.GetComponent<BoxCollider>());
+        body.transform.parent = e.transform; body.transform.localPosition = new Vector3(0, 0.55f, 0);
+        body.transform.localScale = new Vector3(0.7f, 0.55f, 0.5f);
+        body.GetComponent<Renderer>().material = MakeLit(c);
+        // Flat helmet
+        var helmet = GameObject.CreatePrimitive(PrimitiveType.Cube);
+        helmet.name = "Helmet"; Destroy(helmet.GetComponent<BoxCollider>());
+        helmet.transform.parent = e.transform; helmet.transform.localPosition = new Vector3(0, 1.0f, 0);
+        helmet.transform.localScale = new Vector3(0.4f, 0.2f, 0.38f);
+        helmet.GetComponent<Renderer>().material = ShaderCache.NewMetal(c * 0.7f);
+        CreateEye(e.transform, new Vector3(-0.1f, 1.0f, 0.17f), new Color(0.3f, 0.5f, 1f));
+        CreateEye(e.transform, new Vector3(0.1f, 1.0f, 0.17f), new Color(0.3f, 0.5f, 1f));
+        // Large shield — prominent front feature
         var shield = GameObject.CreatePrimitive(PrimitiveType.Cube);
         shield.name = "Shield"; Destroy(shield.GetComponent<BoxCollider>());
-        shield.transform.parent = e.transform; shield.transform.localPosition = new Vector3(0, 0.5f, 0.35f);
-        shield.transform.localScale = new Vector3(0.6f, 0.7f, 0.08f);
-        shield.GetComponent<Renderer>().material = ShaderCache.NewMetal(new Color(0.5f, 0.5f, 0.6f));
+        shield.transform.parent = e.transform; shield.transform.localPosition = new Vector3(0, 0.55f, 0.4f);
+        shield.transform.localScale = new Vector3(0.75f, 0.8f, 0.08f);
+        shield.GetComponent<Renderer>().material = ShaderCache.NewMetal(new Color(0.5f, 0.5f, 0.65f));
+        // Shield boss (center decoration)
+        var boss = GameObject.CreatePrimitive(PrimitiveType.Sphere);
+        boss.name = "ShieldBoss"; Destroy(boss.GetComponent<SphereCollider>());
+        boss.transform.parent = e.transform; boss.transform.localPosition = new Vector3(0, 0.55f, 0.46f);
+        boss.transform.localScale = Vector3.one * 0.12f;
+        boss.GetComponent<Renderer>().material = ShaderCache.NewEmissive(new Color(0.4f, 0.5f, 1f), 2f);
         RegisterEnemy(e, 22 + wave * 3);
         e.AddComponent<ShieldBearerAI>().baseColor = c;
     }
@@ -2206,8 +2260,8 @@ public class Bootstrap : MonoBehaviour
     {
         var e = new GameObject("WardenBoss");
         Color c = new(0.4f, 0.4f, 0.35f);
-        AddCapsuleCol(e, 2f, 0.6f, 1f);
-        BuildBody(e.transform, c, 1.6f);
+        AddCapsuleCol(e, 3.2f, 0.9f, 1.6f);
+        BuildBody(e.transform, c, 2.5f);
         e.transform.position = new Vector3(6, 0, 10);
         var rb = e.AddComponent<Rigidbody>(); rb.useGravity = false; rb.isKinematic = true;
         var hp = e.AddComponent<Health>(); hp.maxHP = 80; hp.currentHP = 80;
@@ -2224,8 +2278,8 @@ public class Bootstrap : MonoBehaviour
     {
         var e = new GameObject("SwarmQueenBoss");
         Color c = new(0.7f, 0.5f, 0.1f);
-        AddCapsuleCol(e, 1.8f, 0.5f, 0.9f);
-        BuildBody(e.transform, c, 1.3f);
+        AddCapsuleCol(e, 3.2f, 0.8f, 1.6f);
+        BuildBody(e.transform, c, 2.5f);
         // Crown spikes
         for (int i = 0; i < 4; i++)
         {
@@ -2253,8 +2307,8 @@ public class Bootstrap : MonoBehaviour
     {
         var e = new GameObject("MirrorKnightBoss");
         Color c = new(0.6f, 0.6f, 0.7f);
-        AddCapsuleCol(e, 2f, 0.5f, 1f);
-        BuildBody(e.transform, c, 1.4f);
+        AddCapsuleCol(e, 3.2f, 0.8f, 1.6f);
+        BuildBody(e.transform, c, 2.5f);
         // Sword
         var sword = GameObject.CreatePrimitive(PrimitiveType.Cube);
         sword.name = "Sword"; Destroy(sword.GetComponent<BoxCollider>());
@@ -2286,8 +2340,8 @@ public class Bootstrap : MonoBehaviour
     {
         var e = new GameObject("LichBoss");
         Color c = new(0.3f, 0.1f, 0.5f);
-        AddCapsuleCol(e, 1.8f, 0.45f, 0.9f);
-        BuildBody(e.transform, c, 1.2f);
+        AddCapsuleCol(e, 3.2f, 0.75f, 1.6f);
+        BuildBody(e.transform, c, 2.5f);
         // Glowing staff
         var staff = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
         staff.name = "Staff"; Destroy(staff.GetComponent<CapsuleCollider>());
@@ -2317,8 +2371,8 @@ public class Bootstrap : MonoBehaviour
     {
         var e = new GameObject("RunebreakerBoss");
         Color c = new(0.6f, 0.1f, 0.1f);
-        AddCapsuleCol(e, 2.2f, 0.6f, 1.1f);
-        BuildBody(e.transform, c, 1.7f);
+        AddCapsuleCol(e, 3.5f, 0.95f, 1.75f);
+        BuildBody(e.transform, c, 2.7f);
         // Rune markings (glowing cubes on body)
         for (int i = 0; i < 3; i++)
         {
@@ -2350,10 +2404,10 @@ public class Bootstrap : MonoBehaviour
         MetaProgression.AwardBossCurrency(currentFloor);
         MetaProgression.RecordFloor(currentFloor);
 
-        // Boss gold drop (CursedGold: 3x)
+        // Boss gold drop (CursedGold: 2x)
         int goldDrop = GoldSystem.CalculateEnemyDrop(wave, true, currentFloor);
         if (relicMgr != null && relicMgr.HasRelic(RelicType.CursedGold))
-            goldDrop *= 3;
+            goldDrop *= 2;
         GoldSystem.SpawnGoldDrop(boss.transform.position, goldDrop);
 
         // Post-boss victory splash
@@ -2457,10 +2511,10 @@ public class Bootstrap : MonoBehaviour
 
     void OnEnemyDeath(GameObject enemy)
     {
-        // Gold drop (CursedGold: 3x)
+        // Gold drop (CursedGold: 2x)
         int goldDrop = GoldSystem.CalculateEnemyDrop(wave, false, currentFloor);
         if (relicMgr != null && relicMgr.HasRelic(RelicType.CursedGold))
-            goldDrop *= 3;
+            goldDrop *= 2;
         GoldSystem.SpawnGoldDrop(enemy.transform.position, goldDrop);
 
         // Synergy effects on enemy death

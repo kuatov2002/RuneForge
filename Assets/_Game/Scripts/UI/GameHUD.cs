@@ -777,10 +777,46 @@ public class GameHUD : MonoBehaviour
             comboNameLabel.text = def.comboName;
     }
 
+    float comboNameFadeTimer;
+
     void OnComboNameChanged(string name)
     {
-        if (comboNameLabel != null)
-            comboNameLabel.text = name;
+        if (comboNameLabel == null) return;
+        comboNameLabel.text = name;
+        comboNameLabel.style.fontSize = 36;
+
+        // Color from combo definition
+        var def = caster != null ? caster.CurrentComboDef : null;
+        if (def != null)
+        {
+            Color c = def.color;
+            // Brighten for readability
+            c = Color.Lerp(c, Color.white, 0.3f);
+            comboNameLabel.style.color = c;
+        }
+
+        comboNameLabel.style.opacity = 1f;
+        comboNameFadeTimer = 1.5f;
+    }
+
+    void UpdateComboNameFade()
+    {
+        if (comboNameFadeTimer > 0 && comboNameLabel != null)
+        {
+            comboNameFadeTimer -= Time.deltaTime;
+            if (comboNameFadeTimer <= 0.5f)
+            {
+                // Fade out over last 0.5s
+                float alpha = Mathf.Clamp01(comboNameFadeTimer / 0.5f);
+                comboNameLabel.style.opacity = alpha;
+            }
+            if (comboNameFadeTimer <= 0)
+            {
+                comboNameLabel.style.fontSize = 24;
+                comboNameLabel.style.color = Color.white;
+                comboNameLabel.style.opacity = 1f;
+            }
+        }
     }
 
     // ── Combo Preview ──
@@ -1763,6 +1799,7 @@ public class GameHUD : MonoBehaviour
     {
         CheckPauseInput();
         UpdateHint();
+        UpdateComboNameFade();
 
         // Damage numbers
         for (int i = activeDamageNumbers.Count - 1; i >= 0; i--)

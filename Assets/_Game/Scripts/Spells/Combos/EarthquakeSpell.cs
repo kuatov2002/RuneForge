@@ -208,7 +208,7 @@ public class EarthquakeShockwaveRing : MonoBehaviour
             {
                 hp.TakeDamage(_damage, _spellElement);
                 hp.ApplyStun(_stunDuration);
-                GameFeel.ApplyKnockback(h.transform, _center, _damage * 0.25f);
+                GameFeel.ApplyKnockback(h.transform, _center, _damage * 1.0f);
                 _hitIds.Add(id);
             }
         }

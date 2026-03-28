@@ -142,6 +142,7 @@ public class MomentumSystem : MonoBehaviour
 
         if (newTier != tier)
         {
+            int oldTierKill = tier;
             tier = newTier;
             multiplier = TierMultipliers[tier];
             OnMomentumChanged?.Invoke(tier, multiplier);
@@ -153,6 +154,10 @@ public class MomentumSystem : MonoBehaviour
                 if (TopDownCamera.Instance != null)
                     TopDownCamera.Instance.AddTrauma(0.05f);
             }
+
+            // Camera zoom at high momentum
+            if (tier >= 3 && oldTierKill < 3 && TopDownCamera.Instance != null)
+                TopDownCamera.Instance.ZoomTo(9.5f, 0.3f);
         }
     }
 
@@ -182,6 +187,10 @@ public class MomentumSystem : MonoBehaviour
 
             // Brief red flash on momentum loss
             GameFeel.ScreenFlash(new Color(1f, 0.2f, 0.1f, 0.3f), 0.1f);
+
+            // Zoom back to normal when dropping below tier 3
+            if (oldTier >= 3 && tier < 3 && TopDownCamera.Instance != null)
+                TopDownCamera.Instance.ZoomTo(10f, 0.5f);
         }
     }
 
@@ -208,7 +217,13 @@ public class MomentumSystem : MonoBehaviour
                 UpdateAura();
 
                 if (oldTier > newTier)
+                {
                     OnMomentumLost?.Invoke(tier);
+
+                    // Zoom back to normal when decaying below tier 3
+                    if (oldTier >= 3 && tier < 3 && TopDownCamera.Instance != null)
+                        TopDownCamera.Instance.ZoomTo(10f, 0.5f);
+                }
             }
         }
     }

@@ -62,12 +62,16 @@ public class GameFeel : MonoBehaviour
         if (dir.sqrMagnitude < 0.01f) dir = Vector3.forward;
         dir.Normalize();
 
+        // Swarm enemies are lighter — fly further
+        var swarm = target.GetComponent<SwarmAI>();
+        if (swarm != null) force *= 1.5f;
+
         // Brief kinematic override to apply displacement
         if (rb.isKinematic)
         {
             // For kinematic enemies, lerp position directly
             var kb = target.gameObject.AddComponent<KnockbackEffect>();
-            kb.Init(dir * force, 0.15f);
+            kb.Init(dir * force, 0.2f);
         }
         else
         {
@@ -194,15 +198,29 @@ public class GameFeel : MonoBehaviour
     // ─── HIT IMPACT PARTICLES ──────────────────────────────────
 
     /// <summary>Spawn small element-colored sparks on every hit.</summary>
-    public static void SpawnHitParticles(Vector3 position, Color color, float scale = 1f)
+    public static void SpawnHitParticles(Vector3 position, Color color, float scale = 1f, float damage = 0f)
     {
-        int count = Random.Range(4, 8);
+        // White impact flash at hit point
+        var hitFlash = GameObject.CreatePrimitive(PrimitiveType.Sphere);
+        Object.Destroy(hitFlash.GetComponent<SphereCollider>());
+        hitFlash.name = "HitFlash";
+        hitFlash.transform.position = position;
+        hitFlash.transform.localScale = Vector3.one * 0.3f;
+        hitFlash.GetComponent<Renderer>().material = ShaderCache.NewEmissive(Color.white, 6f);
+        Object.Destroy(hitFlash, 0.1f);
+
+        // Scale particle size by damage
+        float baseSize = 0.05f;
+        if (damage > 20f) baseSize = 0.12f;
+        else if (damage > 10f) baseSize = 0.08f;
+
+        int count = Random.Range(8, 14);
         for (int i = 0; i < count; i++)
         {
             var spark = GameObject.CreatePrimitive(PrimitiveType.Cube);
             Object.Destroy(spark.GetComponent<BoxCollider>());
             spark.name = "HitSpark";
-            float s = Random.Range(0.03f, 0.07f) * scale;
+            float s = Random.Range(baseSize * 0.6f, baseSize * 1.4f) * scale;
             spark.transform.localScale = new Vector3(s, s, s);
             spark.transform.position = position + Random.insideUnitSphere * 0.2f;
             spark.transform.rotation = Random.rotation;

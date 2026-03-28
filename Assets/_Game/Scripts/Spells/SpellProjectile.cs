@@ -31,12 +31,18 @@ public class SpellProjectile : MonoBehaviour
         startPos = transform.position;
         initialized = true;
 
+        Color col = elem != null ? elem.color : Color.white;
+
+        // Make projectile body glow with element color
+        var renderer = GetComponent<Renderer>();
+        if (renderer != null)
+            renderer.material = ShaderCache.NewEmissive(col, 3f);
+
         // Trail
         var trail = gameObject.AddComponent<TrailRenderer>();
         trail.startWidth = 0.2f;
         trail.endWidth = 0f;
         trail.time = 0.25f;
-        Color col = elem != null ? elem.color : Color.white;
         var tMat = ShaderCache.NewLit(col);
         trail.material = tMat;
         trail.startColor = col;

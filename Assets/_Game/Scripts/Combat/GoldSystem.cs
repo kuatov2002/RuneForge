@@ -99,7 +99,7 @@ public class GoldSystem : MonoBehaviour
         // Floor scaling ensures gold keeps pace with shop prices on later floors
         int baseGold = Random.Range(4, 9); // 4-8
         int waveBonus = Mathf.FloorToInt(wave * 0.8f);
-        int floorBonus = (floor - 1) * 3; // +0/+3/+6/+9/+12 for floors 1-5
+        int floorBonus = (floor - 1) * 2; // +0/+2/+4/+6/+8 for floors 1-5
         return baseGold + waveBonus + floorBonus;
     }
 }
