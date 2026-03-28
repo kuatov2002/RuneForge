@@ -18,6 +18,12 @@ public class MomentumSystem : MonoBehaviour
     float multiplier = 1f;
     float decayTimer;
 
+    // Inactivity decay: momentum drops if player stops dealing damage
+    const float InactivityThreshold = 4f;
+    const float InactivityDecayRate = 1f; // -1 streak per second after threshold
+    float lastDamageTimer; // time since last damage dealt
+    float inactivityDecayAccum;
+
     // Particle aura
     ParticleSystem auraPS;
     static readonly float[] AuraEmissionRates = { 0f, 5f, 10f, 15f, 25f };
@@ -131,10 +137,19 @@ public class MomentumSystem : MonoBehaviour
         DropMomentumTier();
     }
 
+    /// <summary>Call when player deals any damage (not just kills).</summary>
+    public void OnDamageDealt()
+    {
+        lastDamageTimer = 0;
+        inactivityDecayAccum = 0;
+    }
+
     public void OnEnemyKilled()
     {
         killStreak++;
         decayTimer = 7f;
+        lastDamageTimer = 0;
+        inactivityDecayAccum = 0;
 
         int newTier = 0;
         for (int i = TierThresholds.Length - 1; i >= 0; i--)
@@ -197,6 +212,38 @@ public class MomentumSystem : MonoBehaviour
     void Update()
     {
         if (tier <= 0) return;
+
+        // Inactivity decay: if player hasn't dealt damage in 4s, streak drops
+        lastDamageTimer += Time.deltaTime;
+        if (lastDamageTimer >= InactivityThreshold)
+        {
+            inactivityDecayAccum += InactivityDecayRate * Time.deltaTime;
+            if (inactivityDecayAccum >= 1f)
+            {
+                inactivityDecayAccum -= 1f;
+                killStreak = Mathf.Max(0, killStreak - 1);
+                decayTimer = 3f; // reset normal decay so they don't stack
+
+                int newTier = 0;
+                for (int i = TierThresholds.Length - 1; i >= 0; i--)
+                    if (killStreak >= TierThresholds[i]) { newTier = i; break; }
+
+                if (newTier != tier)
+                {
+                    int oldTier = tier;
+                    tier = newTier;
+                    multiplier = TierMultipliers[tier];
+                    OnMomentumChanged?.Invoke(tier, multiplier);
+                    UpdateAura();
+                    if (oldTier > newTier)
+                    {
+                        OnMomentumLost?.Invoke(tier);
+                        if (oldTier >= 3 && tier < 3 && TopDownCamera.Instance != null)
+                            TopDownCamera.Instance.ZoomTo(10f, 0.5f);
+                    }
+                }
+            }
+        }
 
         decayTimer -= Time.deltaTime;
         if (decayTimer <= 0)

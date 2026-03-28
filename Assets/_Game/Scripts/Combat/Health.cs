@@ -118,6 +118,14 @@ public class Health : MonoBehaviour
 
         if (!isPlayer && GameFeel.Instance != null)
         {
+            // Notify momentum system that player dealt damage (for inactivity tracking)
+            var playerObj = FindAnyObjectByType<PlayerController>();
+            if (playerObj != null)
+            {
+                var momentum = playerObj.GetComponent<MomentumSystem>();
+                if (momentum != null) momentum.OnDamageDealt();
+            }
+
             if (dmg >= 3)
                 GameFeel.Instance.Hitstop(dmg >= 8 ? 0.05f : 0.03f);
             GameFeel.ApplyKnockback(transform, transform.position - transform.forward, dmg * 0.7f);

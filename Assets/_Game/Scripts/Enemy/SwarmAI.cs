@@ -17,6 +17,15 @@ public class SwarmAI : MonoBehaviour
     public int attackDamage = 1;
     public Color baseColor = new Color(0.6f, 0.5f, 0.1f);
 
+    // Coordinated charge: pack burst of speed when one is close to player
+    static float coordChargeGlobalCD;
+    const float CoordChargeCooldown = 8f;
+    const float CoordChargeSpeedMult = 2f;
+    const float CoordChargeDuration = 1.5f;
+    const int CoordChargeMinSwarm = 3;
+    const float CoordChargeTriggerDist = 3f;
+    float coordChargeTimer;
+
     Transform target;
     float attackTimer;
     Health health;
@@ -159,8 +168,29 @@ public class SwarmAI : MonoBehaviour
         float frenzyMult = 1f + nearbyAllies * 0.15f; // +15% per ally, up to ~+75% with 5
         frenzyMult = Mathf.Min(frenzyMult, 1.75f);
 
-        // Visual: brighter yellow with more allies
+        // Coordinated charge: if 3+ swarm and one is close, all burst
+        if (coordChargeTimer > 0) coordChargeTimer -= Time.deltaTime;
+        coordChargeGlobalCD -= Time.deltaTime;
+        float distToPlayer = Vector3.Distance(transform.position, target.position);
+        if (coordChargeGlobalCD <= 0 && coordChargeTimer <= 0
+            && nearbyAllies + 1 >= CoordChargeMinSwarm && distToPlayer <= CoordChargeTriggerDist)
+        {
+            // Trigger burst for ALL swarm in range
+            coordChargeGlobalCD = CoordChargeCooldown;
+            foreach (var p in pack)
+            {
+                var sw = p.GetComponent<SwarmAI>();
+                if (sw != null && !sw.isDead)
+                    sw.coordChargeTimer = CoordChargeDuration;
+            }
+            coordChargeTimer = CoordChargeDuration;
+            SFXSystem.Play(SFXSystem.SFXType.CritHit, transform.position, 0.3f);
+        }
+
+        // Visual: brighter yellow with more allies, red during coordinated charge
         Color currentColor = Color.Lerp(baseColor, new Color(1f, 0.8f, 0.1f), (frenzyMult - 1f) * 1.5f);
+        if (coordChargeTimer > 0)
+            currentColor = Color.Lerp(currentColor, new Color(1f, 0.2f, 0.1f), 0.5f);
         foreach (var r in renderers) if (r != null) r.material.color = currentColor;
 
         Vector3 targetPos = target.position + offset;
@@ -191,7 +221,8 @@ public class SwarmAI : MonoBehaviour
             return;
         }
 
-        float finalSpeed = moveSpeed * speedMult * frenzyMult;
+        float coordMult = coordChargeTimer > 0 ? CoordChargeSpeedMult : 1f;
+        float finalSpeed = moveSpeed * speedMult * frenzyMult * coordMult;
         if (dist > attackRange)
         {
             Vector3 moveDir = toPlayer.normalized;

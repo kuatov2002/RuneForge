@@ -19,6 +19,11 @@ public class BruteAI : MonoBehaviour
     public int attackDamage = 2;
     public Color baseColor = new Color(0.5f, 0.2f, 0.15f);
 
+    // Ground Pound hazard zone
+    const float HazardDuration = 3f;
+    const float HazardDamagePerSec = 1f;
+    const float HazardRadius = 3.5f; // matches ground pound AoE
+
     Transform target;
     Health health;
     Rigidbody rb;
@@ -30,8 +35,10 @@ public class BruteAI : MonoBehaviour
     bool isWindingUp;
     float windupTimer;
     const float WindupDuration = 0.5f;
+    const float ChargeTrackingRatio = 0.7f; // first 70% tracks player
     Vector3 chargeDir;
     float chargeDistLeft;
+    float chargeDistTotal;
     GameObject telegraphVFX;
 
     // Ground pound
@@ -122,6 +129,20 @@ public class BruteAI : MonoBehaviour
         if (isCharging)
         {
             float step = chargeSpeed * Time.deltaTime; // Ignore speed mult during charge (unstoppable)
+
+            // Tracking: first 70% of charge follows player, last 30% goes straight
+            float traveled = chargeDistTotal - chargeDistLeft;
+            if (traveled < chargeDistTotal * ChargeTrackingRatio && target != null)
+            {
+                Vector3 toTarget = target.position - transform.position;
+                toTarget.y = 0;
+                if (toTarget.sqrMagnitude > 0.1f)
+                {
+                    chargeDir = Vector3.Lerp(chargeDir, toTarget.normalized, 8f * Time.deltaTime).normalized;
+                    transform.rotation = Quaternion.LookRotation(chargeDir);
+                }
+            }
+
             rb.MovePosition(transform.position + chargeDir * step);
             chargeDistLeft -= step;
 
@@ -184,7 +205,8 @@ public class BruteAI : MonoBehaviour
         {
             chargeTimer = chargeCooldown * cdMult;
             chargeDir = toPlayer.normalized;
-            chargeDistLeft = dist + 2f; // overshoot slightly
+            chargeDistTotal = dist + 2f;
+            chargeDistLeft = chargeDistTotal;
             transform.rotation = Quaternion.LookRotation(chargeDir);
             isWindingUp = true;
             windupTimer = WindupDuration * (isEnraged ? 0.6f : 1f);
@@ -277,6 +299,36 @@ public class BruteAI : MonoBehaviour
         if (TopDownCamera.Instance != null) TopDownCamera.Instance.AddTrauma(0.35f);
         if (GameFeel.Instance != null) GameFeel.Instance.Hitstop(0.06f);
         SFXSystem.Play(SFXSystem.SFXType.Explosion, transform.position);
+
+        // Hazard zone: cracked earth that damages player standing in it
+        SpawnHazardZone(transform.position);
+    }
+
+    void SpawnHazardZone(Vector3 center)
+    {
+        var hazard = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
+        Object.Destroy(hazard.GetComponent<CapsuleCollider>());
+        hazard.name = "BruteHazard";
+        hazard.transform.position = center + Vector3.up * 0.03f;
+        float diameter = HazardRadius * 2f;
+        hazard.transform.localScale = new Vector3(diameter, 0.02f, diameter);
+        hazard.GetComponent<Renderer>().material = ShaderCache.NewEmissive(new Color(0.8f, 0.15f, 0.05f), 1.5f);
+
+        // Crack lines (4 radial strips for visual texture)
+        for (int i = 0; i < 4; i++)
+        {
+            var crack = GameObject.CreatePrimitive(PrimitiveType.Cube);
+            Object.Destroy(crack.GetComponent<BoxCollider>());
+            crack.transform.parent = hazard.transform;
+            crack.transform.localPosition = Vector3.zero;
+            float angle = i * 45f;
+            crack.transform.localRotation = Quaternion.Euler(0, angle, 0);
+            crack.transform.localScale = new Vector3(0.02f, 1.5f, 0.8f);
+            crack.GetComponent<Renderer>().material = ShaderCache.NewEmissive(new Color(1f, 0.3f, 0.05f), 3f);
+        }
+
+        var zone = hazard.AddComponent<HazardZone>();
+        zone.Init(HazardRadius, HazardDuration, HazardDamagePerSec);
     }
 
     void UpdateStatusVisual()
@@ -307,5 +359,60 @@ public class BruteAI : MonoBehaviour
     {
         if (health != null) health.OnDeath -= OnDie;
         if (telegraphVFX != null) Destroy(telegraphVFX);
+    }
+}
+
+/// <summary>Damaging ground hazard zone. Fades out and damages player standing inside.</summary>
+public class HazardZone : MonoBehaviour
+{
+    float _radius;
+    float _duration;
+    float _damagePerSec;
+    float _timer;
+    float _dmgAccum;
+    Renderer _renderer;
+
+    public void Init(float radius, float duration, float damagePerSec)
+    {
+        _radius = radius;
+        _duration = duration;
+        _damagePerSec = damagePerSec;
+        _timer = duration;
+        _renderer = GetComponent<Renderer>();
+    }
+
+    void Update()
+    {
+        _timer -= Time.deltaTime;
+        if (_timer <= 0)
+        {
+            Destroy(gameObject);
+            return;
+        }
+
+        // Fade out over last second
+        if (_renderer != null)
+        {
+            float alpha = Mathf.Clamp01(_timer / 1f);
+            Color c = _renderer.material.color;
+            c.a = alpha;
+            _renderer.material.color = c;
+        }
+
+        // Damage player in radius
+        _dmgAccum += _damagePerSec * Time.deltaTime;
+        if (_dmgAccum >= 1f)
+        {
+            _dmgAccum -= 1f;
+            Collider[] hits = Physics.OverlapSphere(transform.position, _radius);
+            foreach (var h in hits)
+            {
+                var pc = h.GetComponent<PlayerController>();
+                if (pc == null || pc.isInvulnerable) continue;
+                var hp = h.GetComponent<Health>();
+                if (hp != null && !hp.IsDead)
+                    hp.TakeDamage(1);
+            }
+        }
     }
 }

@@ -215,6 +215,11 @@ public class ShieldBearerAI : MonoBehaviour
         }
     }
 
+    // Rally Cry player slow
+    const float RallySlowRadius = 5f;
+    const float RallySlowMultiplier = 0.7f;
+    const float RallySlowDuration = 1.5f;
+
     void RallyCry()
     {
         // Buff nearby enemies with speed boost
@@ -232,6 +237,19 @@ public class ShieldBearerAI : MonoBehaviour
             if (buff == null) buff = c.gameObject.AddComponent<RallyBuff>();
             buff.Apply(3f);
             buffed++;
+        }
+
+        // Slow player if within radius — creates window for melee enemies to close
+        var playerObj = FindAnyObjectByType<PlayerController>();
+        if (playerObj != null)
+        {
+            float playerDist = Vector3.Distance(transform.position, playerObj.transform.position);
+            if (playerDist <= RallySlowRadius)
+            {
+                var slow = playerObj.GetComponent<RallySlow>();
+                if (slow == null) slow = playerObj.gameObject.AddComponent<RallySlow>();
+                slow.Apply(RallySlowDuration, RallySlowMultiplier);
+            }
         }
 
         if (buffed > 0)
@@ -394,4 +412,53 @@ public class RallyBuff : MonoBehaviour
 
     /// <summary>Speed multiplier while buff is active.</summary>
     public float SpeedMultiplier => _active ? 1.3f : 1f;
+}
+
+/// <summary>Temporary slow debuff on player from ShieldBearer Rally Cry.</summary>
+public class RallySlow : MonoBehaviour
+{
+    float _timer;
+    float _mult = 1f;
+    bool _active;
+    Renderer[] _renderers;
+
+    public void Apply(float duration, float multiplier)
+    {
+        _timer = duration;
+        _mult = multiplier;
+        _active = true;
+        _renderers = GetComponentsInChildren<Renderer>();
+
+        // Gold tint feedback on player
+        SFXSystem.Play(SFXSystem.SFXType.Hit, transform.position, 0.2f);
+    }
+
+    void Update()
+    {
+        if (!_active) return;
+        _timer -= Time.deltaTime;
+
+        // Gold/orange tint flash
+        if (_renderers != null)
+        {
+            float flash = Mathf.PingPong(Time.time * 5f, 1f) * 0.2f;
+            foreach (var r in _renderers)
+                if (r != null && r.material.HasProperty("_EmissionColor"))
+                    r.material.SetColor("_EmissionColor", new Color(1f, 0.7f, 0.1f) * flash);
+        }
+
+        if (_timer <= 0)
+        {
+            _active = false;
+            // Clear emission
+            if (_renderers != null)
+                foreach (var r in _renderers)
+                    if (r != null && r.material.HasProperty("_EmissionColor"))
+                        r.material.SetColor("_EmissionColor", Color.black);
+            Destroy(this);
+        }
+    }
+
+    /// <summary>Speed multiplier while debuff is active.</summary>
+    public float SpeedMultiplier => _active ? _mult : 1f;
 }

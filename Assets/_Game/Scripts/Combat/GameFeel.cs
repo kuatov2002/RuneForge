@@ -414,3 +414,17 @@ public class GhostFade : MonoBehaviour
         }
     }
 }
+
+/// <summary>Pulsing red portal VFX for combat pressure warnings.</summary>
+public class PressurePortalVFX : MonoBehaviour
+{
+    Renderer _renderer;
+    void Start() { _renderer = GetComponent<Renderer>(); }
+    void Update()
+    {
+        if (_renderer == null) return;
+        float pulse = 0.5f + Mathf.PingPong(Time.time * 3f, 1f) * 0.5f;
+        _renderer.material.SetColor("_EmissionColor", new Color(1f, 0.1f, 0.1f) * (2f * pulse));
+        transform.localScale = new Vector3(1.2f, 0.03f, 1.2f) * (0.9f + pulse * 0.2f);
+    }
+}

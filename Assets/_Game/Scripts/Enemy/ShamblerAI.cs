@@ -1,4 +1,5 @@
 using UnityEngine;
+using Object = UnityEngine.Object;
 
 /// <summary>
 /// Shambler — melee zombie-like enemy.
@@ -54,6 +55,16 @@ public class ShamblerAI : MonoBehaviour
     // Void pull
     Vector3 pullTarget;
     float pullTimer;
+
+    // Leap prediction
+    const float LeapPredictionTime = 0.4f;
+    Vector3 lastPlayerPos;
+    Vector3 playerVelocity;
+
+    // Leap poison pool
+    const float PoisonPoolRadius = 2f;
+    const float PoisonPoolDuration = 4f;
+    const float PoisonPoolDamagePerSec = 1f;
 
     void Start()
     {
@@ -115,6 +126,14 @@ public class ShamblerAI : MonoBehaviour
     void Update()
     {
         if (isDead || target == null) return;
+
+        // Track player velocity for leap prediction
+        if (Time.deltaTime > 0)
+        {
+            playerVelocity = (target.position - lastPlayerPos) / Time.deltaTime;
+            playerVelocity.y = 0;
+            lastPlayerPos = target.position;
+        }
 
         // Check enrage
         if (!isEnraged && health.currentHP <= Mathf.CeilToInt(health.maxHP * 0.3f))
@@ -203,7 +222,7 @@ public class ShamblerAI : MonoBehaviour
                 leapCooldown = isEnraged ? 3f : 5f;
                 isLeaping = true;
                 leapTimer = 0.4f;
-                leapTarget = target.position;
+                leapTarget = target.position + playerVelocity * LeapPredictionTime;
                 var warn = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
                 Destroy(warn.GetComponent<CapsuleCollider>());
                 warn.transform.position = leapTarget + Vector3.up * 0.02f;
@@ -234,6 +253,9 @@ public class ShamblerAI : MonoBehaviour
                 }
                 GameFeel.SpawnDeathVFX(transform.position, baseColor);
                 if (TopDownCamera.Instance != null) TopDownCamera.Instance.AddTrauma(0.15f);
+
+                // Poison pool at landing site
+                SpawnPoisonPool(transform.position);
             }
             return;
         }
@@ -318,5 +340,93 @@ public class ShamblerAI : MonoBehaviour
             if (r != null && r.gameObject.name != "Eye") r.material.color = col;
     }
 
+    void SpawnPoisonPool(Vector3 center)
+    {
+        var pool = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
+        Object.Destroy(pool.GetComponent<CapsuleCollider>());
+        pool.name = "PoisonPool";
+        pool.transform.position = center + Vector3.up * 0.02f;
+        float diameter = PoisonPoolRadius * 2f;
+        pool.transform.localScale = new Vector3(diameter, 0.015f, diameter);
+        pool.GetComponent<Renderer>().material = ShaderCache.NewEmissive(new Color(0.2f, 0.8f, 0.1f), 1.5f);
+
+        // Bubbling particles
+        var particleGO = new GameObject("PoisonBubbles");
+        particleGO.transform.parent = pool.transform;
+        particleGO.transform.localPosition = Vector3.up * 0.5f;
+        var ps = particleGO.AddComponent<ParticleSystem>();
+        ps.Stop(true, ParticleSystemStopBehavior.StopEmittingAndClear);
+        var main = ps.main;
+        main.loop = true;
+        main.startLifetime = 0.5f;
+        main.startSpeed = new ParticleSystem.MinMaxCurve(0.5f, 1.5f);
+        main.startSize = new ParticleSystem.MinMaxCurve(0.05f, 0.12f);
+        main.startColor = new Color(0.3f, 0.9f, 0.1f, 0.6f);
+        main.simulationSpace = ParticleSystemSimulationSpace.World;
+        main.gravityModifier = -0.3f;
+        var em = ps.emission; em.rateOverTime = 8;
+        var sh = ps.shape; sh.shapeType = ParticleSystemShapeType.Circle; sh.radius = PoisonPoolRadius * 0.8f;
+        var mat = new Material(ShaderCache.ParticleShader);
+        mat.SetColor("_Color", new Color(0.3f, 0.9f, 0.1f));
+        particleGO.GetComponent<ParticleSystemRenderer>().material = mat;
+        ps.Play();
+
+        var zone = pool.AddComponent<PoisonPool>();
+        zone.Init(PoisonPoolRadius, PoisonPoolDuration, PoisonPoolDamagePerSec);
+    }
+
     void OnDestroy() { if (health != null) health.OnDeath -= OnDie; }
+}
+
+/// <summary>Damaging poison pool left by Shambler leap.</summary>
+public class PoisonPool : MonoBehaviour
+{
+    float _radius;
+    float _duration;
+    float _damagePerSec;
+    float _timer;
+    float _dmgAccum;
+    Renderer _renderer;
+
+    public void Init(float radius, float duration, float damagePerSec)
+    {
+        _radius = radius;
+        _duration = duration;
+        _damagePerSec = damagePerSec;
+        _timer = duration;
+        _renderer = GetComponent<Renderer>();
+    }
+
+    void Update()
+    {
+        _timer -= Time.deltaTime;
+        if (_timer <= 0)
+        {
+            Destroy(gameObject);
+            return;
+        }
+
+        // Fade out over last second
+        if (_renderer != null && _timer < 1f)
+        {
+            Color c = _renderer.material.GetColor("_EmissionColor");
+            _renderer.material.SetColor("_EmissionColor", c * Mathf.Clamp01(_timer));
+        }
+
+        // Damage player in radius
+        _dmgAccum += _damagePerSec * Time.deltaTime;
+        if (_dmgAccum >= 1f)
+        {
+            _dmgAccum -= 1f;
+            Collider[] hits = Physics.OverlapSphere(transform.position, _radius);
+            foreach (var h in hits)
+            {
+                var pc = h.GetComponent<PlayerController>();
+                if (pc == null || pc.isInvulnerable) continue;
+                var hp = h.GetComponent<Health>();
+                if (hp != null && !hp.IsDead)
+                    hp.TakeDamage(1, ElementType.Poison);
+            }
+        }
+    }
 }

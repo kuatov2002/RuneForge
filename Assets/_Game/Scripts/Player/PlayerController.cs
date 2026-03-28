@@ -88,6 +88,10 @@ public class PlayerController : MonoBehaviour
             effectiveSpeed *= (1f + momentumSys.SpeedBonus);
         if (spellRushTimer > 0)
             effectiveSpeed *= (1f + spellRushMultiplier);
+        // Rally Cry slow debuff
+        var rallySlow = GetComponent<RallySlow>();
+        if (rallySlow != null)
+            effectiveSpeed *= rallySlow.SpeedMultiplier;
 
         Vector3 vel = new Vector3(input.x, 0, input.y) * effectiveSpeed;
         rb.linearVelocity = new Vector3(vel.x, rb.linearVelocity.y, vel.z);

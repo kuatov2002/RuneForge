@@ -63,6 +63,16 @@ public class Bootstrap : MonoBehaviour
     float encounterSpawnTimer;
     bool encounterBonusRerollFlag;
 
+    // Combat pressure timer: reinforcements if room takes too long
+    const float CombatPressureFirstWave = 45f;
+    const float CombatPressureInterval = 30f;
+    const float CombatPressureWarning = 5f;
+    const int CombatPressureSwarmCount = 3;
+    float combatPressureTimer;
+    bool combatPressureActive;
+    bool combatPressureWarningShown;
+    List<GameObject> pressurePortals = new();
+
     // Boss intro
     float bossIntroTimer;
     bool bossIntroActive;
@@ -405,6 +415,35 @@ public class Bootstrap : MonoBehaviour
                 SpawnSubWave(waveBudget, currentNodeType == NodeType.EliteCombat);
             }
         }
+
+        // Combat pressure: spawn reinforcement Swarm if room takes too long
+        if (combatPressureActive && enemiesAlive > 0 && !bossActive && !roomCleared)
+        {
+            combatPressureTimer -= Time.deltaTime;
+
+            // Warning portals 5s before spawn
+            if (!combatPressureWarningShown && combatPressureTimer <= CombatPressureWarning)
+            {
+                combatPressureWarningShown = true;
+                SpawnPressureWarningPortals();
+            }
+
+            if (combatPressureTimer <= 0)
+            {
+                // Spawn reinforcement swarm
+                ClearPressurePortals();
+                for (int i = 0; i < CombatPressureSwarmCount; i++)
+                {
+                    SpawnEnemy(3); // Swarm
+                    enemiesAlive++;
+                }
+                SFXSystem.Play(SFXSystem.SFXType.Explosion, player.transform.position, 0.3f);
+
+                // Reset for next wave
+                combatPressureTimer = CombatPressureInterval;
+                combatPressureWarningShown = false;
+            }
+        }
     }
 
     // ─── SPELL DATA ───────────────────────────────────────────────
@@ -618,6 +657,8 @@ public class Bootstrap : MonoBehaviour
         foreach (var e in enemies) if (e != null) Destroy(e);
         enemies.Clear();
         enemiesAlive = 0;
+        combatPressureActive = false;
+        ClearPressurePortals();
 
         // Destroy all lingering spell effects between rooms
         CleanupSpellEffects();
@@ -1262,6 +1303,11 @@ public class Bootstrap : MonoBehaviour
         subWave = 0;
         reinforcementTimer = -1;
 
+        // Combat pressure: start timer for anti-kiting reinforcements
+        combatPressureTimer = CombatPressureFirstWave;
+        combatPressureActive = true;
+        combatPressureWarningShown = false;
+
         int waveBudget = totalBudget / totalSubWaves;
         SpawnSubWave(waveBudget, forceElite);
     }
@@ -1269,6 +1315,7 @@ public class Bootstrap : MonoBehaviour
     void SpawnSubWave(int budget, bool forceElite)
     {
         subWave++;
+        flankSide = Random.Range(0, 4); // Randomize starting quadrant each sub-wave
 
         // 60% chance to use encounter template, 40% random
         bool usedTemplate = false;
@@ -1315,6 +1362,33 @@ public class Bootstrap : MonoBehaviour
         // Show sub-wave indicator
         if (totalSubWaves > 1 && hud != null)
             hud.SetWave(wave, subWave, totalSubWaves);
+    }
+
+    // ─── COMBAT PRESSURE PORTALS ────────────────────────────────
+
+    void SpawnPressureWarningPortals()
+    {
+        ClearPressurePortals();
+        // Spawn 2-3 glowing portals at room edges
+        int count = CombatPressureSwarmCount;
+        for (int i = 0; i < count; i++)
+        {
+            var portal = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
+            Object.Destroy(portal.GetComponent<CapsuleCollider>());
+            portal.name = "PressurePortal";
+            portal.transform.position = FlankSpawnPos(i) + Vector3.up * 0.1f;
+            portal.transform.localScale = new Vector3(1.2f, 0.03f, 1.2f);
+            portal.GetComponent<Renderer>().material = ShaderCache.NewEmissive(new Color(1f, 0.1f, 0.1f), 2f);
+            portal.AddComponent<PressurePortalVFX>();
+            pressurePortals.Add(portal);
+        }
+        if (hud != null) hud.SetObjective("Reinforcements incoming!");
+    }
+
+    void ClearPressurePortals()
+    {
+        foreach (var p in pressurePortals) if (p != null) Destroy(p);
+        pressurePortals.Clear();
     }
 
     void StartShopRoom()
@@ -1863,11 +1937,32 @@ public class Bootstrap : MonoBehaviour
         }
     }
 
+    // Flank spawning: alternate sides so melee enemies surround the player
+    int flankSide; // cycles 0-3 for four quadrants
+
     Vector3 RandomSpawnPos()
     {
-        Vector3 pos; int safety = 50;
-        do { pos = new Vector3(Random.Range(1.5f, 10.5f), 0, Random.Range(1.5f, 10.5f)); safety--; }
-        while (Vector3.Distance(pos, player.transform.position) < 4f && safety > 0);
+        return FlankSpawnPos(flankSide++);
+    }
+
+    Vector3 FlankSpawnPos(int side)
+    {
+        // Room is roughly 12x12; usable area 1.5-10.5
+        // Split into 4 quadrants to force flanking
+        float midX = 6f, midZ = 6f;
+        float minX, maxX, minZ, maxZ;
+        switch (side % 4)
+        {
+            case 0: minX = 1.5f; maxX = midX - 1f; minZ = 1.5f; maxZ = midZ - 1f; break; // SW
+            case 1: minX = midX + 1f; maxX = 10.5f; minZ = midZ + 1f; maxZ = 10.5f; break; // NE
+            case 2: minX = midX + 1f; maxX = 10.5f; minZ = 1.5f; maxZ = midZ - 1f; break; // SE
+            default: minX = 1.5f; maxX = midX - 1f; minZ = midZ + 1f; maxZ = 10.5f; break; // NW
+        }
+        Vector3 pos; int safety = 30;
+        do {
+            pos = new Vector3(Random.Range(minX, maxX), 0, Random.Range(minZ, maxZ));
+            safety--;
+        } while (Vector3.Distance(pos, player.transform.position) < 4f && safety > 0);
         return pos;
     }
 
@@ -2433,6 +2528,8 @@ public class Bootstrap : MonoBehaviour
     void SpawnRewardPickup()
     {
         roomCleared = true;
+        combatPressureActive = false;
+        ClearPressurePortals();
 
         // Spawn glowing pickup in center of room
         rewardPickup = new GameObject("RewardPickup");
