@@ -1,5 +1,9 @@
 using UnityEngine;
 
+public enum RoomType { Normal, Elite, Boss, Shop, Other }
+
+public enum RoomShape { Rectangle, LShape, Arena, Cross, Corridor, Pillared }
+
 public static class RoomBuilder
 {
     static Material wallMat;
@@ -7,11 +11,11 @@ public static class RoomBuilder
     static Material floorTileMat;
     static Material pillarMat;
 
-    enum RoomShape { Rectangle, LShape, Arena, Cross }
+    public static RoomShape LastBuiltShape { get; private set; }
 
     public static GameObject Build(int width = 12, int height = 12,
         bool doorN = false, bool doorS = false, bool doorE = false, bool doorW = false,
-        int floorIndex = 0)
+        int floorIndex = 0, RoomType roomType = RoomType.Normal)
     {
         var room = new GameObject("Room");
         var (wallCol, floorCol, floorAltCol, pillarCol) = FloorGenerator.GetFloorTheme(floorIndex);
@@ -20,12 +24,15 @@ public static class RoomBuilder
         wallMat = ShaderCache.NewStone(wallCol);
         pillarMat = ShaderCache.NewStone(pillarCol);
 
-        // Determine room shape: 55% rect, 30% arena, 15% cross (L-shape removed — bad enemy spawns)
-        float roll = Random.value;
-        RoomShape shape;
-        if (roll < 0.55f) shape = RoomShape.Rectangle;
-        else if (roll < 0.85f) shape = RoomShape.Arena;
-        else shape = RoomShape.Cross;
+        RoomShape shape = PickRoomShape(roomType, width, height);
+        LastBuiltShape = shape;
+
+        // Corridor overrides room dimensions to be narrow and elongated
+        if (shape == RoomShape.Corridor)
+        {
+            width = 6;
+            height = Mathf.RoundToInt(height * 1.3f);
+        }
 
         float halfW = width * 0.5f;
         float halfH = height * 0.5f;
@@ -51,7 +58,7 @@ public static class RoomBuilder
         float wh = 2f;
         float doorWidth = 2f;
 
-        // ── Outer walls ──
+        // -- Outer walls --
 
         // North wall (z = height)
         if (doorN)
@@ -117,7 +124,7 @@ public static class RoomBuilder
                 new Vector3(0.5f, wh, height));
         }
 
-        // ── Shape-specific inner walls and features ──
+        // -- Shape-specific inner walls and features --
 
         if (shape == RoomShape.LShape)
         {
@@ -148,6 +155,22 @@ public static class RoomBuilder
                 CreatePillar(room.transform, new Vector3(px, 0, pz));
             }
         }
+        else if (shape == RoomShape.Pillared)
+        {
+            // Scattered pillars in center area for cover-based combat
+            int count = Random.Range(4, 7);
+            float innerW = width * 0.6f;
+            float innerH = height * 0.6f;
+            for (int i = 0; i < count; i++)
+            {
+                Vector3 pos = new Vector3(
+                    halfW + Random.Range(-innerW / 2f, innerW / 2f),
+                    0,
+                    halfH + Random.Range(-innerH / 2f, innerH / 2f)
+                );
+                CreatePillar(room.transform, pos);
+            }
+        }
 
         // Corner pillars
         CreateDecoPillar(room.transform, new Vector3(-0.25f, 0, -0.25f), 3f);
@@ -155,8 +178,9 @@ public static class RoomBuilder
         CreateDecoPillar(room.transform, new Vector3(-0.25f, 0, height + 0.25f), 3f);
         CreateDecoPillar(room.transform, new Vector3(width + 0.25f, 0, height + 0.25f), 3f);
 
-        // Gameplay pillars - vary based on room size (skip for arena which has its own pillars)
-        if (shape != RoomShape.Arena && width >= 10 && height >= 10)
+        // Gameplay pillars - vary based on room size (skip for shapes that have their own pillars)
+        bool hasOwnPillars = shape == RoomShape.Arena || shape == RoomShape.Pillared;
+        if (!hasOwnPillars && width >= 10 && height >= 10)
         {
             float px1 = width * 0.25f;
             float px2 = width * 0.75f;
@@ -207,6 +231,28 @@ public static class RoomBuilder
     }
 
     /// <summary>
+    /// Selects a room shape based on room type and random chance.
+    /// Boss and Shop rooms always use Rectangle. Elite rooms have higher Arena chance.
+    /// </summary>
+    static RoomShape PickRoomShape(RoomType roomType, int width, int height)
+    {
+        if (roomType == RoomType.Boss || roomType == RoomType.Shop || roomType == RoomType.Other)
+            return RoomShape.Rectangle;
+
+        if (roomType == RoomType.Elite)
+            return Random.value < 0.4f ? RoomShape.Arena : RoomShape.Rectangle;
+
+        // Normal combat rooms: weighted random selection
+        float r = Random.value;
+        if (r < 0.35f) return RoomShape.Rectangle;
+        if (r < 0.50f) return RoomShape.Arena;
+        if (r < 0.65f) return RoomShape.Cross;
+        if (r < 0.78f) return RoomShape.Corridor;
+        if (r < 0.90f) return RoomShape.Pillared;
+        return RoomShape.LShape;
+    }
+
+    /// <summary>
     /// Determines whether a floor tile should be placed at (x, z) based on room shape.
     /// </summary>
     static bool ShouldPlaceTile(RoomShape shape, int x, int z, int w, int h,
@@ -239,7 +285,7 @@ public static class RoomBuilder
                 if (xOff > w * 0.3f && zOff > h * 0.3f) return false;
                 return true;
 
-            default: // Rectangle
+            default: // Rectangle, Corridor, Pillared all use full rectangular floor
                 return true;
         }
     }

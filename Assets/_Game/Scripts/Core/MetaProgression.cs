@@ -6,6 +6,8 @@ public static class MetaProgression
     const string KEY_CURRENCY = "meta_currency";
     const string KEY_RUNS_COMPLETED = "meta_runs_completed";
     const string KEY_BEST_FLOOR = "meta_best_floor";
+    const string KEY_TOTAL_KILLS = "meta_total_kills";
+    const string KEY_TOTAL_ESSENCE_SPENT = "meta_total_essence_spent";
 
     // Path A upgrade keys (original)
     const string KEY_MAX_HP_BONUS = "meta_maxhp_bonus";
@@ -55,6 +57,18 @@ public static class MetaProgression
             if (value > PlayerPrefs.GetInt(KEY_BEST_FLOOR, 0))
             { PlayerPrefs.SetInt(KEY_BEST_FLOOR, value); PlayerPrefs.Save(); }
         }
+    }
+
+    public static int TotalKills
+    {
+        get => PlayerPrefs.GetInt(KEY_TOTAL_KILLS, 0);
+        set { PlayerPrefs.SetInt(KEY_TOTAL_KILLS, value); PlayerPrefs.Save(); }
+    }
+
+    public static int TotalEssenceSpent
+    {
+        get => PlayerPrefs.GetInt(KEY_TOTAL_ESSENCE_SPENT, 0);
+        set { PlayerPrefs.SetInt(KEY_TOTAL_ESSENCE_SPENT, value); PlayerPrefs.Save(); }
     }
 
     // ─── PATH A UPGRADE LEVELS ────────────────────────────────
@@ -401,6 +415,7 @@ public static class MetaProgression
         int cost = def.getCost(level);
         if (Currency < cost) return false;
         Currency -= cost;
+        TotalEssenceSpent += cost;
         def.setLevel(level + 1);
         return true;
     }
@@ -411,6 +426,7 @@ public static class MetaProgression
         int cost = GetElementUnlockCost(elemName);
         if (Currency < cost) return false;
         Currency -= cost;
+        TotalEssenceSpent += cost;
         UnlockElement(elemName);
         return true;
     }
@@ -499,6 +515,7 @@ public static class MetaProgression
         if (def == null) return false;
         if (Currency < def.Value.unlockCost) return false;
         Currency -= def.Value.unlockCost;
+        TotalEssenceSpent += def.Value.unlockCost;
         PlayerPrefs.SetInt(KEY_LOADOUT_UNLOCK + loadoutId, 1);
         PlayerPrefs.Save();
         return true;
@@ -568,6 +585,7 @@ public static class MetaProgression
 
     static readonly string[] AllKeys = {
         KEY_CURRENCY, KEY_RUNS_COMPLETED, KEY_BEST_FLOOR,
+        KEY_TOTAL_KILLS, KEY_TOTAL_ESSENCE_SPENT,
         KEY_MAX_HP_BONUS, KEY_BASE_DAMAGE, KEY_DASH_CHARGES,
         KEY_SPEED_BONUS, KEY_STARTING_GOLD, KEY_POTION_SLOT,
         KEY_CRIT_CHANCE, KEY_REROLLS, KEY_STARTING_RELIC,
