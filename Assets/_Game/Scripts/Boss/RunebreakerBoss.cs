@@ -19,7 +19,7 @@ public class RunebreakerBoss : MonoBehaviour
     enum State { Hunt, TeleportStrike, SwordCombo, RuneSteal, Shockwave, BoltBarrage, Berserker, Recover }
     State state = State.Hunt;
     float stateTimer;
-    float actionCooldown = 1.5f;
+    float actionCooldown = 0.9f;
 
     // Teleport strike
     int teleportStrikeCount;
@@ -227,7 +227,7 @@ public class RunebreakerBoss : MonoBehaviour
         {
             state = State.Recover;
             stateTimer = phase >= 2 ? 0.4f : 0.7f;
-            actionCooldown = phase >= 2 ? 0.6f : 1f;
+            actionCooldown = phase >= 2 ? 0.36f : 0.6f;
             foreach (var r in renderers)
                 if (r != null) r.material.color = GetPhaseColor();
         }
@@ -287,7 +287,7 @@ public class RunebreakerBoss : MonoBehaviour
 
                 state = State.Recover;
                 stateTimer = phase >= 3 ? 0.3f : (phase >= 2 ? 0.5f : 0.8f);
-                actionCooldown = phase >= 2 ? 0.5f : 0.8f;
+                actionCooldown = phase >= 2 ? 0.3f : 0.48f;
             }
             else
             {
@@ -353,7 +353,7 @@ public class RunebreakerBoss : MonoBehaviour
 
             state = State.Recover;
             stateTimer = 0.5f;
-            actionCooldown = 1f;
+            actionCooldown = 0.6f;
         }
     }
 
@@ -422,7 +422,7 @@ public class RunebreakerBoss : MonoBehaviour
 
             state = State.Recover;
             stateTimer = phase >= 3 ? 0.3f : 0.6f;
-            actionCooldown = 0.8f;
+            actionCooldown = 0.48f;
         }
     }
 
@@ -469,7 +469,7 @@ public class RunebreakerBoss : MonoBehaviour
         {
             state = State.Recover;
             stateTimer = 0.4f;
-            actionCooldown = phase >= 2 ? 0.5f : 0.8f;
+            actionCooldown = phase >= 2 ? 0.3f : 0.48f;
         }
     }
 
@@ -521,7 +521,7 @@ public class RunebreakerBoss : MonoBehaviour
             // Exhaustion: big recovery window
             state = State.Recover;
             stateTimer = 1.5f;
-            actionCooldown = 0.5f;
+            actionCooldown = 0.3f;
             moveSpeed /= 2f; // Temporarily slower after berserker
 
             foreach (var r in renderers)

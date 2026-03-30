@@ -71,7 +71,7 @@ public class WardenBoss : MonoBehaviour
             };
         }
 
-        actionCooldown = 1f;
+        actionCooldown = 0.6f;
         wallTimer = wallSpawnCooldown;
     }
 
@@ -244,7 +244,7 @@ public class WardenBoss : MonoBehaviour
         {
             state = State.Recover;
             stateTimer = 0.5f;
-            actionCooldown = 0.8f;
+            actionCooldown = 0.48f;
         }
     }
 
@@ -295,7 +295,7 @@ public class WardenBoss : MonoBehaviour
 
                 state = State.Recover;
                 stateTimer = phase2 ? 0.6f : 1f; // Punish window
-                actionCooldown = phase2 ? 0.8f : 1.2f;
+                actionCooldown = phase2 ? 0.48f : 0.72f;
             }
             else
             {
@@ -341,7 +341,7 @@ public class WardenBoss : MonoBehaviour
         {
             state = State.Recover;
             stateTimer = phase2 ? 0.5f : 0.8f;
-            actionCooldown = 1f;
+            actionCooldown = 0.6f;
         }
     }
 
@@ -399,7 +399,7 @@ public class WardenBoss : MonoBehaviour
 
             state = State.Recover;
             stateTimer = 0.6f;
-            actionCooldown = 0.8f;
+            actionCooldown = 0.48f;
         }
     }
 

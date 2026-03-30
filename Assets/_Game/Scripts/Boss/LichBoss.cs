@@ -19,7 +19,7 @@ public class LichBoss : MonoBehaviour
     enum State { Float, TeleportChain, OrbBarrage, BeamSweep, VoidPull, SummonPillars, Recover }
     State state = State.Float;
     float stateTimer;
-    float actionCooldown = 1.5f;
+    float actionCooldown = 0.9f;
     float passiveOrbTimer;
 
     // Teleport chain
@@ -220,7 +220,7 @@ public class LichBoss : MonoBehaviour
             if (teleportChainCount >= teleportChainMax)
             {
                 state = State.Float;
-                actionCooldown = phase2 ? 1f : 1.5f;
+                actionCooldown = phase2 ? 0.6f : 0.9f;
             }
             else
             {
@@ -326,7 +326,7 @@ public class LichBoss : MonoBehaviour
 
             state = State.Recover;
             stateTimer = phase2 ? 0.5f : 0.8f;
-            actionCooldown = phase2 ? 0.8f : 1.2f;
+            actionCooldown = phase2 ? 0.48f : 0.72f;
         }
     }
 
@@ -400,7 +400,7 @@ public class LichBoss : MonoBehaviour
 
             state = State.Recover;
             stateTimer = 1f; // Punish window after beam
-            actionCooldown = 1f;
+            actionCooldown = 0.6f;
         }
     }
 
@@ -508,7 +508,7 @@ public class LichBoss : MonoBehaviour
 
             state = State.Recover;
             stateTimer = 0.8f;
-            actionCooldown = 1.5f;
+            actionCooldown = 0.9f;
         }
     }
 
@@ -568,7 +568,7 @@ public class LichBoss : MonoBehaviour
         // After immunity ends, start aggressive teleport chain
         state = State.Recover;
         stateTimer = 1.5f;
-        actionCooldown = 0.3f;
+        actionCooldown = 0.18f;
     }
 
     // --- ORB FIRING ---

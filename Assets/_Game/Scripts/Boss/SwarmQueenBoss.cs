@@ -22,7 +22,7 @@ public class SwarmQueenBoss : MonoBehaviour
     enum State { Reposition, AcidBarrage, CommandSwarm, BodySlam, Absorb, SummonBurst, Recover }
     State state = State.Reposition;
     float stateTimer;
-    float actionCooldown = 2f;
+    float actionCooldown = 1.2f;
     float spawnTimer;
     float teleportTimer;
 
@@ -201,7 +201,7 @@ public class SwarmQueenBoss : MonoBehaviour
         {
             state = State.Recover;
             stateTimer = 0.6f;
-            actionCooldown = phase2 ? 1f : 1.5f;
+            actionCooldown = phase2 ? 0.6f : 0.9f;
         }
     }
 
@@ -250,7 +250,7 @@ public class SwarmQueenBoss : MonoBehaviour
             foreach (var r in renderers)
                 if (r != null) r.material.color = baseColor;
             state = State.Reposition;
-            actionCooldown = 2f;
+            actionCooldown = 1.2f;
         }
     }
 
@@ -292,7 +292,7 @@ public class SwarmQueenBoss : MonoBehaviour
 
             state = State.Recover;
             stateTimer = 0.7f;
-            actionCooldown = 1.5f;
+            actionCooldown = 0.9f;
             return;
         }
 
@@ -401,7 +401,7 @@ public class SwarmQueenBoss : MonoBehaviour
             SFXSystem.Play(SFXSystem.SFXType.Explosion, target.position);
 
             state = State.Reposition;
-            actionCooldown = 2f;
+            actionCooldown = 1.2f;
         }
     }
 

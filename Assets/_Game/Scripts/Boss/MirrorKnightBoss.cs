@@ -18,7 +18,7 @@ public class MirrorKnightBoss : MonoBehaviour
     enum State { Stalk, DashCombo, Parry, ShieldBash, MirrorClones, SweepSlash, Recover }
     State state = State.Stalk;
     float stateTimer;
-    float actionCooldown = 1.5f;
+    float actionCooldown = 0.9f;
 
     // Dash combo
     int dashComboCount;
@@ -248,7 +248,7 @@ public class MirrorKnightBoss : MonoBehaviour
 
                 state = State.Recover;
                 stateTimer = phase2 ? 0.8f : 1.2f;
-                actionCooldown = phase2 ? 0.6f : 1f;
+                actionCooldown = phase2 ? 0.36f : 0.6f;
             }
             else
             {
@@ -331,7 +331,7 @@ public class MirrorKnightBoss : MonoBehaviour
 
         state = State.Recover;
         stateTimer = 0.5f;
-        actionCooldown = 1f;
+        actionCooldown = 0.6f;
     }
 
     // --- SHIELD BASH: short dash + stun ---
@@ -383,7 +383,7 @@ public class MirrorKnightBoss : MonoBehaviour
             else
             {
                 state = State.Stalk;
-                actionCooldown = 0.8f;
+                actionCooldown = 0.48f;
             }
         }
     }
@@ -434,7 +434,7 @@ public class MirrorKnightBoss : MonoBehaviour
 
             state = State.Recover;
             stateTimer = phase2 ? 0.6f : 1f;
-            actionCooldown = 0.8f;
+            actionCooldown = 0.48f;
         }
     }
 
@@ -463,7 +463,7 @@ public class MirrorKnightBoss : MonoBehaviour
             }
 
             state = State.Stalk;
-            actionCooldown = 3f;
+            actionCooldown = 1.8f;
         }
     }
 
