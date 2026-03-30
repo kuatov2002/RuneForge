@@ -53,12 +53,6 @@ public class GameHUD : MonoBehaviour
     // Relics
     VisualElement relicBar;
 
-    // Relic/Mutation tooltip
-    VisualElement relicTooltip;
-
-    // Mutations
-    VisualElement mutationBar;
-
     // Gold
     Label goldLabel;
 
@@ -87,6 +81,9 @@ public class GameHUD : MonoBehaviour
 
     // Synergy bar
     VisualElement synergyBar;
+
+    // Minimap
+    VisualElement minimapContainer;
 
     // Pause menu
     VisualElement pauseOverlay;
@@ -276,12 +273,6 @@ public class GameHUD : MonoBehaviour
         relicBar.style.paddingLeft = 20;
         relicBar.style.paddingTop = 4;
         root.Add(relicBar);
-
-        // ── Mutation bar ──
-        BuildMutationBar(root);
-
-        // ── Relic/Mutation tooltip ──
-        BuildRelicTooltip(root);
 
         // ── Synergy bar ──
         synergyBar = new VisualElement();
@@ -712,6 +703,9 @@ public class GameHUD : MonoBehaviour
 
         root.Add(bottomArea);
 
+        // ── Minimap ──
+        BuildMinimap(root);
+
         // ── Damage number layer ──
         damageNumberLayer = new VisualElement();
         damageNumberLayer.pickingMode = PickingMode.Ignore;
@@ -721,6 +715,87 @@ public class GameHUD : MonoBehaviour
         damageNumberLayer.style.left = 0;
         damageNumberLayer.style.right = 0;
         root.Add(damageNumberLayer);
+    }
+
+    // ── Minimap ──
+
+    void BuildMinimap(VisualElement root)
+    {
+        minimapContainer = new VisualElement();
+        minimapContainer.style.position = Position.Absolute;
+        minimapContainer.style.top = 10;
+        minimapContainer.style.right = 10;
+        minimapContainer.style.width = 180;
+        minimapContainer.style.height = 200;
+        minimapContainer.style.backgroundColor = new Color(0.05f, 0.05f, 0.1f, 0.8f);
+        Border(minimapContainer, new Color(0.3f, 0.3f, 0.4f), 1);
+        Pad(minimapContainer, 5, 5);
+        minimapContainer.pickingMode = PickingMode.Ignore;
+        root.Add(minimapContainer);
+    }
+
+    public void UpdateMinimap(int currentRoom, int totalRooms, string[] roomTypes)
+    {
+        if (minimapContainer == null) return;
+        minimapContainer.Clear();
+
+        // Title
+        var title = Lbl("Floor Map", 10, new Color(0.6f, 0.6f, 0.7f));
+        title.style.unityTextAlign = TextAnchor.MiddleCenter;
+        title.style.marginBottom = 4;
+        minimapContainer.Add(title);
+
+        // Node grid
+        var grid = new VisualElement();
+        grid.style.flexDirection = FlexDirection.Row;
+        grid.style.flexWrap = Wrap.Wrap;
+        grid.style.justifyContent = Justify.Center;
+        grid.pickingMode = PickingMode.Ignore;
+
+        for (int i = 0; i < totalRooms; i++)
+        {
+            var node = new VisualElement();
+            node.style.width = 28;
+            node.style.height = 28;
+            node.style.marginRight = 4;
+            node.style.marginBottom = 4;
+            Radius(node, 14);
+            node.pickingMode = PickingMode.Ignore;
+
+            Color nodeColor;
+            if (i + 1 == currentRoom)
+                nodeColor = new Color(1f, 1f, 0.3f);       // Current = yellow
+            else if (i + 1 < currentRoom)
+                nodeColor = new Color(0.3f, 0.3f, 0.3f);   // Visited = gray
+            else if (i + 1 == totalRooms)
+                nodeColor = new Color(0.8f, 0.2f, 0.3f);   // Boss = red
+            else if (roomTypes != null && i < roomTypes.Length)
+            {
+                nodeColor = roomTypes[i] switch
+                {
+                    "Shop"     => new Color(0.3f, 0.8f, 0.3f),
+                    "Rest"     => new Color(0.8f, 0.8f, 0.8f),
+                    "Event"    => new Color(0.3f, 0.5f, 0.9f),
+                    "Elite"    => new Color(1f, 0.5f, 0.2f),
+                    "Treasure" => new Color(1f, 0.8f, 0.2f),
+                    _          => new Color(0.5f, 0.4f, 0.4f)
+                };
+            }
+            else
+                nodeColor = new Color(0.4f, 0.4f, 0.4f);   // Unknown
+
+            node.style.backgroundColor = nodeColor;
+
+            var label = Lbl((i + 1).ToString(), 9, Color.white);
+            label.style.unityTextAlign = TextAnchor.MiddleCenter;
+            label.style.width = 28;
+            label.style.height = 28;
+            node.Add(label);
+
+            grid.Add(node);
+        }
+
+        minimapContainer.Add(grid);
     }
 
     // ── Combo Display ──
@@ -1229,28 +1304,92 @@ public class GameHUD : MonoBehaviour
         }
     }
 
-    public void ShowVictory(int wave, int floor, int kills = 0)
+    public void ShowVictory(int wave, int floor, int kills = 0,
+        float runTime = 0f, int relicsCollected = 0, int combosDiscovered = 0,
+        int damageDealt = 0, int damageTaken = 0, string favCombo = null, int essenceEarned = 0)
     {
         victoryOverlay.style.display = DisplayStyle.Flex;
         victoryOverlay.Clear();
 
+        // Ensure dark overlay background
+        victoryOverlay.style.backgroundColor = new Color(0, 0, 0, 0.8f);
+
+        // Central panel
+        var panel = new VisualElement();
+        panel.style.alignItems = Align.Center;
+        panel.style.justifyContent = Justify.Center;
+        Pad(panel, 32, 48);
+        panel.style.backgroundColor = new Color(0.05f, 0.05f, 0.08f, 0.85f);
+        Radius(panel, 12);
+        Border(panel, new Color(1f, 0.85f, 0.2f, 0.4f), 1);
+
         var title = Lbl("VICTORY!", 64, new Color(1f, 0.85f, 0.2f), FontStyle.Bold);
-        victoryOverlay.Add(title);
+        panel.Add(title);
 
         var sub = Lbl("You have conquered the dungeon!", 24, new Color(0.8f, 0.8f, 0.85f));
-        sub.style.marginTop = 12;
-        victoryOverlay.Add(sub);
+        sub.style.marginTop = 8;
+        panel.Add(sub);
 
-        if (kills > 0)
-        {
-            var killLbl = Lbl($"Total kills: {kills}", 20, new Color(0.9f, 0.9f, 0.95f));
-            killLbl.style.marginTop = 8;
-            victoryOverlay.Add(killLbl);
-        }
+        // Separator
+        var sep = new VisualElement();
+        sep.style.width = 280;
+        sep.style.height = 2;
+        sep.style.backgroundColor = new Color(1f, 0.85f, 0.2f, 0.3f);
+        sep.style.marginTop = 12;
+        sep.style.marginBottom = 16;
+        panel.Add(sep);
+
+        // Stats grid
+        var stats = new VisualElement();
+        stats.style.width = 320;
+
+        AddStatRow(stats, "Time", FormatRunTime(runTime));
+        AddStatRow(stats, "Floors Cleared", floor.ToString());
+        AddStatRow(stats, "Enemies Slain", kills.ToString());
+        if (relicsCollected > 0)
+            AddStatRow(stats, "Relics Collected", relicsCollected.ToString());
+        if (combosDiscovered > 0)
+            AddStatRow(stats, "Combos Discovered", combosDiscovered.ToString());
+        if (damageDealt > 0)
+            AddStatRow(stats, "Damage Dealt", damageDealt.ToString());
+        if (damageTaken > 0)
+            AddStatRow(stats, "Damage Taken", damageTaken.ToString());
+        if (!string.IsNullOrEmpty(favCombo))
+            AddStatRow(stats, "Favourite Combo", favCombo);
+        if (essenceEarned > 0)
+            AddStatRow(stats, "Soul Essence Earned", $"+{essenceEarned}");
+
+        panel.Add(stats);
 
         var hint = Lbl("Press  R  to return to the Sanctum", 20, new Color(0.6f, 0.6f, 0.65f));
         hint.style.marginTop = 24;
-        victoryOverlay.Add(hint);
+        panel.Add(hint);
+
+        victoryOverlay.Add(panel);
+    }
+
+    void AddStatRow(VisualElement parent, string label, string value)
+    {
+        var row = new VisualElement();
+        row.style.flexDirection = FlexDirection.Row;
+        row.style.justifyContent = Justify.SpaceBetween;
+        row.style.marginBottom = 4;
+        row.pickingMode = PickingMode.Ignore;
+
+        var lbl = Lbl(label, 14, new Color(0.7f, 0.7f, 0.7f));
+        row.Add(lbl);
+
+        var val = Lbl(value, 14, Color.white, FontStyle.Bold);
+        row.Add(val);
+
+        parent.Add(row);
+    }
+
+    static string FormatRunTime(float seconds)
+    {
+        int m = (int)(seconds / 60);
+        int s = (int)(seconds % 60);
+        return $"{m}:{s:D2}";
     }
 
     public void ShowBossHP(Health bossHP, string bossName)
@@ -1277,122 +1416,14 @@ public class GameHUD : MonoBehaviour
         relicBar.Clear();
         foreach (var r in relics)
         {
-            var relic = r;
-            var icon = new VisualElement();
-            icon.style.width = 32;
-            icon.style.height = 32;
-            Radius(icon, 6);
-            icon.style.backgroundColor = relic.color;
-            icon.style.marginRight = 4;
-            Border(icon, relic.isCursed ? new Color(0.8f, 0.2f, 0.2f) : new Color(0.5f, 0.5f, 0.5f), 1);
-            icon.pickingMode = PickingMode.Position;
-            icon.RegisterCallback<MouseEnterEvent>(e => ShowRelicTooltip(relic, icon));
-            icon.RegisterCallback<MouseLeaveEvent>(e => HideRelicTooltip());
-            relicBar.Add(icon);
-        }
-
-        RefreshMutations();
-    }
-
-    // ── Relic/Mutation Tooltip ──
-
-    void BuildRelicTooltip(VisualElement root)
-    {
-        relicTooltip = new VisualElement();
-        relicTooltip.style.position = Position.Absolute;
-        relicTooltip.style.backgroundColor = new Color(0.1f, 0.1f, 0.15f, 0.95f);
-        Border(relicTooltip, new Color(0.4f, 0.4f, 0.5f), 1);
-        relicTooltip.style.paddingTop = 6;
-        relicTooltip.style.paddingBottom = 6;
-        relicTooltip.style.paddingLeft = 10;
-        relicTooltip.style.paddingRight = 10;
-        relicTooltip.style.maxWidth = 250;
-        Radius(relicTooltip, 6);
-        relicTooltip.style.display = DisplayStyle.None;
-        relicTooltip.pickingMode = PickingMode.Ignore;
-
-        var nameLabel = Lbl("", 14, Color.white, FontStyle.Bold);
-        nameLabel.name = "tooltip-name";
-        relicTooltip.Add(nameLabel);
-
-        var descLabel = Lbl("", 11, new Color(0.8f, 0.8f, 0.8f));
-        descLabel.name = "tooltip-desc";
-        descLabel.style.whiteSpace = WhiteSpace.Normal;
-        relicTooltip.Add(descLabel);
-
-        root.Add(relicTooltip);
-    }
-
-    void ShowRelicTooltip(RelicSO relic, VisualElement icon)
-    {
-        var nameLabel = relicTooltip.Q<Label>("tooltip-name");
-        var descLabel = relicTooltip.Q<Label>("tooltip-desc");
-        nameLabel.text = relic.relicName;
-        descLabel.text = relic.description;
-
-        if (relic.isCursed)
-            nameLabel.style.color = new Color(0.9f, 0.3f, 0.3f);
-        else
-            nameLabel.style.color = Color.white;
-
-        relicTooltip.style.display = DisplayStyle.Flex;
-        var iconRect = icon.worldBound;
-        relicTooltip.style.left = iconRect.x;
-        relicTooltip.style.top = iconRect.y - 60;
-    }
-
-    void HideRelicTooltip()
-    {
-        relicTooltip.style.display = DisplayStyle.None;
-    }
-
-    // ── Mutation Bar ──
-
-    void BuildMutationBar(VisualElement root)
-    {
-        mutationBar = new VisualElement();
-        mutationBar.pickingMode = PickingMode.Ignore;
-        mutationBar.style.flexDirection = FlexDirection.Row;
-        mutationBar.style.paddingLeft = 20;
-        mutationBar.style.marginTop = 4;
-        root.Add(mutationBar);
-    }
-
-    void RefreshMutations()
-    {
-        if (mutationBar == null) return;
-        mutationBar.Clear();
-
-        var mutations = SpellMutationSystem.ActiveMutations;
-        if (mutations.Count == 0) return;
-
-        foreach (var mutType in mutations)
-        {
-            var mut = mutType;
-            var def = SpellMutationSystem.GetDef(mut);
             var icon = new VisualElement();
             icon.style.width = 24;
             icon.style.height = 24;
-            icon.style.marginRight = 3;
-            icon.style.backgroundColor = def.color;
-            Radius(icon, 3);
-            icon.pickingMode = PickingMode.Position;
-
-            icon.RegisterCallback<MouseEnterEvent>(e =>
-            {
-                var nameLabel = relicTooltip.Q<Label>("tooltip-name");
-                var descLabel = relicTooltip.Q<Label>("tooltip-desc");
-                nameLabel.text = def.name;
-                descLabel.text = def.description;
-                nameLabel.style.color = new Color(0.7f, 0.9f, 0.5f);
-                relicTooltip.style.display = DisplayStyle.Flex;
-                var r = icon.worldBound;
-                relicTooltip.style.left = r.x;
-                relicTooltip.style.top = r.y - 60;
-            });
-            icon.RegisterCallback<MouseLeaveEvent>(e => HideRelicTooltip());
-
-            mutationBar.Add(icon);
+            Radius(icon, 6);
+            icon.style.backgroundColor = r.color;
+            icon.style.marginRight = 4;
+            Border(icon, r.isCursed ? new Color(0.8f, 0.2f, 0.2f) : new Color(0.5f, 0.5f, 0.5f), 1);
+            relicBar.Add(icon);
         }
     }
 
@@ -1583,6 +1614,8 @@ public class GameHUD : MonoBehaviour
         grid.style.flexWrap = Wrap.Wrap;
         grid.style.justifyContent = Justify.Center;
 
+        var relicMgr = FindAnyObjectByType<RelicManager>();
+
         for (int i = 0; i < items.Length; i++)
         {
             var item = items[i];
@@ -1598,6 +1631,22 @@ public class GameHUD : MonoBehaviour
             card.style.width = 180;
             card.style.marginLeft = 6;
             card.style.marginRight = 6;
+
+            // Show synergy hint for relic items
+            if (relicMgr != null && item.relic != null)
+            {
+                string synHint = CheckSynergy(item.relic, relicMgr);
+                if (!string.IsNullOrEmpty(synHint))
+                {
+                    var synLabel = Lbl(synHint, 10, new Color(0.3f, 0.9f, 0.3f), FontStyle.Bold);
+                    synLabel.style.marginTop = 4;
+                    synLabel.style.paddingLeft = 12;
+                    synLabel.style.paddingRight = 12;
+                    synLabel.style.whiteSpace = WhiteSpace.Normal;
+                    card.Add(synLabel);
+                }
+            }
+
             grid.Add(card);
         }
         panel.Add(grid);
@@ -1609,6 +1658,29 @@ public class GameHUD : MonoBehaviour
         });
         leaveBtn.style.marginTop = 16;
         panel.Add(leaveBtn);
+    }
+
+    // ── Shop Synergy Check ──
+
+    string CheckSynergy(RelicSO newRelic, RelicManager mgr)
+    {
+        if (newRelic == null || mgr == null) return null;
+        var type = newRelic.relicType;
+
+        if (type == RelicType.GlassCannon && mgr.HasRelic(RelicType.Berserker)) return "SYNERGY: Rage Glass";
+        if (type == RelicType.Berserker && mgr.HasRelic(RelicType.GlassCannon)) return "SYNERGY: Rage Glass";
+        if (type == RelicType.Thorns && mgr.HasRelic(RelicType.Shield)) return "SYNERGY: Retribution";
+        if (type == RelicType.Shield && mgr.HasRelic(RelicType.Thorns)) return "SYNERGY: Retribution";
+        if (type == RelicType.DashFire && mgr.HasRelic(RelicType.CursedSpeed)) return "SYNERGY: Inferno Dash";
+        if (type == RelicType.CursedSpeed && mgr.HasRelic(RelicType.DashFire)) return "SYNERGY: Inferno Dash";
+        if (type == RelicType.BloodPact && mgr.HasRelic(RelicType.Regeneration)) return "SYNERGY: Blood Renewal";
+        if (type == RelicType.Regeneration && mgr.HasRelic(RelicType.BloodPact)) return "SYNERGY: Blood Renewal";
+        if (type == RelicType.DoubleStrike && mgr.HasRelic(RelicType.Chaos)) return "SYNERGY: Chaotic Surge";
+        if (type == RelicType.Chaos && mgr.HasRelic(RelicType.DoubleStrike)) return "SYNERGY: Chaotic Surge";
+        if (type == RelicType.VampireAura && mgr.HasRelic(RelicType.Lucky)) return "SYNERGY: Fortune's Vitality";
+        if (type == RelicType.Lucky && mgr.HasRelic(RelicType.VampireAura)) return "SYNERGY: Fortune's Vitality";
+
+        return null;
     }
 
     // ── NEW: Boss Intro ──
