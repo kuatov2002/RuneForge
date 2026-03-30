@@ -32,6 +32,7 @@ public class SpellCaster : MonoBehaviour
 
     // ── Cooldown ──
     float cooldownTimer;
+    int bloodPactCastCounter;
 
     // ── Events ──
     public event Action OnOrbsChanged;
@@ -318,19 +319,30 @@ public class SpellCaster : MonoBehaviour
         if (UnityEngine.Random.value < MetaProgression.CritChance)
             dmgMult *= 2f;
 
-        // Soft cap moved to ComboSpellFactory.Cast() to cover charged + mutation multipliers
-
-        // Relic modifiers
+        // Relic damage multipliers (Berserker, GlassCannon, DoubleStrike, CursedPower, BloodPact, Chaos, PrismShard)
         var relicMgr = GetComponent<RelicManager>();
+        if (relicMgr != null)
+        {
+            float baseDmg = def.baseDamage * dmgMult;
+            float relicDmg = relicMgr.ModifyDamage(baseDmg);
+            if (baseDmg > 0) dmgMult *= relicDmg / baseDmg;
+        }
 
-        // BloodPact cost
+        // Soft cap moved to ComboSpellFactory.Cast() to cover charged + mutation + relic multipliers
+
+        // BloodPact cost: 1 HP every 3 casts (can kill)
         if (relicMgr != null && relicMgr.HasRelic(RelicType.BloodPact))
         {
-            var hp = GetComponent<Health>();
-            if (hp != null && !hp.IsDead)
+            bloodPactCastCounter++;
+            if (bloodPactCastCounter >= 3)
             {
-                hp.currentHP = Mathf.Max(1, hp.currentHP - 1);
-                hp.InvokeHPChanged();
+                bloodPactCastCounter = 0;
+                var hp = GetComponent<Health>();
+                if (hp != null && !hp.IsDead && hp.currentHP > 1)
+                {
+                    hp.currentHP -= 1;
+                    hp.InvokeHPChanged();
+                }
             }
         }
 
