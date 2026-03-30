@@ -169,8 +169,8 @@ public static class ComboSpellFactory
     {
         if (baseDmg <= 0) return totalDmg;
         float mult = totalDmg / baseDmg;
-        if (mult <= 4f) return totalDmg;
-        float capped = 4f + Mathf.Sqrt(mult - 4f);
+        if (mult <= 3.5f) return totalDmg;
+        float capped = 3.5f + Mathf.Sqrt(mult - 3.5f) * 0.7f;
         return baseDmg * capped;
     }
 }
