@@ -443,7 +443,7 @@ public class Bootstrap : MonoBehaviour
             CreateRelic("Blazing Trail", RelicType.DashFire, "Dash leaves a fire trail", new Color(1f, 0.3f, 0.1f)),
             CreateRelic("Thorns", RelicType.Thorns, "Reflect 1 damage to melee attackers", new Color(0.5f, 0.8f, 0.2f)),
             CreateRelic("Vampire Aura", RelicType.VampireAura, "Heal 1 HP per room cleared", new Color(0.8f, 0.1f, 0.2f)),
-            CreateRelic("Glass Cannon", RelicType.GlassCannon, "+50% damage, -1 max HP", new Color(0.9f, 0.9f, 0.3f)),
+            CreateCursedRelic("Glass Cannon", RelicType.GlassCannon, "+50% damage, -2 max HP", new Color(0.9f, 0.9f, 0.3f)),
             CreateRelic("Aegis", RelicType.Shield, "Block the first hit in each room", new Color(0.4f, 0.6f, 0.9f)),
             CreateRelic("Lucky Charm", RelicType.Lucky, "+20% chance for 4th rune choice", new Color(0.2f, 0.9f, 0.4f)),
             CreateRelic("Berserker Rage", RelicType.Berserker, "+25% damage when below 50% HP", new Color(0.9f, 0.2f, 0.1f)),
@@ -2184,7 +2184,6 @@ public class Bootstrap : MonoBehaviour
         }
         if (currentBoss != null)
         {
-            currentBoss.AddComponent<BossEnrage>();
             var bossHP = currentBoss.GetComponent<Health>();
             if (bossHP != null)
             {
@@ -2211,7 +2210,7 @@ public class Bootstrap : MonoBehaviour
         BuildBody(e.transform, c, 1.6f);
         e.transform.position = new Vector3(6, 0, 10);
         var rb = e.AddComponent<Rigidbody>(); rb.useGravity = false; rb.isKinematic = true;
-        var hp = e.AddComponent<Health>(); hp.maxHP = 200; hp.currentHP = 200;
+        var hp = e.AddComponent<Health>(); hp.maxHP = 80; hp.currentHP = 80;
         e.AddComponent<EnemyHealthBar>();
         e.AddComponent<ElementalStatus>();
         e.AddComponent<ElementalStatusVisuals>();
@@ -2240,7 +2239,7 @@ public class Bootstrap : MonoBehaviour
         }
         e.transform.position = new Vector3(6, 0, 10);
         var rb = e.AddComponent<Rigidbody>(); rb.useGravity = false; rb.isKinematic = true;
-        var hp = e.AddComponent<Health>(); hp.maxHP = 275; hp.currentHP = 275;
+        var hp = e.AddComponent<Health>(); hp.maxHP = 110; hp.currentHP = 110;
         e.AddComponent<EnemyHealthBar>();
         e.AddComponent<ElementalStatus>();
         e.AddComponent<ElementalStatusVisuals>();
@@ -2273,7 +2272,7 @@ public class Bootstrap : MonoBehaviour
         shieldVis.GetComponent<Renderer>().material = MakeEmissive(new Color(0.5f, 0.5f, 0.8f));
         e.transform.position = new Vector3(6, 0, 10);
         var rb = e.AddComponent<Rigidbody>(); rb.useGravity = false; rb.isKinematic = true;
-        var hp = e.AddComponent<Health>(); hp.maxHP = 350; hp.currentHP = 350;
+        var hp = e.AddComponent<Health>(); hp.maxHP = 140; hp.currentHP = 140;
         e.AddComponent<EnemyHealthBar>();
         e.AddComponent<ElementalStatus>();
         e.AddComponent<ElementalStatusVisuals>();
@@ -2304,7 +2303,7 @@ public class Bootstrap : MonoBehaviour
         tip.GetComponent<Renderer>().material = MakeEmissive(new Color(0.6f, 0f, 1f));
         e.transform.position = new Vector3(6, 0, 10);
         var rb = e.AddComponent<Rigidbody>(); rb.useGravity = false; rb.isKinematic = true;
-        var hp = e.AddComponent<Health>(); hp.maxHP = 450; hp.currentHP = 450;
+        var hp = e.AddComponent<Health>(); hp.maxHP = 180; hp.currentHP = 180;
         e.AddComponent<EnemyHealthBar>();
         e.AddComponent<ElementalStatus>();
         e.AddComponent<ElementalStatusVisuals>();
@@ -2332,7 +2331,7 @@ public class Bootstrap : MonoBehaviour
         }
         e.transform.position = new Vector3(6, 0, 10);
         var rb = e.AddComponent<Rigidbody>(); rb.useGravity = false; rb.isKinematic = true;
-        var hp = e.AddComponent<Health>(); hp.maxHP = 550; hp.currentHP = 550;
+        var hp = e.AddComponent<Health>(); hp.maxHP = 220; hp.currentHP = 220;
         e.AddComponent<EnemyHealthBar>();
         e.AddComponent<ElementalStatus>();
         e.AddComponent<ElementalStatusVisuals>();
