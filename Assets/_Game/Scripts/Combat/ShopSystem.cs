@@ -26,11 +26,32 @@ public static class ShopSystem
         if (relic.isCursed)
             return 50 + floor * 8;
 
-        if (relic.relicType == RelicType.SpeedBoost || relic.relicType == RelicType.GaleRing ||
-            relic.relicType == RelicType.Lucky || relic.relicType == RelicType.Regeneration)
-            return 40 + floor * 8;   // Common tier
+        // Common tier
+        switch (relic.relicType)
+        {
+            case RelicType.SpeedBoost: case RelicType.GaleRing:
+            case RelicType.Lucky: case RelicType.Regeneration:
+            case RelicType.Aftershock: case RelicType.QuickSwap:
+            case RelicType.DashRecharge: case RelicType.GoldRush:
+            case RelicType.LowTide: case RelicType.Underdog:
+            case RelicType.CrowdedRoom: case RelicType.ChargeHoarder:
+            case RelicType.Cartographer: case RelicType.EscapeArtist:
+            case RelicType.Scavenger:
+                return 40 + floor * 8;
+        }
 
-        return 70 + floor * 12; // Uncommon tier
+        // Rare tier
+        switch (relic.relicType)
+        {
+            case RelicType.LastStand: case RelicType.ReactorCore:
+            case RelicType.Minimalist: case RelicType.Monolith:
+            case RelicType.Gambler: case RelicType.Cascade:
+            case RelicType.PhantomCaster: case RelicType.ReactionCatalyst:
+                return 120 + floor * 15;
+        }
+
+        // Uncommon tier (default)
+        return 70 + floor * 12;
     }
 
     /// <summary>Apply Haggler meta-upgrade discount to a price.</summary>

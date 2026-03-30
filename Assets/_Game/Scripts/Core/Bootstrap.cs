@@ -465,6 +465,64 @@ public class Bootstrap : MonoBehaviour
             CreateRelic("Venom Sac", RelicType.VenomSac, "Poison ticks deal 1.5x damage", new Color(0.2f, 0.8f, 0.1f)),
             CreateRelic("Void Lens", RelicType.VoidLens, "Void pull radius +40%", new Color(0.5f, 0.1f, 0.8f)),
             CreateRelic("Prism Shard", RelicType.PrismShard, "3+ elements in 10s = +25% damage", new Color(0.9f, 0.5f, 0.9f)),
+
+            // ═══ TRIGGER-BASED RELICS ═══
+            CreateRelic("Aftershock", RelicType.Aftershock, "Momentum kills create shockwaves (tier 2+)", new Color(0.7f, 0.5f, 0.2f)),
+            CreateRelic("Quick Swap", RelicType.QuickSwap, "+25% damage 1.5s after element switch", new Color(0.4f, 0.8f, 0.6f)),
+            CreateRelic("Overheat Surge", RelicType.OverheatSurge, "Elemental explosion on overheat", new Color(1f, 0.5f, 0.2f)),
+            CreateRelic("Soul Harvest", RelicType.SoulHarvest, "Heal 1 HP every 8 streak kills", new Color(0.6f, 0.1f, 0.3f)),
+            CreateRelic("Dash Recharge", RelicType.DashRecharge, "Dash restores 1 overheated charge", new Color(0.3f, 0.7f, 0.9f)),
+            CreateRelic("Last Stand", RelicType.LastStand, "Survive lethal hit once, +50% dmg 5s", new Color(1f, 0.9f, 0.2f)),
+            CreateRelic("Elemental Echo", RelicType.ElementalEcho, "Kills spread victim's status (2u)", new Color(0.5f, 0.7f, 0.9f)),
+            CreateRelic("Dash Chain", RelicType.DashChain, "Dash through 2+ enemies = next cast free", new Color(0.6f, 0.4f, 1f)),
+            CreateRelic("Reactor Core", RelicType.ReactorCore, "Reactions stack +6% damage (8s, max 5)", new Color(0.9f, 0.6f, 0.1f)),
+            CreateRelic("Gold Rush", RelicType.GoldRush, "Clear room <15s = +50% gold", new Color(1f, 0.85f, 0.2f)),
+
+            // ═══ CONDITIONAL PASSIVE RELICS ═══
+            CreateRelic("Low Tide", RelicType.LowTide, "No overheated slots = -15% cooldown", new Color(0.4f, 0.6f, 0.8f)),
+            CreateRelic("Underdog", RelicType.Underdog, "Below 30% HP: +20% speed, -1 dmg taken", new Color(0.8f, 0.3f, 0.2f)),
+            CreateRelic("Full Power", RelicType.FullPower, "At max HP: +20% damage", new Color(0.3f, 0.9f, 0.3f)),
+            CreateRelic("Elemental Focus", RelicType.ElementalFocus, "Same-element combo = +15% damage", new Color(0.7f, 0.5f, 0.8f)),
+            CreateRelic("Floor Veteran", RelicType.FloorVeteran, "+5% damage per floor cleared", new Color(0.5f, 0.5f, 0.5f)),
+            CreateRelic("Minimalist", RelicType.Minimalist, "3 or fewer relics = +40% damage", new Color(0.9f, 0.9f, 0.9f)),
+            CreateRelic("Momentum Armor", RelicType.MomentumArmor, "Momentum tier 3+ = -2 dmg taken", new Color(0.8f, 0.6f, 0.2f)),
+            CreateRelic("Void Affinity", RelicType.VoidAffinity, "+30% damage to Exposed enemies", new Color(0.5f, 0.2f, 0.7f)),
+            CreateRelic("Crowded Room", RelicType.CrowdedRoom, "5+ enemies alive = +20% damage", new Color(0.6f, 0.3f, 0.3f)),
+            CreateRelic("Charge Hoarder", RelicType.ChargeHoarder, "All charges full = +15% damage", new Color(0.3f, 0.5f, 0.7f)),
+
+            // ═══ BUILD-DEFINING RELICS ═══
+            CreateRelic("Monolith", RelicType.Monolith, "Stand still: +60% dmg, +50% radius (6s max)", new Color(0.4f, 0.35f, 0.3f)),
+            CreateRelic("Gambler", RelicType.Gambler, "50% triple damage, 50% zero damage", new Color(0.9f, 0.8f, 0.1f)),
+            CreateCursedRelic("Siphon", RelicType.Siphon, "CURSED: 50% damage, steal HP equal to dealt", new Color(0.4f, 0.8f, 0.4f)),
+            CreateRelic("Cascade", RelicType.Cascade, "Kill = auto-cast last spell at death pos (50%)", new Color(0.8f, 0.4f, 0.9f)),
+            CreateCursedRelic("Overload", RelicType.ElementalOverload, "CURSED: Shared overheat, +25% damage", new Color(1f, 0.3f, 0.3f)),
+            CreateRelic("Phantom Caster", RelicType.PhantomCaster, "Dash spawns phantom that copies spell (3s)", new Color(0.6f, 0.5f, 0.9f)),
+            CreateCursedRelic("Convergence", RelicType.Convergence, "CURSED: Lock to 2 elements, +40% damage", new Color(0.7f, 0.7f, 0.3f)),
+            CreateCursedRelic("Entropy", RelicType.EntropyRelic, "CURSED: Force overheat every 20s, +30% dmg", new Color(0.4f, 0.2f, 0.5f)),
+
+            // ═══ UTILITY RELICS ═══
+            CreateRelic("Cartographer", RelicType.Cartographer, "Reveal adjacent room types", new Color(0.6f, 0.5f, 0.4f)),
+            CreateRelic("Scavenger", RelicType.Scavenger, "15% chance enemies drop 1 HP pickup", new Color(0.5f, 0.7f, 0.3f)),
+            CreateRelic("Magnet Field", RelicType.MagnetField, "Gold pickup radius x2.5", new Color(0.8f, 0.7f, 0.2f)),
+            CreateRelic("Merchant", RelicType.Merchant, "Shop +1 item, potions -30% cheaper", new Color(0.6f, 0.6f, 0.2f)),
+            CreateRelic("Time Dilation", RelicType.TimeDilation, "Stand 0.5s = slow nearby enemies 40% (3u)", new Color(0.5f, 0.5f, 0.8f)),
+            CreateRelic("Escape Artist", RelicType.EscapeArtist, "At 1 HP: free emergency dash (10s CD)", new Color(0.9f, 0.4f, 0.3f)),
+            CreateRelic("Rune Recycler", RelicType.RuneRecycler, "Skip overheat penalty, lose 1 charge", new Color(0.4f, 0.6f, 0.5f)),
+            CreateRelic("Gold Shield", RelicType.GoldShield, "Spend 10 gold to block 1 damage", new Color(0.9f, 0.8f, 0.3f)),
+
+            // ═══ COMBO-SYSTEM RELICS ═══
+            CreateRelic("Combo Master", RelicType.ComboMaster, "Variety bonus needs 1 fewer element", new Color(0.7f, 0.4f, 0.9f)),
+            CreateRelic("Reaction Catalyst", RelicType.ReactionCatalyst, "30% chance reaction keeps status", new Color(0.6f, 0.8f, 0.3f)),
+            CreateRelic("Overheat Mastery", RelicType.OverheatMastery, "Any element overheated = +30% damage", new Color(1f, 0.4f, 0.1f)),
+            CreateRelic("Dual Element", RelicType.DualElement, "Spells apply BOTH element statuses", new Color(0.5f, 0.6f, 0.9f)),
+
+            // ═══ NEW CURSED RELICS ═══
+            CreateCursedRelic("Cursed Velocity", RelicType.CursedVelocity, "CURSED: -30% cooldown, stunned 0.5s every 12s", new Color(0.3f, 0.2f, 0.6f)),
+            CreateCursedRelic("Cursed Absorption", RelicType.CursedAbsorption, "CURSED: Kills +3% dmg (max 10), -1 HP every 8s", new Color(0.5f, 0.1f, 0.1f)),
+            CreateCursedRelic("Cursed Echo", RelicType.CursedEcho, "CURSED: 25% free recast, 10% recast hits you (3 dmg)", new Color(0.4f, 0.3f, 0.5f)),
+            CreateCursedRelic("Cursed Hunger", RelicType.CursedHunger, "CURSED: +35% damage, no kills 6s = lose 1 HP", new Color(0.6f, 0.2f, 0.1f)),
+            CreateCursedRelic("Cursed Mirror", RelicType.CursedMirror, "CURSED: Reactions +50% dmg, apply 0.3s debuff to you", new Color(0.5f, 0.3f, 0.6f)),
+            CreateCursedRelic("Cursed Fortune", RelicType.CursedFortune, "CURSED: Gold pickups heal 1 HP, shop prices +50%", new Color(0.7f, 0.6f, 0.1f)),
         };
     }
 
