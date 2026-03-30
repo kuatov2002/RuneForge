@@ -19,6 +19,17 @@ public class RelicManager : MonoBehaviour
     float synergyVampireThornsHeal;   // VampireAura+Thorns: stored overkill heal
     int synergyDoubleStrikeChaosCounter; // DoubleStrike+Chaos: AoE on proc
 
+    // Retaliation (Thorns rework)
+    float pendingRetaliationDmg;
+    float pendingRetaliationRadius;
+
+    // Fortify (StoneSkin rework)
+    float fortifyMoveTimer;
+    int fortifyStacks;
+
+    // Vitality overshield (Regeneration rework)
+    bool tempShieldActive;
+
     // Element relic state
     float prismTimer;
     float prismDamageBuff;
@@ -98,15 +109,22 @@ public class RelicManager : MonoBehaviour
 
         if (synergyBerserkerGlassTimer > 0) synergyBerserkerGlassTimer -= Time.deltaTime;
 
-        // Regeneration: heal 1 HP every 30s (15s with BloodPact synergy)
+        // Regeneration → Vitality: heal 1 HP every 20s (10s with BloodPact synergy)
+        // At max HP, grants a one-hit overshield instead of healing
         if (HasRelic(RelicType.Regeneration))
         {
-            float interval = (HasRelic(RelicType.BloodPact)) ? 15f : 30f;
+            float interval = (HasRelic(RelicType.BloodPact)) ? 10f : 20f;
             regenTimer += Time.deltaTime;
             if (regenTimer >= interval)
             {
                 regenTimer = 0;
-                playerHealth.Heal(1);
+                if (playerHealth != null && !playerHealth.IsDead)
+                {
+                    if (playerHealth.currentHP >= playerHealth.maxHP)
+                        tempShieldActive = true;
+                    else
+                        playerHealth.Heal(1);
+                }
             }
         }
 
@@ -116,7 +134,31 @@ public class RelicManager : MonoBehaviour
             if (prismDamageBuff > 0) prismDamageBuff -= Time.deltaTime;
         }
 
-        // StoneSkin visual hint (handled in ModifyIncomingDamage)
+        // Fortify: gain stacks over time from movement (max 3)
+        if (HasRelic(RelicType.StoneSkin))
+        {
+            fortifyMoveTimer += Time.deltaTime;
+            if (fortifyMoveTimer >= 5f && fortifyStacks < 3)
+            {
+                fortifyStacks++;
+                fortifyMoveTimer = 0f;
+            }
+        }
+
+        // Process pending retaliation (delayed to avoid recursion)
+        if (pendingRetaliationDmg > 0)
+        {
+            var player = GetComponent<Transform>();
+            Collider[] hits = Physics.OverlapSphere(player.position, pendingRetaliationRadius);
+            foreach (var h in hits)
+            {
+                if (h.GetComponent<PlayerController>() != null) continue;
+                var hp = h.GetComponent<Health>();
+                if (hp != null && !hp.IsDead)
+                    hp.TakeDamage(pendingRetaliationDmg);
+            }
+            pendingRetaliationDmg = 0;
+        }
     }
 
     // Called by SpellProjectile/attack systems when dealing damage
@@ -145,9 +187,9 @@ public class RelicManager : MonoBehaviour
         if (HasRelic(RelicType.CursedPower))
             dmg *= 1.75f;
 
-        // Blood Pact: +100% damage
+        // Blood Pact: +60% damage
         if (HasRelic(RelicType.BloodPact))
-            dmg *= 2f;
+            dmg *= 1.6f;
 
         // Chaos: +30% damage
         if (HasRelic(RelicType.Chaos))
@@ -175,10 +217,10 @@ public class RelicManager : MonoBehaviour
             // Trigger AoE via flag — checked by SpellProjectile on hit
         }
 
-        // BloodPact + Regeneration = "Blood Renewal": regen ticks every 15s instead of 30s
+        // BloodPact + Regeneration = "Blood Renewal": regen ticks every 10s instead of 20s
         // (handled in Update)
 
-        // Shield + Thorns = "Retribution": blocked hit reflects 5 damage instead of 1
+        // Shield + Thorns = "Retribution": retaliation deals 3× damage with larger radius
         // (handled in ModifyIncomingDamage)
 
         // DashFire + CursedSpeed = "Inferno Dash": fire trail deals 2x damage + lasts 2x longer
@@ -197,38 +239,45 @@ public class RelicManager : MonoBehaviour
     // Called when player takes damage
     public int ModifyIncomingDamage(int damage)
     {
+        // Vitality overshield (from Regeneration at max HP)
+        if (tempShieldActive && damage > 0)
+        {
+            tempShieldActive = false;
+            return 0;
+        }
+
         // Shield: block first hit per room
         if (roomShieldActive && HasRelic(RelicType.Shield))
         {
             roomShieldActive = false;
-
-            // Shield + Thorns synergy: blocked hit reflects 5 damage to nearby enemies
-            if (HasRelic(RelicType.Thorns))
-            {
-                Collider[] nearby = Physics.OverlapSphere(transform.position, 3f);
-                foreach (var col in nearby)
-                {
-                    if (col.GetComponent<PlayerController>() != null) continue;
-                    var hp = col.GetComponent<Health>();
-                    if (hp != null && !hp.IsDead) hp.TakeDamage(5);
-                }
-                SFXSystem.Play(SFXSystem.SFXType.Explosion, transform.position, 0.5f);
-            }
-
             return 0;
         }
 
-        // StoneSkin: -1 damage when player is standing still
-        if (HasRelic(RelicType.StoneSkin) && playerCtrl != null)
+        // Thorns → Retaliation: AoE damage pulse when hit
+        if (HasRelic(RelicType.Thorns) && damage > 0)
         {
-            var rb = playerCtrl.GetComponent<Rigidbody>();
-            if (rb != null && rb.linearVelocity.sqrMagnitude < 0.1f)
-                damage = Mathf.Max(0, damage - 1);
+            float retaliationDmg = Mathf.Max(2f, damage * 0.3f);
+            float retaliationRadius = 2.5f;
+            // Shield+Thorns = Retribution synergy: 3× damage, larger radius
+            if (HasRelic(RelicType.Shield) && roomShieldActive)
+            {
+                retaliationDmg *= 3f;
+                retaliationRadius = 4f;
+            }
+            pendingRetaliationDmg = retaliationDmg;
+            pendingRetaliationRadius = retaliationRadius;
         }
 
-        // Cursed Power: take 1 extra damage per hit
+        // StoneSkin → Fortify: stacks from movement, lost on hit
+        if (HasRelic(RelicType.StoneSkin) && fortifyStacks > 0)
+        {
+            damage = Mathf.Max(0, damage - fortifyStacks);
+            fortifyStacks = 0;
+        }
+
+        // Cursed Power: take 50% extra damage per hit
         if (HasRelic(RelicType.CursedPower))
-            damage += 1;
+            damage = Mathf.CeilToInt(damage * 1.5f);
 
         // BloodPact: take 1 extra damage per hit (stacks with CursedPower)
         if (HasRelic(RelicType.BloodPact))
@@ -251,6 +300,14 @@ public class RelicManager : MonoBehaviour
             if (HasRelic(RelicType.Lucky))
                 heal = Random.value < 0.2f ? 3 : 2;
             playerHealth.Heal(heal);
+        }
+
+        // Lucky → Treasure Hunter: bonus gold on room clear
+        if (HasRelic(RelicType.Lucky) && playerHealth != null)
+        {
+            float chance = 0.25f;
+            if (Random.value < chance)
+                GoldSystem.SpawnGoldDrop(transform.position, 15);
         }
     }
 
