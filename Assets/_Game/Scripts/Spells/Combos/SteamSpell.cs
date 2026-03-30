@@ -150,7 +150,7 @@ public class SteamCloudZone : MonoBehaviour
         _radius = radius;
         _duration = duration;
         _charged = charged;
-        _explosionDamage = dps * 5f;
+        _explosionDamage = dps * 3f;
     }
 
     void OnTriggerStay(Collider other)

@@ -103,7 +103,7 @@ public static class ComboSpellRegistry
         {
             comboType = ComboType.Ascend, comboName = "Wind Slash",
             description = "Piercing wind blade, charged = 3 blades",
-            baseDamage = 5, radius = 2f, cooldown = 0.7f, // nerfed for reaction balance
+            baseDamage = 7, radius = 2f, cooldown = 0.7f, // buffed: was 5, wind trail compensates
             chargedDamageMultiplier = 2.5f, // keeps 3-blade charged viable
             color = new Color(0.8f, 0.9f, 1f)
         });
@@ -135,7 +135,7 @@ public static class ComboSpellRegistry
         {
             comboType = ComboType.Permafrost, comboName = "Permafrost",
             description = "Ice floor, enemies slide",
-            baseDamage = 3.5f, radius = 4f, duration = 5f, cooldown = 0.8f, // buffed: area control needs bite
+            baseDamage = 3f, radius = 3f, duration = 5f, cooldown = 0.8f, // nerfed: was 3.5/4.0, slide buff compensates
             color = new Color(0.5f, 0.8f, 0.9f)
         });
         Register(ElementType.Water, ElementType.Air, new ComboSpellDef
@@ -158,7 +158,7 @@ public static class ComboSpellRegistry
         {
             comboType = ComboType.LightningStrike, comboName = "Lightning Strike",
             description = "Bolt from the sky",
-            baseDamage = 13, radius = 1.5f, cooldown = 0.7f,
+            baseDamage = 10, radius = 1.5f, cooldown = 0.7f, // nerfed: was 13, chain count reduced in spell code
             color = new Color(1f, 1f, 0.3f)
         });
         Register(ElementType.Lightning, ElementType.Fire, new ComboSpellDef
@@ -239,7 +239,7 @@ public static class ComboSpellRegistry
         {
             comboType = ComboType.Collapse, comboName = "Collapse",
             description = "Reality collapses inward",
-            baseDamage = 17, radius = 2.5f, cooldown = 0.9f,
+            baseDamage = 12, radius = 3f, cooldown = 0.9f, // nerfed: was 17/2.5, pull utility compensates
             color = new Color(0.5f, 0.1f, 0.8f)
         });
         Register(ElementType.Void, ElementType.Fire, new ComboSpellDef
@@ -253,7 +253,7 @@ public static class ComboSpellRegistry
         {
             comboType = ComboType.Rift, comboName = "Rift",
             description = "Rift that slows and damages",
-            baseDamage = 5, radius = 2f, duration = 2.5f, cooldown = 0.8f,
+            baseDamage = 5, radius = 2f, duration = 3.5f, cooldown = 0.8f, // buffed: was 2.5dur, anti-mobility zone
             color = new Color(0.4f, 0.3f, 0.8f)
         });
         Register(ElementType.Void, ElementType.Earth, new ComboSpellDef
@@ -267,7 +267,7 @@ public static class ComboSpellRegistry
         {
             comboType = ComboType.Vacuum, comboName = "Vacuum",
             description = "Pulls enemies toward a point",
-            baseDamage = 3.5f, radius = 3.5f, duration = 1.5f, cooldown = 0.8f,
+            baseDamage = 3.5f, radius = 4.5f, duration = 2.5f, cooldown = 0.8f, // buffed: was 3.5r/1.5dur, best grouping
             color = new Color(0.5f, 0.4f, 0.8f)
         });
         Register(ElementType.Void, ElementType.Lightning, new ComboSpellDef

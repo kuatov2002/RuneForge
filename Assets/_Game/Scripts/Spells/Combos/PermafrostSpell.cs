@@ -202,7 +202,7 @@ public class PermafrostZone : MonoBehaviour
             vel.y = 0;
             if (vel.sqrMagnitude > 0.5f)
             {
-                erb.AddForce(vel.normalized * 8f, ForceMode.Acceleration);
+                erb.AddForce(vel.normalized * 12f, ForceMode.Acceleration);
             }
         }
 
