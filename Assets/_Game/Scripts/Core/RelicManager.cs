@@ -333,6 +333,22 @@ public class RelicManager : MonoBehaviour
     /// <summary>Check if EmberHeart is active (fire chains to extra target).</summary>
     public bool HasEmberHeart => HasRelic(RelicType.EmberHeart);
 
+    /// <summary>Check if CursedVelocity is owned (SpellCaster reads for -30% cooldowns).</summary>
+    public bool HasCursedVelocity => HasRelic(RelicType.CursedVelocity);
+
+    /// <summary>Cooldown multiplier: LowTide gives -15% when no element is overheated.</summary>
+    public float GetCooldownMult()
+    {
+        if (HasRelic(RelicType.LowTide))
+        {
+            // Check if any element is overheated via SpellCaster
+            var caster = playerCtrl != null ? playerCtrl.GetComponent<SpellCaster>() : null;
+            if (caster != null && !caster.HasAnyOverheated)
+                return 0.85f;
+        }
+        return 1f;
+    }
+
     /// <summary>Remove a relic and undo its passive effects.</summary>
     public void RemoveRelic(RelicSO relic)
     {

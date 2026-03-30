@@ -311,8 +311,7 @@ public class Bootstrap : MonoBehaviour
             if (vfx != null) Object.Destroy(vfx.gameObject);
         foreach (var vfx in Object.FindObjectsByType<FlashShrink>(FindObjectsSortMode.None))
             if (vfx != null) Object.Destroy(vfx.gameObject);
-        foreach (var vfx in Object.FindObjectsByType<GeyserRise>(FindObjectsSortMode.None))
-            if (vfx != null) Object.Destroy(vfx.gameObject);
+        // GeyserRise removed (legacy stub deleted)
 
         // Destroy any standalone particle systems not parented to player/camera
         foreach (var ps in Object.FindObjectsByType<ParticleSystem>(FindObjectsSortMode.None))
