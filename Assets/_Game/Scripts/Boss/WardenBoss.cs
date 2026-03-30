@@ -16,12 +16,9 @@ public class WardenBoss : MonoBehaviour
     bool isDead;
     List<GameObject> walls = new();
     bool phase2;
-    BossEnrage enrage;
-    float crackTimer;
-    List<GameObject> cracks = new();
 
     // State machine
-    enum State { Chase, LeapWindup, Leaping, SlamCombo, ShockwaveAttack, PillarCharge, Recover, ArenaClose }
+    enum State { Chase, LeapWindup, Leaping, SlamCombo, ShockwaveAttack, PillarCharge, Recover }
     State state = State.Chase;
     float stateTimer;
     float actionCooldown;
@@ -47,7 +44,6 @@ public class WardenBoss : MonoBehaviour
 
     // Phase 2 arena closing
     List<GameObject> arenaWalls = new();
-    float arenaTimer;
 
     void Start()
     {
@@ -74,9 +70,8 @@ public class WardenBoss : MonoBehaviour
             };
         }
 
-        actionCooldown = 0.6f;
+        actionCooldown = 1f;
         wallTimer = wallSpawnCooldown;
-        enrage = GetComponent<BossEnrage>();
     }
 
     void Update()
@@ -114,24 +109,6 @@ public class WardenBoss : MonoBehaviour
             case State.Recover:
                 RecoverUpdate();
                 break;
-            case State.ArenaClose:
-                ArenaCloseUpdate(toPlayer, dist, speedMult);
-                break;
-        }
-
-        // Phase 2: arena walls slowly close in
-        if (phase2 && arenaWalls.Count > 0)
-        {
-            Vector3 center = target != null ? (transform.position + target.position) * 0.5f : transform.position;
-            center.y = 0;
-            for (int i = arenaWalls.Count - 1; i >= 0; i--)
-            {
-                if (arenaWalls[i] == null) { arenaWalls.RemoveAt(i); continue; }
-                Vector3 toCenter = center - arenaWalls[i].transform.position;
-                toCenter.y = 0;
-                if (toCenter.magnitude > 2f)
-                    arenaWalls[i].transform.position += toCenter.normalized * 0.3f * Time.deltaTime;
-            }
         }
 
         // Spawn walls between attacks
@@ -151,19 +128,9 @@ public class WardenBoss : MonoBehaviour
 
         // Move toward player aggressively
         float speed = phase2 ? moveSpeed * 1.4f : moveSpeed;
-        float enrageSpeed = enrage != null ? enrage.SpeedMultiplier : 1f;
-        rb.MovePosition(transform.position + dir * speed * speedMult * enrageSpeed * Time.deltaTime);
+        rb.MovePosition(transform.position + dir * speed * speedMult * Time.deltaTime);
 
-        // Seismic cracks while chasing
-        crackTimer -= Time.deltaTime;
-        if (crackTimer <= 0)
-        {
-            crackTimer = 0.5f;
-            SpawnSeismicCrack(transform.position);
-        }
-
-        float cdSpeed = enrage != null ? 1f / enrage.CooldownMultiplier : 1f;
-        actionCooldown -= Time.deltaTime * cdSpeed;
+        actionCooldown -= Time.deltaTime;
         if (actionCooldown > 0) return;
 
         // Pick attack based on distance and randomness
@@ -273,7 +240,7 @@ public class WardenBoss : MonoBehaviour
         {
             state = State.Recover;
             stateTimer = 0.5f;
-            actionCooldown = 0.48f;
+            actionCooldown = 0.8f;
         }
     }
 
@@ -324,7 +291,7 @@ public class WardenBoss : MonoBehaviour
 
                 state = State.Recover;
                 stateTimer = phase2 ? 0.6f : 1f; // Punish window
-                actionCooldown = phase2 ? 0.48f : 0.72f;
+                actionCooldown = phase2 ? 0.8f : 1.2f;
             }
             else
             {
@@ -370,7 +337,7 @@ public class WardenBoss : MonoBehaviour
         {
             state = State.Recover;
             stateTimer = phase2 ? 0.5f : 0.8f;
-            actionCooldown = 0.6f;
+            actionCooldown = 1f;
         }
     }
 
@@ -381,22 +348,6 @@ public class WardenBoss : MonoBehaviour
         ring.transform.position = transform.position;
         var sw = ring.AddComponent<ExpandingShockwave>();
         sw.Setup(startRadius, startRadius + 1.5f, phase2 ? 6f : 4.5f, slamDamage, 0.8f);
-
-        // Random gap in each ring
-        float gapAngle = Random.Range(0f, 360f);
-        sw.SetGap(gapAngle, 60f);
-
-        // Gap indicator (green marker showing safe zone)
-        float gapMidRad = (gapAngle + 30f) * Mathf.Deg2Rad;
-        Vector3 gapDir = new Vector3(Mathf.Cos(gapMidRad), 0, Mathf.Sin(gapMidRad));
-        var gapMarker = GameObject.CreatePrimitive(PrimitiveType.Cube);
-        Destroy(gapMarker.GetComponent<BoxCollider>());
-        gapMarker.transform.parent = ring.transform;
-        gapMarker.transform.localPosition = gapDir * startRadius + Vector3.up * 0.15f;
-        gapMarker.transform.localScale = new Vector3(1.2f, 0.15f, 0.3f);
-        gapMarker.transform.rotation = Quaternion.LookRotation(gapDir);
-        gapMarker.GetComponent<Renderer>().material = ShaderCache.NewEmissive(new Color(0.2f, 1f, 0.2f, 0.8f), 3f);
-
         Destroy(ring, 1.2f);
     }
 
@@ -444,7 +395,7 @@ public class WardenBoss : MonoBehaviour
 
             state = State.Recover;
             stateTimer = 0.6f;
-            actionCooldown = 0.48f;
+            actionCooldown = 0.8f;
         }
     }
 
@@ -518,46 +469,20 @@ public class WardenBoss : MonoBehaviour
             w.GetComponent<Renderer>().material = ShaderCache.NewLit(new Color(0.35f, 0.25f, 0.15f));
             arenaWalls.Add(w);
             walls.Add(w);
+            Destroy(w, 30f);
         }
-    }
-
-    void ArenaCloseUpdate(Vector3 toPlayer, float dist, float speedMult)
-    {
-        // Not used currently — arena walls are static after spawn
-        state = State.Chase;
-    }
-
-    void SpawnSeismicCrack(Vector3 pos)
-    {
-        pos.y = 0.03f;
-        var crack = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
-        Destroy(crack.GetComponent<CapsuleCollider>());
-        crack.name = "SeismicCrack";
-        crack.transform.position = pos;
-        float radius = 1.0f;
-        crack.transform.localScale = new Vector3(radius * 2, 0.03f, radius * 2);
-        crack.GetComponent<Renderer>().material = ShaderCache.NewEmissive(new Color(0.8f, 0.3f, 0.05f, 0.6f), 1.5f);
-
-        var pz = crack.AddComponent<PoisonZone>();
-        pz.dps = 1f;
-        pz.radius = radius;
-
-        cracks.Add(crack);
-        Destroy(crack, 8f);
     }
 
     // --- UTILITY ---
     void DamagePlayerInRadius(float radius, int damage)
     {
-        float dmgMult = enrage != null ? enrage.DamageMultiplier : 1f;
-        int finalDmg = Mathf.CeilToInt(damage * dmgMult);
         Collider[] hits = Physics.OverlapSphere(transform.position, radius);
         foreach (var h in hits)
         {
             var pc = h.GetComponent<PlayerController>();
             if (pc == null || pc.isInvulnerable) continue;
             var hp = h.GetComponent<Health>();
-            if (hp != null && !hp.IsDead) hp.TakeDamage(finalDmg);
+            if (hp != null && !hp.IsDead) hp.TakeDamage(damage);
         }
     }
 
@@ -595,8 +520,6 @@ public class WardenBoss : MonoBehaviour
         walls.Clear();
         foreach (var w in arenaWalls) if (w != null) Destroy(w);
         arenaWalls.Clear();
-        foreach (var c in cracks) if (c != null) Destroy(c);
-        cracks.Clear();
     }
 
     void OnDestroy() { CleanupWalls(); }
@@ -611,16 +534,6 @@ public class ExpandingShockwave : MonoBehaviour
     float lifetime;
     GameObject ringVisual;
     bool hasHit;
-    float gapAngleStart;
-    float gapAngleSize;
-    bool hasGap;
-
-    public void SetGap(float gapStart, float gapSize)
-    {
-        hasGap = true;
-        gapAngleStart = gapStart;
-        gapAngleSize = gapSize;
-    }
 
     public void Setup(float inner, float outer, float speed, int dmg, float life)
     {
@@ -671,22 +584,7 @@ public class ExpandingShockwave : MonoBehaviour
                 // Hit if player is in the ring band
                 if (dist >= currentRadius - 0.5f && dist <= currentRadius + 0.5f)
                 {
-                    // Check if player is in the safe gap
-                    bool inGap = false;
-                    if (hasGap)
-                    {
-                        Vector3 toPlayerDir = player.transform.position - transform.position;
-                        toPlayerDir.y = 0;
-                        float angle = Mathf.Atan2(toPlayerDir.z, toPlayerDir.x) * Mathf.Rad2Deg;
-                        if (angle < 0) angle += 360f;
-                        float gapEnd = gapAngleStart + gapAngleSize;
-                        if (gapEnd <= 360f)
-                            inGap = angle >= gapAngleStart && angle <= gapEnd;
-                        else
-                            inGap = angle >= gapAngleStart || angle <= (gapEnd - 360f);
-                    }
-
-                    if (!inGap && !player.isInvulnerable)
+                    if (!player.isInvulnerable)
                     {
                         var hp = player.GetComponent<Health>();
                         if (hp != null && !hp.IsDead)

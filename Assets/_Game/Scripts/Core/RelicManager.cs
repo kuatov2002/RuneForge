@@ -7,18 +7,12 @@ public class RelicManager : MonoBehaviour
     List<RelicSO> ownedRelics = new();
     Health playerHealth;
     PlayerController playerCtrl;
-    SpellCaster spellCasterRef;
     ElementSO[] allElementsRef;
 
     // Relic state
     int hitCounter;
     float regenTimer;
     bool roomShieldActive;
-    public bool magnetFieldActive;
-
-    // Entropy state
-    float entropyTimer;
-    float entropyBuff;
 
     // Synergy state
     float synergyBerserkerGlassTimer; // Berserker+GlassCannon: lifesteal window
@@ -38,15 +32,11 @@ public class RelicManager : MonoBehaviour
     {
         playerHealth = hp;
         playerCtrl = ctrl;
-        spellCasterRef = ctrl != null ? ctrl.GetComponent<SpellCaster>() : null;
         allElementsRef = allElements;
         ownedRelics.Clear();
         hitCounter = 0;
         regenTimer = 0;
         roomShieldActive = false;
-        magnetFieldActive = false;
-        entropyTimer = 0;
-        entropyBuff = 0;
         synergyBerserkerGlassTimer = 0;
         synergyVampireThornsHeal = 0;
         synergyDoubleStrikeChaosCounter = 0;
@@ -63,6 +53,7 @@ public class RelicManager : MonoBehaviour
     {
         ownedRelics.Add(relic);
         ApplyPassive(relic);
+        SFXSystem.Play(SFXSystem.SFXType.PickupJuice, transform.position);
     }
 
     public bool HasRelic(RelicType type)
@@ -99,9 +90,6 @@ public class RelicManager : MonoBehaviour
             case RelicType.GaleRing:
                 if (playerCtrl != null) playerCtrl.dashDistance *= 1.3f;
                 break;
-            case RelicType.MagnetField:
-                magnetFieldActive = true;
-                break;
         }
     }
 
@@ -127,26 +115,6 @@ public class RelicManager : MonoBehaviour
         if (HasRelic(RelicType.PrismShard))
         {
             if (prismDamageBuff > 0) prismDamageBuff -= Time.deltaTime;
-        }
-
-        // EntropyRelic: every 20s, grant +5 damage buff and force-overheat a random slot
-        if (HasRelic(RelicType.EntropyRelic))
-        {
-            entropyTimer += Time.deltaTime;
-            if (entropyBuff > 0) entropyBuff -= Time.deltaTime;
-
-            if (entropyTimer >= 20f)
-            {
-                entropyTimer = 0;
-                entropyBuff = 5f;
-                // Force-overheat a random element
-                if (spellCasterRef != null)
-                {
-                    int slot = Random.Range(0, 4);
-                    spellCasterRef.ForceOverheat(slot);
-                }
-                SFXSystem.Play(SFXSystem.SFXType.Explosion, transform.position, 0.3f);
-            }
         }
 
         // StoneSkin visual hint (handled in ModifyIncomingDamage)
@@ -189,18 +157,6 @@ public class RelicManager : MonoBehaviour
         // PrismShard: +25% damage when buff active
         if (HasRelic(RelicType.PrismShard) && prismDamageBuff > 0)
             dmg *= 1.25f;
-
-        // VoidAffinity: +30% damage with Void spells
-        if (HasRelic(RelicType.VoidAffinity) && ComboSpellFactory.CurrentCastElement == ElementType.Void)
-            dmg *= 1.3f;
-
-        // ChargeHoarder: +15% damage when all charges are full
-        if (HasRelic(RelicType.ChargeHoarder) && spellCasterRef != null && spellCasterRef.AllChargesFull)
-            dmg *= 1.15f;
-
-        // EntropyRelic: bonus damage during entropy buff window
-        if (HasRelic(RelicType.EntropyRelic) && entropyBuff > 0)
-            dmg += 5f;
 
         // ─── SYNERGIES ─────────────────────────────────────────
         // Berserker + GlassCannon = "Rage Glass": 10% lifesteal while below 50% HP
@@ -297,32 +253,11 @@ public class RelicManager : MonoBehaviour
                 heal = Random.value < 0.2f ? 3 : 2;
             playerHealth.Heal(heal);
         }
-
-        // Cartographer: reveal room types (flag for HUD to display)
-        if (HasRelic(RelicType.Cartographer))
-        {
-            // Create floating text hint above the door
-            var hint = new GameObject("CartographerHint");
-            var tm = hint.AddComponent<TextMesh>();
-            tm.text = "Scout ahead...";
-            tm.fontSize = 24;
-            tm.color = new Color(0.6f, 0.5f, 0.4f);
-            tm.alignment = TextAlignment.Center;
-            tm.anchor = TextAnchor.MiddleCenter;
-            tm.characterSize = 0.1f;
-            hint.transform.position = transform.position + Vector3.up * 2.5f + Vector3.forward * 2f;
-            hint.AddComponent<BillboardText>();
-            Object.Destroy(hint, 3f);
-        }
     }
 
     // Called when player dashes
     public void OnDash(Vector3 from, Vector3 to)
     {
-        // DashRecharge: restore 1 overheated charge
-        if (HasRelic(RelicType.DashRecharge) && spellCasterRef != null)
-            spellCasterRef.RestoreOverheatedCharge();
-
         if (!HasRelic(RelicType.DashFire)) return;
 
         bool infernoSynergy = HasRelic(RelicType.CursedSpeed); // DashFire+CursedSpeed = "Inferno Dash"
@@ -397,9 +332,6 @@ public class RelicManager : MonoBehaviour
 
     /// <summary>Check if EmberHeart is active (fire chains to extra target).</summary>
     public bool HasEmberHeart => HasRelic(RelicType.EmberHeart);
-
-    /// <summary>Check if Convergence is active.</summary>
-    public bool HasConvergence => HasRelic(RelicType.Convergence);
 
     /// <summary>Remove a relic and undo its passive effects.</summary>
     public void RemoveRelic(RelicSO relic)

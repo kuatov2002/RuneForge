@@ -226,9 +226,3 @@ public static class GeyserSpell
         SFXSystem.Play(SFXSystem.SFXType.Explosion, center);
     }
 }
-
-/// <summary>Legacy stub kept for Bootstrap cleanup compatibility.</summary>
-public class GeyserRise : MonoBehaviour
-{
-    public void Init(float height, float duration) { }
-}

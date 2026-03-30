@@ -149,7 +149,7 @@ public class MomentumSystem : MonoBehaviour
 
             if (tier >= 2)
             {
-                SFXSystem.Play(SFXSystem.SFXType.LevelUp, transform.position, 0.3f);
+                SFXSystem.Play(SFXSystem.SFXType.MomentumUp, transform.position, 0.3f);
                 if (TopDownCamera.Instance != null)
                     TopDownCamera.Instance.AddTrauma(0.05f);
             }
