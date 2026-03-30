@@ -53,6 +53,12 @@ public class GameHUD : MonoBehaviour
     // Relics
     VisualElement relicBar;
 
+    // Relic/Mutation tooltip
+    VisualElement relicTooltip;
+
+    // Mutations
+    VisualElement mutationBar;
+
     // Gold
     Label goldLabel;
 
@@ -270,6 +276,12 @@ public class GameHUD : MonoBehaviour
         relicBar.style.paddingLeft = 20;
         relicBar.style.paddingTop = 4;
         root.Add(relicBar);
+
+        // ── Mutation bar ──
+        BuildMutationBar(root);
+
+        // ── Relic/Mutation tooltip ──
+        BuildRelicTooltip(root);
 
         // ── Synergy bar ──
         synergyBar = new VisualElement();
@@ -1265,14 +1277,122 @@ public class GameHUD : MonoBehaviour
         relicBar.Clear();
         foreach (var r in relics)
         {
+            var relic = r;
+            var icon = new VisualElement();
+            icon.style.width = 32;
+            icon.style.height = 32;
+            Radius(icon, 6);
+            icon.style.backgroundColor = relic.color;
+            icon.style.marginRight = 4;
+            Border(icon, relic.isCursed ? new Color(0.8f, 0.2f, 0.2f) : new Color(0.5f, 0.5f, 0.5f), 1);
+            icon.pickingMode = PickingMode.Position;
+            icon.RegisterCallback<MouseEnterEvent>(e => ShowRelicTooltip(relic, icon));
+            icon.RegisterCallback<MouseLeaveEvent>(e => HideRelicTooltip());
+            relicBar.Add(icon);
+        }
+
+        RefreshMutations();
+    }
+
+    // ── Relic/Mutation Tooltip ──
+
+    void BuildRelicTooltip(VisualElement root)
+    {
+        relicTooltip = new VisualElement();
+        relicTooltip.style.position = Position.Absolute;
+        relicTooltip.style.backgroundColor = new Color(0.1f, 0.1f, 0.15f, 0.95f);
+        Border(relicTooltip, new Color(0.4f, 0.4f, 0.5f), 1);
+        relicTooltip.style.paddingTop = 6;
+        relicTooltip.style.paddingBottom = 6;
+        relicTooltip.style.paddingLeft = 10;
+        relicTooltip.style.paddingRight = 10;
+        relicTooltip.style.maxWidth = 250;
+        Radius(relicTooltip, 6);
+        relicTooltip.style.display = DisplayStyle.None;
+        relicTooltip.pickingMode = PickingMode.Ignore;
+
+        var nameLabel = Lbl("", 14, Color.white, FontStyle.Bold);
+        nameLabel.name = "tooltip-name";
+        relicTooltip.Add(nameLabel);
+
+        var descLabel = Lbl("", 11, new Color(0.8f, 0.8f, 0.8f));
+        descLabel.name = "tooltip-desc";
+        descLabel.style.whiteSpace = WhiteSpace.Normal;
+        relicTooltip.Add(descLabel);
+
+        root.Add(relicTooltip);
+    }
+
+    void ShowRelicTooltip(RelicSO relic, VisualElement icon)
+    {
+        var nameLabel = relicTooltip.Q<Label>("tooltip-name");
+        var descLabel = relicTooltip.Q<Label>("tooltip-desc");
+        nameLabel.text = relic.relicName;
+        descLabel.text = relic.description;
+
+        if (relic.isCursed)
+            nameLabel.style.color = new Color(0.9f, 0.3f, 0.3f);
+        else
+            nameLabel.style.color = Color.white;
+
+        relicTooltip.style.display = DisplayStyle.Flex;
+        var iconRect = icon.worldBound;
+        relicTooltip.style.left = iconRect.x;
+        relicTooltip.style.top = iconRect.y - 60;
+    }
+
+    void HideRelicTooltip()
+    {
+        relicTooltip.style.display = DisplayStyle.None;
+    }
+
+    // ── Mutation Bar ──
+
+    void BuildMutationBar(VisualElement root)
+    {
+        mutationBar = new VisualElement();
+        mutationBar.pickingMode = PickingMode.Ignore;
+        mutationBar.style.flexDirection = FlexDirection.Row;
+        mutationBar.style.paddingLeft = 20;
+        mutationBar.style.marginTop = 4;
+        root.Add(mutationBar);
+    }
+
+    void RefreshMutations()
+    {
+        if (mutationBar == null) return;
+        mutationBar.Clear();
+
+        var mutations = SpellMutationSystem.ActiveMutations;
+        if (mutations.Count == 0) return;
+
+        foreach (var mutType in mutations)
+        {
+            var mut = mutType;
+            var def = SpellMutationSystem.GetDef(mut);
             var icon = new VisualElement();
             icon.style.width = 24;
             icon.style.height = 24;
-            Radius(icon, 6);
-            icon.style.backgroundColor = r.color;
-            icon.style.marginRight = 4;
-            Border(icon, r.isCursed ? new Color(0.8f, 0.2f, 0.2f) : new Color(0.5f, 0.5f, 0.5f), 1);
-            relicBar.Add(icon);
+            icon.style.marginRight = 3;
+            icon.style.backgroundColor = def.color;
+            Radius(icon, 3);
+            icon.pickingMode = PickingMode.Position;
+
+            icon.RegisterCallback<MouseEnterEvent>(e =>
+            {
+                var nameLabel = relicTooltip.Q<Label>("tooltip-name");
+                var descLabel = relicTooltip.Q<Label>("tooltip-desc");
+                nameLabel.text = def.name;
+                descLabel.text = def.description;
+                nameLabel.style.color = new Color(0.7f, 0.9f, 0.5f);
+                relicTooltip.style.display = DisplayStyle.Flex;
+                var r = icon.worldBound;
+                relicTooltip.style.left = r.x;
+                relicTooltip.style.top = r.y - 60;
+            });
+            icon.RegisterCallback<MouseLeaveEvent>(e => HideRelicTooltip());
+
+            mutationBar.Add(icon);
         }
     }
 
