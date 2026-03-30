@@ -318,8 +318,7 @@ public class SpellCaster : MonoBehaviour
         if (UnityEngine.Random.value < MetaProgression.CritChance)
             dmgMult *= 2f;
 
-        // Diminishing returns: soft cap prevents trivial endgame from stacked multipliers
-        dmgMult = SoftCapMultiplier(dmgMult);
+        // Soft cap moved to ComboSpellFactory.Cast() to cover charged + mutation multipliers
 
         // Relic modifiers
         var relicMgr = GetComponent<RelicManager>();
