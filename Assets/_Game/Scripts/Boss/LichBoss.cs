@@ -4,9 +4,9 @@ using System.Collections.Generic;
 public class LichBoss : MonoBehaviour
 {
     public float teleportCooldown = 2.5f;
-    public float orbSpeed = 6f;
+    public float orbSpeed = 4f;     // was 6f — start slow
     public int orbDamage = 2;
-    public float orbHomingTurn = 100f;
+    public float orbHomingTurn = 60f; // was 100f — start weak homing
     public Color baseColor = new Color(0.3f, 0.1f, 0.5f);
 
     Transform target;
@@ -49,6 +49,8 @@ public class LichBoss : MonoBehaviour
 
     // Poison zones
     List<GameObject> hazards = new();
+    float runeCircleTimer = 15f;
+    float voidPullTimer = 12f;
 
     public bool IsImmune => isTeleporting;
 
@@ -101,6 +103,14 @@ public class LichBoss : MonoBehaviour
             if (teleportImmuneTimer <= 0)
                 isTeleporting = false;
             return;
+        }
+
+        // Rune Circle: periodic area denial (runs independently of state machine)
+        runeCircleTimer -= Time.deltaTime;
+        if (runeCircleTimer <= 0 && state != State.Recover)
+        {
+            runeCircleTimer = 15f;
+            SpawnRuneCircle();
         }
 
         switch (state)
@@ -164,6 +174,18 @@ public class LichBoss : MonoBehaviour
         {
             passiveOrbTimer = passiveCD;
             FireVoidOrb(toPlayer.normalized);
+        }
+
+        // Phase 2: VoidPull on a timer (not just RNG)
+        if (phase2)
+        {
+            voidPullTimer -= Time.deltaTime;
+            if (voidPullTimer <= 0 && state == State.Float)
+            {
+                voidPullTimer = 12f;
+                StartVoidPull();
+                return;
+            }
         }
 
         // Attack selection
@@ -237,25 +259,49 @@ public class LichBoss : MonoBehaviour
     {
         Vector3 oldPos = transform.position;
 
-        // Teleport to flanking position around player
-        float angle = Random.Range(0f, 360f) * Mathf.Deg2Rad;
-        float dist = Random.Range(5f, 9f);
-        Vector3 newPos = target.position + new Vector3(Mathf.Cos(angle), 0, Mathf.Sin(angle)) * dist;
-        newPos.y = 0;
-        transform.position = newPos;
+        // 50% chance: teleport close to player (aggressive) vs flanking (evasive)
+        bool aggressive = Random.value < 0.5f;
+
+        if (aggressive)
+        {
+            // Close teleport: 4 units from player
+            Vector3 offset = Quaternion.Euler(0, Random.Range(-60f, 60f), 0) *
+                -(target.position - transform.position).normalized * 4f;
+            Vector3 newPos = target.position + offset;
+            newPos.y = 0;
+            transform.position = newPos;
+        }
+        else
+        {
+            // Flanking teleport (original behavior)
+            float angle = Random.Range(0f, 360f) * Mathf.Deg2Rad;
+            float dist = Random.Range(5f, 9f);
+            Vector3 newPos = target.position + new Vector3(Mathf.Cos(angle), 0, Mathf.Sin(angle)) * dist;
+            newPos.y = 0;
+            transform.position = newPos;
+        }
 
         isTeleporting = true;
         teleportImmuneTimer = 0.3f;
 
-        // VFX at old position
         CreateTeleportVFX(oldPos);
-        CreateTeleportVFX(newPos);
+        CreateTeleportVFX(transform.position);
 
-        // Leave poison zone at old position
-        if (phase2)
-            CreatePoisonZone(oldPos);
+        // Poison zone at old position in ALL phases (not just P2)
+        CreatePoisonZone(oldPos);
 
         SFXSystem.Play(SFXSystem.SFXType.Dash, transform.position);
+
+        // Aggressive teleport: immediate close-range barrage
+        if (aggressive)
+        {
+            Vector3 toP = target.position - transform.position; toP.y = 0;
+            for (int i = 0; i < 3; i++)
+            {
+                Vector3 dir = Quaternion.Euler(0, Random.Range(-20f, 20f), 0) * toP.normalized;
+                FireVoidOrb(dir, 1.2f);
+            }
+        }
     }
 
     // --- ORB BARRAGE: varied projectile patterns ---
@@ -480,13 +526,16 @@ public class LichBoss : MonoBehaviour
             voidZone.transform.localScale = new Vector3(voidPullRadius * 2 * pulse, 0.05f, voidPullRadius * 2 * pulse);
         }
 
-        // Fire orbs while pulling
+        // Spiral barrage while pulling
         passiveOrbTimer -= Time.deltaTime;
         if (passiveOrbTimer <= 0)
         {
-            passiveOrbTimer = 0.8f;
-            Vector3 toP = target.position - transform.position; toP.y = 0;
-            FireVoidOrb(toP.normalized);
+            passiveOrbTimer = 0.3f;
+            float spiralAngle = Time.time * 120f;
+            Vector3 spiralDir = Quaternion.Euler(0, spiralAngle, 0) * Vector3.forward;
+            FireVoidOrb(spiralDir, 0.5f);
+            Vector3 spiralDir2 = Quaternion.Euler(0, spiralAngle + 180f, 0) * Vector3.forward;
+            FireVoidOrb(spiralDir2, 0.5f);
         }
 
         if (stateTimer <= 0)
@@ -525,6 +574,31 @@ public class LichBoss : MonoBehaviour
             state = State.Float;
             actionCooldown = 1.5f;
         }
+    }
+
+    void SpawnRuneCircle()
+    {
+        bool damageInside = Random.value < 0.5f;
+        Vector3 center = target.position;
+        center.y = 0.05f;
+        float radius = 6f;
+
+        var circle = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
+        Destroy(circle.GetComponent<CapsuleCollider>());
+        circle.name = "RuneCircle";
+        circle.transform.position = center;
+        circle.transform.localScale = new Vector3(radius * 2, 0.04f, radius * 2);
+
+        Color telegraphColor = damageInside
+            ? new Color(1f, 0.2f, 0.1f, 0.4f)
+            : new Color(0.2f, 0.4f, 1f, 0.4f);
+        circle.GetComponent<Renderer>().material = ShaderCache.NewEmissive(telegraphColor, 2f);
+
+        var det = circle.AddComponent<RuneCircleDetonation>();
+        det.Setup(center, radius, 4, damageInside, 3f);
+
+        hazards.Add(circle);
+        SFXSystem.Play(SFXSystem.SFXType.Cast, center);
     }
 
     // --- RECOVER ---
@@ -604,6 +678,12 @@ public class LichBoss : MonoBehaviour
         trail.startColor = new Color(0.5f, 0f, 0.8f);
         trail.endColor = new Color(0.5f, 0f, 0.8f, 0f);
 
+        // Destroyable: give orb 1 HP
+        var orbHP = orb.AddComponent<Health>();
+        orbHP.maxHP = 1;
+        orbHP.currentHP = 1;
+        orbHP.OnDeath += () => { if (orb != null) Destroy(orb); };
+
         Destroy(orb, 5f);
     }
 
@@ -647,7 +727,6 @@ public class LichBoss : MonoBehaviour
     void OnDestroy() { CleanupHazards(); }
 }
 
-// VoidOrbProjectile and PoisonZone are defined in the original — keeping them here
 public class VoidOrbProjectile : MonoBehaviour
 {
     Vector3 direction;
@@ -655,6 +734,7 @@ public class VoidOrbProjectile : MonoBehaviour
     float damage;
     float homingTurn;
     Transform target;
+    float lifetime;
 
     public void Setup(Vector3 dir, float spd, float dmg, float turn, Transform tgt)
     {
@@ -663,16 +743,22 @@ public class VoidOrbProjectile : MonoBehaviour
         damage = dmg;
         homingTurn = turn;
         target = tgt;
+        lifetime = 0f;
     }
 
     void Update()
     {
+        lifetime += Time.deltaTime;
+        // Accelerate: +2 speed/sec, +30 deg/s homing per second
+        float currentSpeed = speed + 2f * lifetime;
+        float currentHoming = homingTurn + 30f * lifetime;
+
         if (target != null)
         {
             Vector3 toTarget = (target.position + Vector3.up * 0.5f - transform.position).normalized;
-            direction = Vector3.RotateTowards(direction, toTarget, homingTurn * Mathf.Deg2Rad * Time.deltaTime, 0f).normalized;
+            direction = Vector3.RotateTowards(direction, toTarget, currentHoming * Mathf.Deg2Rad * Time.deltaTime, 0f).normalized;
         }
-        transform.position += direction * speed * Time.deltaTime;
+        transform.position += direction * currentSpeed * Time.deltaTime;
     }
 
     void OnTriggerEnter(Collider other)
@@ -706,5 +792,72 @@ public class PoisonZone : MonoBehaviour
         var hp = player.GetComponent<Health>();
         if (hp != null && !hp.IsDead)
             hp.TakeDamage(dps * 0.5f);
+    }
+}
+
+public class RuneCircleDetonation : MonoBehaviour
+{
+    Vector3 center;
+    float radius;
+    int damage;
+    bool damageInside;
+    float detonateTimer;
+
+    public void Setup(Vector3 c, float r, int dmg, bool inside, float delay)
+    {
+        center = c; radius = r; damage = dmg;
+        damageInside = inside; detonateTimer = delay;
+    }
+
+    void Update()
+    {
+        detonateTimer -= Time.deltaTime;
+
+        // Pulsing telegraph
+        float pulse = 1f + Mathf.Sin(Time.time * 4f) * 0.08f;
+        float s = radius * 2 * pulse;
+        transform.localScale = new Vector3(s, 0.04f, s);
+
+        // Fade color intensity as detonation approaches
+        var r = GetComponent<Renderer>();
+        if (r != null)
+        {
+            Color c = r.material.color;
+            c.a = Mathf.Lerp(0.4f, 0.8f, 1f - detonateTimer / 3f);
+            r.material.color = c;
+        }
+
+        if (detonateTimer <= 0)
+        {
+            var player = FindAnyObjectByType<PlayerController>();
+            if (player != null && !player.isInvulnerable)
+            {
+                float dist = Vector3.Distance(
+                    new Vector3(center.x, 0, center.z),
+                    new Vector3(player.transform.position.x, 0, player.transform.position.z));
+                bool playerInside = dist <= radius;
+                bool shouldDamage = damageInside ? playerInside : !playerInside;
+
+                if (shouldDamage)
+                {
+                    var hp = player.GetComponent<Health>();
+                    if (hp != null && !hp.IsDead) hp.TakeDamage(damage);
+                }
+            }
+
+            if (TopDownCamera.Instance != null) TopDownCamera.Instance.AddTrauma(0.3f);
+            SFXSystem.Play(SFXSystem.SFXType.Explosion, center);
+
+            // Detonation VFX
+            var vfx = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
+            Destroy(vfx.GetComponent<CapsuleCollider>());
+            vfx.transform.position = center;
+            vfx.transform.localScale = new Vector3(radius * 2, 0.2f, radius * 2);
+            Color vfxColor = damageInside ? new Color(1f, 0.2f, 0f, 0.6f) : new Color(0.2f, 0.3f, 1f, 0.6f);
+            vfx.GetComponent<Renderer>().material = ShaderCache.NewEmissive(vfxColor, 4f);
+            Destroy(vfx, 0.3f);
+
+            Destroy(gameObject);
+        }
     }
 }
