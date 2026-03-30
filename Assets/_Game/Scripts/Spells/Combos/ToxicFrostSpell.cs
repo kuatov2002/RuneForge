@@ -196,5 +196,6 @@ public class ToxicFrostZone : MonoBehaviour
         if (_tickTimer > 0) return;
         _tickTimer = 0.5f;
         hp.TakeDamage(_dps * 0.5f, _spellElement);
+        hp.ApplyBrittle(2f);
     }
 }

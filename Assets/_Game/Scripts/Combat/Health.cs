@@ -21,6 +21,14 @@ public class Health : MonoBehaviour
     // Slow (Magma)
     float magmaSlowTimer;
 
+    // Brittle (Toxic Frost)
+    float brittleTimer;
+    bool brittleReady;
+    public bool IsMovementLocked;
+
+    // Rift slow (stronger than magma)
+    float riftSlowTimer;
+
     bool isDead;
 
     /// <summary>Second Wind: survive lethal hits, set to 1 HP instead. Decrements each use.</summary>
@@ -29,12 +37,15 @@ public class Health : MonoBehaviour
     public bool IsDead => isDead;
     public bool IsFrozen => freezeTimer > 0;
     public bool IsStunned => stunTimer > 0 || freezeTimer > 0;
+    public bool IsBrittle => brittleReady;
 
     public float SpeedMultiplier
     {
         get
         {
             if (stunTimer > 0 || freezeTimer > 0) return 0f;
+            if (IsMovementLocked) return 0f;
+            if (riftSlowTimer > 0) return 0.2f;
             if (magmaSlowTimer > 0) return 0.3f;
             var es = GetComponent<ElementalStatus>();
             if (es != null) return es.GetSpeedMultiplier();
@@ -67,6 +78,13 @@ public class Health : MonoBehaviour
         bool isPlayer = pc != null;
         if (isPlayer && hitRecoveryTimer > 0) return;
         if (isPlayer && pc.isInvulnerable) return;
+
+        if (brittleReady)
+        {
+            amount *= 1.5f;
+            brittleReady = false;
+            brittleTimer = 2f;
+        }
 
         int dmg = Mathf.Max(1, Mathf.CeilToInt(amount));
 
@@ -226,6 +244,18 @@ public class Health : MonoBehaviour
         magmaSlowTimer = 0.3f; // Refreshed each physics tick while in pool
     }
 
+    /// <summary>Rift slow — stronger than magma, 20% speed.</summary>
+    public void ApplyRiftSlow()
+    {
+        riftSlowTimer = 0.3f; // Refreshed each physics tick while in zone
+    }
+
+    public void ApplyBrittle(float cooldown)
+    {
+        if (!brittleReady && brittleTimer > 0) return; // On cooldown
+        brittleReady = true;
+    }
+
     void Update()
     {
         if (isDead) return;
@@ -271,6 +301,13 @@ public class Health : MonoBehaviour
         // Magma slow
         if (magmaSlowTimer > 0)
             magmaSlowTimer -= Time.deltaTime;
+
+        // Rift slow
+        if (riftSlowTimer > 0)
+            riftSlowTimer -= Time.deltaTime;
+
+        // Brittle cooldown
+        if (brittleTimer > 0) brittleTimer -= Time.deltaTime;
     }
 
     public void ResetHealth()
@@ -280,6 +317,10 @@ public class Health : MonoBehaviour
         freezeTimer = 0;
         stunTimer = 0;
         magmaSlowTimer = 0;
+        brittleTimer = 0;
+        brittleReady = false;
+        riftSlowTimer = 0;
+        IsMovementLocked = false;
         hitRecoveryTimer = 0;
         preFreezeEmission = null;
         GetComponent<ElementalStatus>()?.ClearAll();

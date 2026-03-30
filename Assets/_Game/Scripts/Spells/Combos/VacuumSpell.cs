@@ -193,7 +193,7 @@ public class VacuumVortexZone : MonoBehaviour
         _radius = radius;
         _duration = duration;
         _charged = charged;
-        _pullStrength = charged ? 7f : 5f;
+        _pullStrength = charged ? 10f : 8f;
         _core = core;
     }
 
@@ -218,9 +218,18 @@ public class VacuumVortexZone : MonoBehaviour
         // Pull toward center
         Vector3 toCenter = (transform.position - other.transform.position);
         toCenter.y = 0;
+        float dist = toCenter.magnitude;
         if (toCenter.sqrMagnitude > 0.1f)
         {
             other.transform.position += toCenter.normalized * _pullStrength * Time.deltaTime;
+        }
+
+        // Enemies near center get Exposed (Void status)
+        if (dist < 1.5f)
+        {
+            var elemStatus = hp.GetComponent<ElementalStatus>();
+            if (elemStatus != null)
+                elemStatus.ApplyElement(ElementType.Void, 0);
         }
 
         // DoT tick

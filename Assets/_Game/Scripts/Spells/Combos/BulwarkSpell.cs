@@ -238,6 +238,7 @@ public class BulwarkFortress : MonoBehaviour
     float _width;
     bool _charged;
     float _spikeDamageTimer;
+    float wallRetaliationTimer = 1f;
     ElementType _spellElement = ElementType.Fire;
 
     public void Init(float targetHeight, float duration, Vector3 forward, float width, bool charged)
@@ -286,6 +287,24 @@ public class BulwarkFortress : MonoBehaviour
                         if (hp != null && !hp.IsDead)
                             hp.TakeDamage(3, _spellElement);
                     }
+                }
+            }
+        }
+
+        // Wall retaliation: enemies touching the wall take damage + stun
+        wallRetaliationTimer -= Time.deltaTime;
+        if (wallRetaliationTimer <= 0)
+        {
+            wallRetaliationTimer = 1f;
+            Collider[] nearby = Physics.OverlapSphere(transform.position, 1.5f);
+            foreach (var c in nearby)
+            {
+                if (c.GetComponent<PlayerController>() != null) continue;
+                var hp = c.GetComponent<Health>();
+                if (hp != null && !hp.IsDead)
+                {
+                    hp.TakeDamage(2);
+                    hp.ApplyStun(0.5f);
                 }
             }
         }

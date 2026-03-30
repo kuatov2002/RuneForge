@@ -96,7 +96,7 @@ public class ImplodeVortex : MonoBehaviour
     float _damage;
     float _radius;
     bool _charged;
-    float _pullDuration = 0.5f;
+    float _pullDuration = 1.0f;
     float _timer;
     bool _exploded;
     ElementType _spellElement = ElementType.Fire;
@@ -227,6 +227,22 @@ public class ImplodeVortex : MonoBehaviour
                 hp.TakeDamage(_damage, _spellElement);
                 GameFeel.ApplyKnockback(h.transform, _center, _damage * 0.4f);
             }
+        }
+
+        // Bonus damage scales with enemies caught
+        int enemyCount = 0;
+        foreach (var h in hits)
+        {
+            if (h.GetComponent<PlayerController>() != null) continue;
+            var hp = h.GetComponent<Health>();
+            if (hp != null && !hp.IsDead) enemyCount++;
+        }
+        float bonusDmg = 3f + 2f * enemyCount;
+        foreach (var h in hits)
+        {
+            if (h.GetComponent<PlayerController>() != null) continue;
+            var hp = h.GetComponent<Health>();
+            if (hp != null && !hp.IsDead) hp.TakeDamage(bonusDmg);
         }
 
         // Red-purple explosion burst particles
