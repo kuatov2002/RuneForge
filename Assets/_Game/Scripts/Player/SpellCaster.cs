@@ -26,7 +26,7 @@ public class SpellCaster : MonoBehaviour
     const float MaxChargeTime = 1.5f;
 
     // ── Combo bonus (variety tracking) ──
-    ElementType[] recentElements = new ElementType[6];
+    ElementType[] recentElements = new ElementType[8];
     int recentIndex;
     [HideInInspector] public float comboMultiplier = 1f;
 
@@ -435,11 +435,13 @@ public class SpellCaster : MonoBehaviour
         int uniqueCount = seen.Count;
 
         if (uniqueCount <= 2)
-            comboMultiplier = 1.0f; // No penalty for specialization
+            comboMultiplier = 1.0f;
         else if (uniqueCount == 3)
-            comboMultiplier = 1.15f; // Good variety bonus
+            comboMultiplier = 1.25f;
+        else if (uniqueCount == 4)
+            comboMultiplier = 1.5f;
         else
-            comboMultiplier = 1.3f; // Excellent variety bonus
+            comboMultiplier = 1.75f;
     }
 
     void UpdateComboName()
