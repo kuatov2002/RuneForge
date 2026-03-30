@@ -15,6 +15,7 @@ public class RunebreakerBoss : MonoBehaviour
     bool isDead;
     int phase = 1;
     SpellCaster playerCaster;
+    BossEnrage enrage;
 
     enum State { Hunt, TeleportStrike, SwordCombo, RuneSteal, Shockwave, BoltBarrage, Berserker, Recover }
     State state = State.Hunt;
@@ -66,6 +67,7 @@ public class RunebreakerBoss : MonoBehaviour
             health.OnDeath += () => { isDead = true; Destroy(gameObject, 0.5f); };
             health.OnHPChanged += OnHPChanged;
         }
+        enrage = GetComponent<BossEnrage>();
     }
 
     void OnHPChanged(int cur, int max)
@@ -129,11 +131,13 @@ public class RunebreakerBoss : MonoBehaviour
         transform.rotation = Quaternion.LookRotation(dir);
 
         // Always closing distance
-        float speed = moveSpeed * (phase >= 2 ? 1.3f : 1f);
+        float enrageSpeed = enrage != null ? enrage.SpeedMultiplier : 1f;
+        float speed = moveSpeed * (phase >= 2 ? 1.3f : 1f) * enrageSpeed;
         if (dist > meleeRange)
             rb.MovePosition(transform.position + dir * speed * speedMult * Time.deltaTime);
 
-        actionCooldown -= Time.deltaTime;
+        float cdSpeed = enrage != null ? 1f / enrage.CooldownMultiplier : 1f;
+        actionCooldown -= Time.deltaTime * cdSpeed;
         if (actionCooldown > 0) return;
 
         float r = Random.value;
@@ -593,13 +597,15 @@ public class RunebreakerBoss : MonoBehaviour
     // --- UTILITY ---
     void DamagePlayerInRadius(float radius, int damage)
     {
+        float dmgMult = enrage != null ? enrage.DamageMultiplier : 1f;
+        int finalDmg = Mathf.CeilToInt(damage * dmgMult);
         Collider[] hits = Physics.OverlapSphere(transform.position, radius);
         foreach (var h in hits)
         {
             var pc = h.GetComponent<PlayerController>();
             if (pc == null || pc.isInvulnerable) continue;
             var hp = h.GetComponent<Health>();
-            if (hp != null && !hp.IsDead) hp.TakeDamage(damage);
+            if (hp != null && !hp.IsDead) hp.TakeDamage(finalDmg);
         }
     }
 

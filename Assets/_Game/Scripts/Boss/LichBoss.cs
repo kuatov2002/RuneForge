@@ -15,6 +15,7 @@ public class LichBoss : MonoBehaviour
     Renderer[] renderers;
     bool isDead;
     bool phase2;
+    BossEnrage enrage;
 
     enum State { Float, TeleportChain, OrbBarrage, BeamSweep, VoidPull, SummonPillars, Recover }
     State state = State.Float;
@@ -84,6 +85,7 @@ public class LichBoss : MonoBehaviour
         }
 
         passiveOrbTimer = 2f;
+        enrage = GetComponent<BossEnrage>();
     }
 
     void Update()
@@ -135,7 +137,8 @@ public class LichBoss : MonoBehaviour
         transform.rotation = Quaternion.LookRotation(toPlayer.normalized);
 
         // Keep at range, strafe
-        float speed = phase2 ? 4f : 3f;
+        float enrageSpeed = enrage != null ? enrage.SpeedMultiplier : 1f;
+        float speed = (phase2 ? 4f : 3f) * enrageSpeed;
         if (dist < 5f)
         {
             // Back away while strafing
@@ -164,7 +167,8 @@ public class LichBoss : MonoBehaviour
         }
 
         // Attack selection
-        actionCooldown -= Time.deltaTime;
+        float cdSpeed = enrage != null ? 1f / enrage.CooldownMultiplier : 1f;
+        actionCooldown -= Time.deltaTime * cdSpeed;
         if (actionCooldown > 0) return;
 
         float r = Random.value;

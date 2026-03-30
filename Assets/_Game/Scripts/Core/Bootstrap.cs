@@ -2184,6 +2184,7 @@ public class Bootstrap : MonoBehaviour
         }
         if (currentBoss != null)
         {
+            currentBoss.AddComponent<BossEnrage>();
             var bossHP = currentBoss.GetComponent<Health>();
             if (bossHP != null)
             {

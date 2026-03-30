@@ -16,6 +16,7 @@ public class WardenBoss : MonoBehaviour
     bool isDead;
     List<GameObject> walls = new();
     bool phase2;
+    BossEnrage enrage;
 
     // State machine
     enum State { Chase, LeapWindup, Leaping, SlamCombo, ShockwaveAttack, PillarCharge, Recover, ArenaClose }
@@ -73,6 +74,7 @@ public class WardenBoss : MonoBehaviour
 
         actionCooldown = 0.6f;
         wallTimer = wallSpawnCooldown;
+        enrage = GetComponent<BossEnrage>();
     }
 
     void Update()
@@ -132,9 +134,11 @@ public class WardenBoss : MonoBehaviour
 
         // Move toward player aggressively
         float speed = phase2 ? moveSpeed * 1.4f : moveSpeed;
-        rb.MovePosition(transform.position + dir * speed * speedMult * Time.deltaTime);
+        float enrageSpeed = enrage != null ? enrage.SpeedMultiplier : 1f;
+        rb.MovePosition(transform.position + dir * speed * speedMult * enrageSpeed * Time.deltaTime);
 
-        actionCooldown -= Time.deltaTime;
+        float cdSpeed = enrage != null ? 1f / enrage.CooldownMultiplier : 1f;
+        actionCooldown -= Time.deltaTime * cdSpeed;
         if (actionCooldown > 0) return;
 
         // Pick attack based on distance and randomness
@@ -486,13 +490,15 @@ public class WardenBoss : MonoBehaviour
     // --- UTILITY ---
     void DamagePlayerInRadius(float radius, int damage)
     {
+        float dmgMult = enrage != null ? enrage.DamageMultiplier : 1f;
+        int finalDmg = Mathf.CeilToInt(damage * dmgMult);
         Collider[] hits = Physics.OverlapSphere(transform.position, radius);
         foreach (var h in hits)
         {
             var pc = h.GetComponent<PlayerController>();
             if (pc == null || pc.isInvulnerable) continue;
             var hp = h.GetComponent<Health>();
-            if (hp != null && !hp.IsDead) hp.TakeDamage(damage);
+            if (hp != null && !hp.IsDead) hp.TakeDamage(finalDmg);
         }
     }
 

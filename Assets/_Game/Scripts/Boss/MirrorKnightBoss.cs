@@ -14,6 +14,7 @@ public class MirrorKnightBoss : MonoBehaviour
     Renderer[] renderers;
     bool isDead;
     bool phase2;
+    BossEnrage enrage;
 
     enum State { Stalk, DashCombo, Parry, ShieldBash, MirrorClones, SweepSlash, Recover }
     State state = State.Stalk;
@@ -67,6 +68,7 @@ public class MirrorKnightBoss : MonoBehaviour
                 }
             };
         }
+        enrage = GetComponent<BossEnrage>();
     }
 
     void Update()
@@ -112,7 +114,8 @@ public class MirrorKnightBoss : MonoBehaviour
         transform.rotation = Quaternion.LookRotation(dir);
 
         // Circle the player at medium distance
-        float speed = phase2 ? moveSpeed * 1.3f : moveSpeed;
+        float enrageSpeed = enrage != null ? enrage.SpeedMultiplier : 1f;
+        float speed = (phase2 ? moveSpeed * 1.3f : moveSpeed) * enrageSpeed;
         if (dist > 5f)
         {
             rb.MovePosition(transform.position + dir * speed * speedMult * Time.deltaTime);
@@ -130,7 +133,8 @@ public class MirrorKnightBoss : MonoBehaviour
             rb.MovePosition(transform.position + strafe * speed * speedMult * Time.deltaTime);
         }
 
-        actionCooldown -= Time.deltaTime;
+        float cdSpeed = enrage != null ? 1f / enrage.CooldownMultiplier : 1f;
+        actionCooldown -= Time.deltaTime * cdSpeed;
         if (actionCooldown > 0) return;
 
         // Attack selection — always aggressive
@@ -202,6 +206,7 @@ public class MirrorKnightBoss : MonoBehaviour
         transform.rotation = Quaternion.LookRotation(dashDir);
 
         // Damage on contact during dash
+        float dmgMult = enrage != null ? enrage.DamageMultiplier : 1f;
         Collider[] hits = Physics.OverlapSphere(transform.position, 1.5f);
         foreach (var h in hits)
         {
@@ -210,7 +215,7 @@ public class MirrorKnightBoss : MonoBehaviour
             var hp = h.GetComponent<Health>();
             if (hp != null && !hp.IsDead)
             {
-                hp.TakeDamage(attackDamage);
+                hp.TakeDamage(Mathf.CeilToInt(attackDamage * dmgMult));
                 if (GameFeel.Instance != null) GameFeel.Instance.Hitstop(0.04f);
             }
         }

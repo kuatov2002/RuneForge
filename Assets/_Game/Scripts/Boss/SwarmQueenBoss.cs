@@ -16,6 +16,7 @@ public class SwarmQueenBoss : MonoBehaviour
     Renderer[] renderers;
     bool isDead;
     bool phase2;
+    BossEnrage enrage;
     List<GameObject> minions = new();
 
     // State machine
@@ -69,6 +70,7 @@ public class SwarmQueenBoss : MonoBehaviour
 
         spawnTimer = 1f;
         teleportTimer = teleportCooldown;
+        enrage = GetComponent<BossEnrage>();
     }
 
     void Update()
@@ -115,7 +117,8 @@ public class SwarmQueenBoss : MonoBehaviour
         transform.rotation = Quaternion.LookRotation(toPlayer.normalized);
 
         // Keep at medium range (5-8m)
-        float speed = phase2 ? moveSpeed * 1.3f : moveSpeed;
+        float enrageSpeed = enrage != null ? enrage.SpeedMultiplier : 1f;
+        float speed = (phase2 ? moveSpeed * 1.3f : moveSpeed) * enrageSpeed;
         if (dist < 4f)
         {
             // Flee
@@ -152,7 +155,8 @@ public class SwarmQueenBoss : MonoBehaviour
         }
 
         // Pick attacks
-        actionCooldown -= Time.deltaTime;
+        float cdSpeed = enrage != null ? 1f / enrage.CooldownMultiplier : 1f;
+        actionCooldown -= Time.deltaTime * cdSpeed;
         if (actionCooldown > 0) return;
 
         if (dist < 3.5f && Random.value < 0.5f)
@@ -274,13 +278,14 @@ public class SwarmQueenBoss : MonoBehaviour
 
             // Damage + spawn acid pool at landing
             float radius = 2.5f;
+            float dmgMult = enrage != null ? enrage.DamageMultiplier : 1f;
             Collider[] hits = Physics.OverlapSphere(transform.position, radius);
             foreach (var h in hits)
             {
                 var pc = h.GetComponent<PlayerController>();
                 if (pc == null || pc.isInvulnerable) continue;
                 var hp = h.GetComponent<Health>();
-                if (hp != null && !hp.IsDead) hp.TakeDamage(3);
+                if (hp != null && !hp.IsDead) hp.TakeDamage(Mathf.CeilToInt(3 * dmgMult));
             }
 
             // Acid pool at landing
@@ -344,13 +349,14 @@ public class SwarmQueenBoss : MonoBehaviour
         {
             // Power burst: AoE damage
             float radius = 4f;
+            float burstDmgMult = enrage != null ? enrage.DamageMultiplier : 1f;
             Collider[] hits = Physics.OverlapSphere(transform.position, radius);
             foreach (var h in hits)
             {
                 var pc = h.GetComponent<PlayerController>();
                 if (pc == null || pc.isInvulnerable) continue;
                 var hp = h.GetComponent<Health>();
-                if (hp != null && !hp.IsDead) hp.TakeDamage(4);
+                if (hp != null && !hp.IsDead) hp.TakeDamage(Mathf.CeilToInt(4 * burstDmgMult));
             }
 
             // VFX explosion
