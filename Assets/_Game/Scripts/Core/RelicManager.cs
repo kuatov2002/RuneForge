@@ -19,18 +19,8 @@ public class RelicManager : MonoBehaviour
     float synergyVampireThornsHeal;   // VampireAura+Thorns: stored overkill heal
     int synergyDoubleStrikeChaosCounter; // DoubleStrike+Chaos: AoE on proc
 
-    // Retaliation (Thorns rework)
-    float pendingRetaliationDmg;
-    float pendingRetaliationRadius;
-
-    // Fortify (StoneSkin rework)
-    float fortifyMoveTimer;
-    int fortifyStacks;
-
-    // Vitality overshield (Regeneration rework)
-    bool tempShieldActive;
-
     // Element relic state
+    float galeRingDashBuff;
     float prismTimer;
     float prismDamageBuff;
     ElementType[] prismRecentElements = new ElementType[8];
@@ -109,22 +99,15 @@ public class RelicManager : MonoBehaviour
 
         if (synergyBerserkerGlassTimer > 0) synergyBerserkerGlassTimer -= Time.deltaTime;
 
-        // Regeneration → Vitality: heal 1 HP every 20s (10s with BloodPact synergy)
-        // At max HP, grants a one-hit overshield instead of healing
+        // Regeneration: heal 1 HP every 30s (15s with BloodPact synergy)
         if (HasRelic(RelicType.Regeneration))
         {
-            float interval = (HasRelic(RelicType.BloodPact)) ? 10f : 20f;
+            float interval = (HasRelic(RelicType.BloodPact)) ? 15f : 30f;
             regenTimer += Time.deltaTime;
             if (regenTimer >= interval)
             {
                 regenTimer = 0;
-                if (playerHealth != null && !playerHealth.IsDead)
-                {
-                    if (playerHealth.currentHP >= playerHealth.maxHP)
-                        tempShieldActive = true;
-                    else
-                        playerHealth.Heal(1);
-                }
+                playerHealth.Heal(1);
             }
         }
 
@@ -134,31 +117,10 @@ public class RelicManager : MonoBehaviour
             if (prismDamageBuff > 0) prismDamageBuff -= Time.deltaTime;
         }
 
-        // Fortify: gain stacks over time from movement (max 3)
-        if (HasRelic(RelicType.StoneSkin))
-        {
-            fortifyMoveTimer += Time.deltaTime;
-            if (fortifyMoveTimer >= 5f && fortifyStacks < 3)
-            {
-                fortifyStacks++;
-                fortifyMoveTimer = 0f;
-            }
-        }
+        // GaleRing: post-dash damage buff countdown
+        if (galeRingDashBuff > 0) galeRingDashBuff -= Time.deltaTime;
 
-        // Process pending retaliation (delayed to avoid recursion)
-        if (pendingRetaliationDmg > 0)
-        {
-            var player = GetComponent<Transform>();
-            Collider[] hits = Physics.OverlapSphere(player.position, pendingRetaliationRadius);
-            foreach (var h in hits)
-            {
-                if (h.GetComponent<PlayerController>() != null) continue;
-                var hp = h.GetComponent<Health>();
-                if (hp != null && !hp.IsDead)
-                    hp.TakeDamage(pendingRetaliationDmg);
-            }
-            pendingRetaliationDmg = 0;
-        }
+        // StoneSkin visual hint (handled in ModifyIncomingDamage)
     }
 
     // Called by SpellProjectile/attack systems when dealing damage
@@ -187,9 +149,9 @@ public class RelicManager : MonoBehaviour
         if (HasRelic(RelicType.CursedPower))
             dmg *= 1.75f;
 
-        // Blood Pact: +60% damage
+        // Blood Pact: +100% damage
         if (HasRelic(RelicType.BloodPact))
-            dmg *= 1.6f;
+            dmg *= 2f;
 
         // Chaos: +30% damage
         if (HasRelic(RelicType.Chaos))
@@ -217,10 +179,10 @@ public class RelicManager : MonoBehaviour
             // Trigger AoE via flag — checked by SpellProjectile on hit
         }
 
-        // BloodPact + Regeneration = "Blood Renewal": regen ticks every 10s instead of 20s
+        // BloodPact + Regeneration = "Blood Renewal": regen ticks every 15s instead of 30s
         // (handled in Update)
 
-        // Shield + Thorns = "Retribution": retaliation deals 3× damage with larger radius
+        // Shield + Thorns = "Retribution": blocked hit reflects 5 damage instead of 1
         // (handled in ModifyIncomingDamage)
 
         // DashFire + CursedSpeed = "Inferno Dash": fire trail deals 2x damage + lasts 2x longer
@@ -239,45 +201,38 @@ public class RelicManager : MonoBehaviour
     // Called when player takes damage
     public int ModifyIncomingDamage(int damage)
     {
-        // Vitality overshield (from Regeneration at max HP)
-        if (tempShieldActive && damage > 0)
-        {
-            tempShieldActive = false;
-            return 0;
-        }
-
         // Shield: block first hit per room
         if (roomShieldActive && HasRelic(RelicType.Shield))
         {
             roomShieldActive = false;
+
+            // Shield + Thorns synergy: blocked hit reflects 5 damage to nearby enemies
+            if (HasRelic(RelicType.Thorns))
+            {
+                Collider[] nearby = Physics.OverlapSphere(transform.position, 3f);
+                foreach (var col in nearby)
+                {
+                    if (col.GetComponent<PlayerController>() != null) continue;
+                    var hp = col.GetComponent<Health>();
+                    if (hp != null && !hp.IsDead) hp.TakeDamage(5);
+                }
+                SFXSystem.Play(SFXSystem.SFXType.Explosion, transform.position, 0.5f);
+            }
+
             return 0;
         }
 
-        // Thorns → Retaliation: AoE damage pulse when hit
-        if (HasRelic(RelicType.Thorns) && damage > 0)
+        // StoneSkin: -1 damage when player is standing still
+        if (HasRelic(RelicType.StoneSkin) && playerCtrl != null)
         {
-            float retaliationDmg = Mathf.Max(2f, damage * 0.3f);
-            float retaliationRadius = 2.5f;
-            // Shield+Thorns = Retribution synergy: 3× damage, larger radius
-            if (HasRelic(RelicType.Shield) && roomShieldActive)
-            {
-                retaliationDmg *= 3f;
-                retaliationRadius = 4f;
-            }
-            pendingRetaliationDmg = retaliationDmg;
-            pendingRetaliationRadius = retaliationRadius;
+            var rb = playerCtrl.GetComponent<Rigidbody>();
+            if (rb != null && rb.linearVelocity.sqrMagnitude < 0.1f)
+                damage = Mathf.Max(0, damage - 1);
         }
 
-        // StoneSkin → Fortify: stacks from movement, lost on hit
-        if (HasRelic(RelicType.StoneSkin) && fortifyStacks > 0)
-        {
-            damage = Mathf.Max(0, damage - fortifyStacks);
-            fortifyStacks = 0;
-        }
-
-        // Cursed Power: take 50% extra damage per hit
+        // Cursed Power: take 1 extra damage per hit
         if (HasRelic(RelicType.CursedPower))
-            damage = Mathf.CeilToInt(damage * 1.5f);
+            damage += 1;
 
         // BloodPact: take 1 extra damage per hit (stacks with CursedPower)
         if (HasRelic(RelicType.BloodPact))
@@ -300,14 +255,6 @@ public class RelicManager : MonoBehaviour
             if (HasRelic(RelicType.Lucky))
                 heal = Random.value < 0.2f ? 3 : 2;
             playerHealth.Heal(heal);
-        }
-
-        // Lucky → Treasure Hunter: bonus gold on room clear
-        if (HasRelic(RelicType.Lucky) && playerHealth != null)
-        {
-            float chance = 0.25f;
-            if (Random.value < chance)
-                GoldSystem.SpawnGoldDrop(transform.position, 15);
         }
     }
 
@@ -383,11 +330,78 @@ public class RelicManager : MonoBehaviour
     /// <summary>Check if VoidLens is active (void pull radius x1.4).</summary>
     public bool HasVoidLens => HasRelic(RelicType.VoidLens);
 
-    /// <summary>Check if StormConductor is active (+10% crit for lightning).</summary>
+    /// <summary>Check if StormConductor is active (+15% crit for lightning).</summary>
     public bool HasStormConductor => HasRelic(RelicType.StormConductor);
 
     /// <summary>Check if EmberHeart is active (fire chains to extra target).</summary>
     public bool HasEmberHeart => HasRelic(RelicType.EmberHeart);
+
+    // ─── ELEMENT RELIC SECONDARY EFFECTS ──────────────────────────
+
+    /// <summary>Called by fire spells on hit. Leaves small burn zone if EmberHeart equipped.</summary>
+    public void OnFireSpellHit(Vector3 pos)
+    {
+        if (!HasRelic(RelicType.EmberHeart)) return;
+        pos.y = 0.05f;
+        var zone = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
+        Object.Destroy(zone.GetComponent<CapsuleCollider>());
+        zone.transform.position = pos;
+        zone.transform.localScale = new Vector3(1f, 0.03f, 1f);
+        zone.GetComponent<Renderer>().material = ShaderCache.NewEmissive(new Color(1f, 0.4f, 0.05f, 0.5f), 1.5f);
+        var pz = zone.AddComponent<PoisonZone>();
+        pz.dps = 1f;
+        pz.radius = 0.5f;
+        Object.Destroy(zone, 1f);
+    }
+
+    /// <summary>Called on enemy kill. If FrostCrown + enemy was frozen, freeze nearby.</summary>
+    public void OnEnemyKill(Vector3 pos, Health victim)
+    {
+        // FrostCrown: frozen enemies explode on death, freezing neighbors
+        if (HasRelic(RelicType.FrostCrown) && victim != null && victim.IsFrozen)
+        {
+            Collider[] nearby = Physics.OverlapSphere(pos, 1.5f);
+            foreach (var c in nearby)
+            {
+                if (c.GetComponent<PlayerController>() != null) continue;
+                var hp = c.GetComponent<Health>();
+                if (hp != null && !hp.IsDead)
+                    hp.ApplyFreeze(1f);
+            }
+        }
+
+        // VenomSac: poisoned enemies leave poison cloud on death
+        if (HasRelic(RelicType.VenomSac) && victim != null)
+        {
+            var es = victim.GetComponent<ElementalStatus>();
+            if (es != null && es.HasStatus(ElementalStatusType.Poisoned))
+            {
+                Vector3 cloudPos = pos; cloudPos.y = 0.05f;
+                var cloud = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
+                Object.Destroy(cloud.GetComponent<CapsuleCollider>());
+                cloud.transform.position = cloudPos;
+                cloud.transform.localScale = new Vector3(3f, 0.04f, 3f);
+                cloud.GetComponent<Renderer>().material = ShaderCache.NewEmissive(new Color(0.2f, 0.8f, 0.1f, 0.5f), 1.5f);
+                var pz = cloud.AddComponent<PoisonZone>();
+                pz.dps = 2f;
+                pz.radius = 1.5f;
+                Object.Destroy(cloud, 3f);
+            }
+        }
+    }
+
+    /// <summary>Called after player dashes. Activates 0.5s damage buff if GaleRing equipped.</summary>
+    public void OnDashComplete()
+    {
+        if (HasRelic(RelicType.GaleRing))
+            galeRingDashBuff = 0.5f;
+    }
+
+    /// <summary>Returns GaleRing post-dash damage multiplier (1.0 if inactive).</summary>
+    public float GetGaleRingMult()
+    {
+        return galeRingDashBuff > 0 ? 1.3f : 1f;
+    }
 
     /// <summary>Remove a relic and undo its passive effects.</summary>
     public void RemoveRelic(RelicSO relic)
