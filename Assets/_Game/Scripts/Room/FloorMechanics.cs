@@ -123,13 +123,20 @@ public static class FloorMechanics
 
 // ─── FLOOR MECHANIC BEHAVIORS ──────────────────────────────
 
-/// <summary>Water zone: enemies take 2x lightning damage while in it.</summary>
+/// <summary>Water zone: applies Wet status to enemies inside, enabling Lightning amplification via Electrocute reaction.</summary>
 public class WaterZoneBehavior : MonoBehaviour
 {
     void OnTriggerEnter(Collider other)
     {
         var hp = other.GetComponent<Health>();
         if (hp != null) hp.ApplyStun(0.1f); // Brief stagger on entering water
+    }
+
+    void OnTriggerStay(Collider other)
+    {
+        if (other.GetComponent<PlayerController>() != null) return;
+        var es = other.GetComponent<ElementalStatus>();
+        if (es != null) es.ApplyElement(ElementType.Water, 0); // Wet status enables Electrocute (1.5x, AoE chain) from Lightning
     }
 }
 

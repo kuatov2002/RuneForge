@@ -16,15 +16,23 @@ public class SwarmQueenBoss : MonoBehaviour
     Renderer[] renderers;
     bool isDead;
     bool phase2;
+    BossEnrage enrage;
     List<GameObject> minions = new();
 
     // State machine
     enum State { Reposition, AcidBarrage, CommandSwarm, BodySlam, Absorb, SummonBurst, Recover }
     State state = State.Reposition;
     float stateTimer;
-    float actionCooldown = 2f;
+    float actionCooldown = 1.2f;
     float spawnTimer;
     float teleportTimer;
+
+    // Cycle phases
+    enum CyclePhase { Spawn, Barrage, BodySlam }
+    CyclePhase cyclePhase = CyclePhase.Spawn;
+    float cycleTimer;
+    int slamSeriesCount;
+    int slamSeriesMax;
 
     // Acid barrage
     int acidShotsRemaining;
@@ -37,7 +45,7 @@ public class SwarmQueenBoss : MonoBehaviour
 
     // Absorb
     float absorbTimer;
-    bool hasAbsorbed;
+    float absorbCooldownTimer = 20f;
 
     // Swarm command
     Vector3 commandTarget;
@@ -67,8 +75,10 @@ public class SwarmQueenBoss : MonoBehaviour
             };
         }
 
+        cycleTimer = 5f;
         spawnTimer = 1f;
         teleportTimer = teleportCooldown;
+        enrage = GetComponent<BossEnrage>();
     }
 
     void Update()
@@ -109,37 +119,22 @@ public class SwarmQueenBoss : MonoBehaviour
         }
     }
 
-    // --- REPOSITION: keep distance, spawn minions, pick attacks ---
+    // --- REPOSITION: keep distance, cycle through attack phases ---
     void RepositionUpdate(Vector3 toPlayer, float dist, float speedMult)
     {
         transform.rotation = Quaternion.LookRotation(toPlayer.normalized);
 
         // Keep at medium range (5-8m)
-        float speed = phase2 ? moveSpeed * 1.3f : moveSpeed;
+        float enrageSpeed = enrage != null ? enrage.SpeedMultiplier : 1f;
+        float speed = (phase2 ? moveSpeed * 1.3f : moveSpeed) * enrageSpeed;
         if (dist < 4f)
-        {
-            // Flee
             rb.MovePosition(transform.position - toPlayer.normalized * speed * speedMult * Time.deltaTime);
-        }
         else if (dist > 9f)
-        {
-            // Close in
             rb.MovePosition(transform.position + toPlayer.normalized * speed * 0.5f * speedMult * Time.deltaTime);
-        }
         else
         {
-            // Strafe
             Vector3 strafe = Vector3.Cross(toPlayer.normalized, Vector3.up);
             rb.MovePosition(transform.position + strafe * speed * 0.7f * speedMult * Time.deltaTime);
-        }
-
-        // Spawn minions periodically
-        spawnTimer -= Time.deltaTime;
-        float cd = phase2 ? spawnCooldown * 0.5f : spawnCooldown;
-        if (spawnTimer <= 0 && minions.Count < (phase2 ? 8 : 5))
-        {
-            spawnTimer = cd;
-            SpawnMinions(phase2 ? 2 : spawnCount);
         }
 
         // Teleport if player gets too close
@@ -151,25 +146,58 @@ public class SwarmQueenBoss : MonoBehaviour
             return;
         }
 
-        // Pick attacks
-        actionCooldown -= Time.deltaTime;
-        if (actionCooldown > 0) return;
-
-        if (dist < 3.5f && Random.value < 0.5f)
+        // Absorb interrupt (every 20s when conditions met)
+        absorbCooldownTimer -= Time.deltaTime;
+        if (absorbCooldownTimer <= 0 && minions.Count >= 3 && health.currentHP < health.maxHP / 2)
         {
-            StartBodySlam();
-        }
-        else if (minions.Count >= 2 && Random.value < 0.4f)
-        {
-            StartCommandSwarm();
-        }
-        else if (phase2 && !hasAbsorbed && minions.Count >= 3 && health.currentHP < health.maxHP * 0.3f)
-        {
+            absorbCooldownTimer = 20f;
             StartAbsorb();
+            return;
         }
-        else
+
+        // Cycle timer
+        cycleTimer -= Time.deltaTime;
+        if (cycleTimer <= 0)
         {
-            StartAcidBarrage();
+            switch (cyclePhase)
+            {
+                case CyclePhase.Spawn:
+                    cyclePhase = CyclePhase.Barrage;
+                    cycleTimer = 5f;
+                    StartAcidBarrage();
+                    return;
+                case CyclePhase.Barrage:
+                    cyclePhase = CyclePhase.BodySlam;
+                    cycleTimer = 3f;
+                    StartBodySlamSeries();
+                    return;
+                case CyclePhase.BodySlam:
+                    cyclePhase = CyclePhase.Spawn;
+                    cycleTimer = 5f;
+                    return;
+            }
+        }
+
+        // During Spawn phase, continuously spawn minions + Command Swarm
+        if (cyclePhase == CyclePhase.Spawn)
+        {
+            spawnTimer -= Time.deltaTime;
+            if (spawnTimer <= 0 && minions.Count < (phase2 ? 8 : 5))
+            {
+                spawnTimer = phase2 ? 1f : 1.5f;
+                SpawnMinions(phase2 ? 2 : spawnCount);
+            }
+
+            // Auto-command existing minions to charge during spawn phase
+            if (minions.Count >= 2 && spawnTimer < -0.5f) // Command after a brief delay
+            {
+                foreach (var m in minions)
+                {
+                    if (m == null) continue;
+                    var ai = m.GetComponent<SwarmAI>();
+                    if (ai != null) ai.CommandCharge(target.position);
+                }
+            }
         }
     }
 
@@ -201,7 +229,7 @@ public class SwarmQueenBoss : MonoBehaviour
         {
             state = State.Recover;
             stateTimer = 0.6f;
-            actionCooldown = phase2 ? 1f : 1.5f;
+            actionCooldown = phase2 ? 0.6f : 0.9f;
         }
     }
 
@@ -250,11 +278,18 @@ public class SwarmQueenBoss : MonoBehaviour
             foreach (var r in renderers)
                 if (r != null) r.material.color = baseColor;
             state = State.Reposition;
-            actionCooldown = 2f;
+            actionCooldown = 1.2f;
         }
     }
 
-    // --- BODY SLAM: leap onto player when they get close ---
+    // --- BODY SLAM: leap onto player (chained series) ---
+    void StartBodySlamSeries()
+    {
+        slamSeriesCount = 0;
+        slamSeriesMax = phase2 ? 3 : 2;
+        StartBodySlam();
+    }
+
     void StartBodySlam()
     {
         state = State.BodySlam;
@@ -274,13 +309,14 @@ public class SwarmQueenBoss : MonoBehaviour
 
             // Damage + spawn acid pool at landing
             float radius = 2.5f;
+            float dmgMult = enrage != null ? enrage.DamageMultiplier : 1f;
             Collider[] hits = Physics.OverlapSphere(transform.position, radius);
             foreach (var h in hits)
             {
                 var pc = h.GetComponent<PlayerController>();
                 if (pc == null || pc.isInvulnerable) continue;
                 var hp = h.GetComponent<Health>();
-                if (hp != null && !hp.IsDead) hp.TakeDamage(3);
+                if (hp != null && !hp.IsDead) hp.TakeDamage(Mathf.CeilToInt(3 * dmgMult));
             }
 
             // Acid pool at landing
@@ -290,9 +326,20 @@ public class SwarmQueenBoss : MonoBehaviour
             if (GameFeel.Instance != null) GameFeel.Instance.Hitstop(0.04f);
             SFXSystem.Play(SFXSystem.SFXType.Explosion, transform.position);
 
+            slamSeriesCount++;
+            if (slamSeriesCount < slamSeriesMax)
+            {
+                // Chain slam — brief pause then slam again
+                state = State.Recover;
+                stateTimer = 0.5f;
+                actionCooldown = 0.1f; // Quick return to trigger next slam
+                return;
+            }
+
+            // Series done — long vulnerability window
             state = State.Recover;
-            stateTimer = 0.7f;
-            actionCooldown = 1.5f;
+            stateTimer = 2f;
+            actionCooldown = 0.9f;
             return;
         }
 
@@ -307,7 +354,6 @@ public class SwarmQueenBoss : MonoBehaviour
     {
         state = State.Absorb;
         absorbTimer = 1.5f;
-        hasAbsorbed = true;
 
         foreach (var r in renderers)
             if (r != null) r.material.color = new Color(0.9f, 0.2f, 0.1f);
@@ -328,7 +374,7 @@ public class SwarmQueenBoss : MonoBehaviour
             if (toSelf.magnitude < 1f)
             {
                 // Absorb: heal + destroy minion
-                health.Heal(3);
+                health.Heal(5);
                 Destroy(m);
             }
         }
@@ -344,13 +390,14 @@ public class SwarmQueenBoss : MonoBehaviour
         {
             // Power burst: AoE damage
             float radius = 4f;
+            float burstDmgMult = enrage != null ? enrage.DamageMultiplier : 1f;
             Collider[] hits = Physics.OverlapSphere(transform.position, radius);
             foreach (var h in hits)
             {
                 var pc = h.GetComponent<PlayerController>();
                 if (pc == null || pc.isInvulnerable) continue;
                 var hp = h.GetComponent<Health>();
-                if (hp != null && !hp.IsDead) hp.TakeDamage(4);
+                if (hp != null && !hp.IsDead) hp.TakeDamage(Mathf.CeilToInt(4 * burstDmgMult));
             }
 
             // VFX explosion
@@ -401,7 +448,7 @@ public class SwarmQueenBoss : MonoBehaviour
             SFXSystem.Play(SFXSystem.SFXType.Explosion, target.position);
 
             state = State.Reposition;
-            actionCooldown = 2f;
+            actionCooldown = 1.2f;
         }
     }
 
@@ -410,7 +457,15 @@ public class SwarmQueenBoss : MonoBehaviour
     {
         stateTimer -= Time.deltaTime;
         if (stateTimer <= 0)
+        {
+            // If in slam series and more slams to do, chain next slam
+            if (cyclePhase == CyclePhase.BodySlam && slamSeriesCount < slamSeriesMax)
+            {
+                StartBodySlam();
+                return;
+            }
             state = State.Reposition;
+        }
     }
 
     // --- PHASE 2 ---
@@ -506,7 +561,7 @@ public class SwarmQueenBoss : MonoBehaviour
         pz.dps = 1.5f;
         pz.radius = radius;
 
-        Destroy(pool, 5f);
+        Destroy(pool, 10f);
     }
 
     void CleanupMinions()
@@ -536,6 +591,6 @@ public class AcidPoolOnImpact : MonoBehaviour
         pz.dps = 1f;
         pz.radius = 0.75f;
 
-        Object.Destroy(pool, 3f);
+        Object.Destroy(pool, 10f);
     }
 }

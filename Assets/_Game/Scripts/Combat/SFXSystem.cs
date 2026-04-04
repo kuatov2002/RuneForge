@@ -29,7 +29,11 @@ public class SFXSystem : MonoBehaviour
         PlayerDeath,
         DoorOpen,
         ShopBuy,
-        PickupJuice
+        PickupJuice,
+        Footstep,
+        UIHover,
+        RelicPickup,
+        StatusApply
     }
 
     AudioSource _source;
@@ -197,6 +201,39 @@ public class SFXSystem : MonoBehaviour
         {
             float env = Mathf.Exp(-t * 20f);
             return (Mathf.Sin(t * 1800f) + Mathf.Sin(t * 2700f) * 0.6f) * env * 0.2f;
+        });
+
+        // Footstep: soft thud with noise burst
+        _clips[(int)SFXType.Footstep] = MakeClip("Footstep", 0.03f, (t, d) =>
+        {
+            float env = 1f - t / d;
+            float body = Mathf.Sin(t * 200f * 6.28f) * 0.15f;
+            float grit = (Mathf.PerlinNoise(t * 500f, 0) - 0.5f) * 0.1f;
+            return (body + grit) * env;
+        });
+
+        // UI hover: short click
+        _clips[(int)SFXType.UIHover] = MakeClip("UIHover", 0.02f, (t, d) =>
+        {
+            float env = 1f - t / d;
+            return Mathf.Sin(t * 1200f * 6.28f) * 0.3f * env;
+        });
+
+        // Relic pickup: ascending chord sweep
+        _clips[(int)SFXType.RelicPickup] = MakeClip("RelicPickup", 0.2f, (t, d) =>
+        {
+            float env = 1f - t / d;
+            float freq = 600f + t * 3000f;
+            return (Mathf.Sin(t * freq * 6.28f) * 0.15f +
+                    Mathf.Sin(t * freq * 1.5f * 6.28f) * 0.1f +
+                    Mathf.Sin(t * freq * 2f * 6.28f) * 0.08f) * env;
+        });
+
+        // Status apply: modulated zing
+        _clips[(int)SFXType.StatusApply] = MakeClip("StatusApply", 0.05f, (t, d) =>
+        {
+            float env = 1f - t / d;
+            return Mathf.Sin(t * 500f * 6.28f) * Mathf.Sin(t * 80f * 6.28f) * 0.2f * env;
         });
     }
 

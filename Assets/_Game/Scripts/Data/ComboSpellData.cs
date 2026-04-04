@@ -56,7 +56,7 @@ public class ComboSpellDef
     public Color color;
 
     // Charged shot multiplier
-    public float chargedDamageMultiplier = 2.5f;
+    public float chargedDamageMultiplier = 1.8f;
     public float chargedRadiusMultiplier = 1.5f;
 }
 
@@ -88,6 +88,7 @@ public static class ComboSpellRegistry
             comboType = ComboType.DeepFreeze, comboName = "Deep Freeze",
             description = "Piercing ice spike that freezes enemies",
             baseDamage = 3, radius = 2.5f, duration = 2.5f, cooldown = 0.9f, // nerfed for reaction balance
+            chargedDamageMultiplier = 2.5f, // CC spell: charged = quality change via pierce
             color = new Color(0.3f, 0.7f, 1f)
         });
         Register(ElementType.Earth, ElementType.Earth, new ComboSpellDef
@@ -95,13 +96,15 @@ public static class ComboSpellRegistry
             comboType = ComboType.Bulwark, comboName = "Bulwark",
             description = "Fortress wall, recast to shatter",
             baseDamage = 4, radius = 0, duration = 5f, cooldown = 1f, // nerfed for reaction balance
+            chargedDamageMultiplier = 2.5f, // utility: charged = different wall
             color = new Color(0.6f, 0.4f, 0.2f)
         });
         Register(ElementType.Air, ElementType.Air, new ComboSpellDef
         {
             comboType = ComboType.Ascend, comboName = "Wind Slash",
             description = "Piercing wind blade, charged = 3 blades",
-            baseDamage = 5, radius = 2f, cooldown = 0.7f, // nerfed for reaction balance
+            baseDamage = 7, radius = 2f, cooldown = 0.7f, // buffed: was 5, wind trail compensates
+            chargedDamageMultiplier = 2.5f, // keeps 3-blade charged viable
             color = new Color(0.8f, 0.9f, 1f)
         });
 
@@ -132,7 +135,7 @@ public static class ComboSpellRegistry
         {
             comboType = ComboType.Permafrost, comboName = "Permafrost",
             description = "Ice floor, enemies slide",
-            baseDamage = 3.5f, radius = 4f, duration = 5f, cooldown = 0.8f, // buffed: area control needs bite
+            baseDamage = 3f, radius = 3f, duration = 5f, cooldown = 0.8f, // nerfed: was 3.5/4.0, slide buff compensates
             color = new Color(0.5f, 0.8f, 0.9f)
         });
         Register(ElementType.Water, ElementType.Air, new ComboSpellDef
@@ -155,7 +158,7 @@ public static class ComboSpellRegistry
         {
             comboType = ComboType.LightningStrike, comboName = "Lightning Strike",
             description = "Bolt from the sky",
-            baseDamage = 13, radius = 1.5f, cooldown = 0.7f,
+            baseDamage = 10, radius = 1.5f, cooldown = 0.7f, // nerfed: was 13, chain count reduced in spell code
             color = new Color(1f, 1f, 0.3f)
         });
         Register(ElementType.Lightning, ElementType.Fire, new ComboSpellDef
@@ -250,7 +253,7 @@ public static class ComboSpellRegistry
         {
             comboType = ComboType.Rift, comboName = "Rift",
             description = "Rift that slows and damages",
-            baseDamage = 5, radius = 2f, duration = 2.5f, cooldown = 0.8f,
+            baseDamage = 5, radius = 2f, duration = 3.5f, cooldown = 0.8f, // buffed: was 2.5dur, anti-mobility zone
             color = new Color(0.4f, 0.3f, 0.8f)
         });
         Register(ElementType.Void, ElementType.Earth, new ComboSpellDef
@@ -264,7 +267,7 @@ public static class ComboSpellRegistry
         {
             comboType = ComboType.Vacuum, comboName = "Vacuum",
             description = "Pulls enemies toward a point",
-            baseDamage = 3.5f, radius = 3.5f, duration = 1.5f, cooldown = 0.8f,
+            baseDamage = 3.5f, radius = 4.5f, duration = 2.5f, cooldown = 0.8f, // buffed: was 3.5r/1.5dur, best grouping
             color = new Color(0.5f, 0.4f, 0.8f)
         });
         Register(ElementType.Void, ElementType.Lightning, new ComboSpellDef

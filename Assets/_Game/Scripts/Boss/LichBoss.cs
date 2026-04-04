@@ -16,7 +16,7 @@ public class LichBoss : MonoBehaviour
     bool isDead;
     bool phase2;
 
-    enum State { Float, TeleportChain, OrbBarrage, BeamSweep, VoidPull, SummonPillars, Recover }
+    enum State { Float, TeleportChain, OrbBarrage, BeamSweep, VoidPull, Recover }
     State state = State.Float;
     float stateTimer;
     float actionCooldown = 1.5f;
@@ -117,9 +117,6 @@ public class LichBoss : MonoBehaviour
                 break;
             case State.VoidPull:
                 VoidPullUpdate();
-                break;
-            case State.SummonPillars:
-                SummonPillarsUpdate();
                 break;
             case State.Recover:
                 RecoverUpdate();
@@ -508,17 +505,6 @@ public class LichBoss : MonoBehaviour
 
             state = State.Recover;
             stateTimer = 0.8f;
-            actionCooldown = 1.5f;
-        }
-    }
-
-    // --- SUMMON PILLARS: create void pillars that block and fire ---
-    void SummonPillarsUpdate()
-    {
-        stateTimer -= Time.deltaTime;
-        if (stateTimer <= 0)
-        {
-            state = State.Float;
             actionCooldown = 1.5f;
         }
     }

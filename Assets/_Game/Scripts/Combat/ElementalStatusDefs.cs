@@ -219,7 +219,7 @@ public static class ElementalStatusDefs
             {
                 (ElementalStatusType.Burning, ElementalStatusType.Windswept),
                 new ReactionResult { type = ReactionType.Firestorm, displayName = "FIRESTORM",
-                    damageMultiplier = 1f, aoeRadius = 4f,
+                    damageMultiplier = 1.5f, aoeRadius = 5f,
                     color = new Color(1f, 0.4f, 0f) }
             },
             {
@@ -255,7 +255,7 @@ public static class ElementalStatusDefs
             {
                 (ElementalStatusType.Weighted, ElementalStatusType.Windswept),
                 new ReactionResult { type = ReactionType.Launch, displayName = "LAUNCH",
-                    damageMultiplier = 1.5f, aoeRadius = 0f,
+                    damageMultiplier = 1.5f, aoeRadius = 1.5f,
                     color = new Color(0.7f, 0.8f, 0.9f) }
             },
         };

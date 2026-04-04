@@ -34,6 +34,7 @@ public class Bootstrap : MonoBehaviour
     int wave = 1;
     int enemiesAlive;
     int enemiesKilledThisRun;
+    float runStartTime;
     bool isPlayerDead;
     bool bossActive;
     GameObject currentBoss;
@@ -146,6 +147,7 @@ public class Bootstrap : MonoBehaviour
         roomCleared = false;
         bossActive = false;
         enemiesKilledThisRun = 0;
+        runStartTime = Time.time;
         SpellMutationSystem.Reset();
 
         floorGen = new FloorGenerator();
@@ -319,8 +321,7 @@ public class Bootstrap : MonoBehaviour
             if (vfx != null) Object.Destroy(vfx.gameObject);
         foreach (var vfx in Object.FindObjectsByType<FlashShrink>(FindObjectsSortMode.None))
             if (vfx != null) Object.Destroy(vfx.gameObject);
-        foreach (var vfx in Object.FindObjectsByType<GeyserRise>(FindObjectsSortMode.None))
-            if (vfx != null) Object.Destroy(vfx.gameObject);
+        // GeyserRise removed (legacy stub deleted)
 
         // Destroy any standalone particle systems not parented to player/camera
         foreach (var ps in Object.FindObjectsByType<ParticleSystem>(FindObjectsSortMode.None))
@@ -677,7 +678,12 @@ public class Bootstrap : MonoBehaviour
                 MetaProgression.CompleteRun();
                 AscensionSystem.OnRunComplete();
                 isPlayerDead = true;
-                hud.ShowVictory(wave, currentFloor - 1, enemiesKilledThisRun);
+                int ownedRelicCount = relicMgr != null ? relicMgr.OwnedRelics.Count : 0;
+                hud.ShowVictory(wave, currentFloor - 1, enemiesKilledThisRun,
+                    runTime: Time.time - runStartTime,
+                    relicsCollected: ownedRelicCount,
+                    combosDiscovered: Codex.DiscoveredComboCount,
+                    essenceEarned: 100);
                 playerCtrl.enabled = false;
                 spellCaster.enabled = false;
                 return;

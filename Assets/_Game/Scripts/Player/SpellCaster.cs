@@ -96,13 +96,55 @@ public class SpellCaster : MonoBehaviour
     /// <summary>Is element slot overheated (no charges)?</summary>
     public bool IsOverheated(int slot) => slot >= 0 && slot < 4 && charges[slot] <= 0 && overheatTimers[slot] > 0;
 
-    /// <summary>Force-overheat an element slot (e.g. boss mechanic). Sets charges to 0 and starts penalty + trickle.</summary>
+    /// <summary>Force-overheat a specific element slot (used by EntropyRelic and boss mechanics).</summary>
     public void ForceOverheat(int slot)
     {
-        if (slot < 0 || slot >= 4 || equippedElements[slot] == null) return;
+        if (slot < 0 || slot >= equippedElements.Length) return;
+        if (IsOverheated(slot)) return;
         charges[slot] = 0;
+        overheatTimers[slot] = OverheatRechargeDefault;
         overheatPenalty[slot] = true;
-        overheatTimers[slot] = OverheatPenaltyTime;
+    }
+
+    /// <summary>True if any equipped element slot is currently overheated.</summary>
+    public bool HasAnyOverheated
+    {
+        get
+        {
+            for (int i = 0; i < equippedElements.Length; i++)
+                if (IsOverheated(i)) return true;
+            return false;
+        }
+    }
+
+    /// <summary>True if all equipped element slots have maximum charges.</summary>
+    public bool AllChargesFull
+    {
+        get
+        {
+            for (int i = 0; i < equippedElements.Length; i++)
+            {
+                if (equippedElements[i] == null) continue;
+                if (charges[i] < equippedElements[i].maxCharges) return false;
+            }
+            return true;
+        }
+    }
+
+    /// <summary>Restore 1 charge to the first overheated element (used by DashRecharge relic).</summary>
+    public void RestoreOverheatedCharge()
+    {
+        for (int i = 0; i < equippedElements.Length; i++)
+        {
+            if (!IsOverheated(i)) continue;
+            charges[i] = Mathf.Min(charges[i] + 1, equippedElements[i].maxCharges);
+            if (charges[i] >= equippedElements[i].maxCharges)
+            {
+                overheatTimers[i] = 0;
+                overheatPenalty[i] = false;
+            }
+            break;
+        }
     }
 
     /// <summary>Get overheat recharge progress (0 = empty, 1 = fully charged).</summary>
@@ -263,6 +305,17 @@ public class SpellCaster : MonoBehaviour
         if (elem == null) return;
         if (IsOverheated(slotIndex)) return; // Can't select overheated element
 
+        // Convergence relic: block element changes if already have 2 locked elements
+        var relicMgr = GetComponent<RelicManager>();
+        if (relicMgr != null && relicMgr.HasRelic(RelicType.Convergence))
+        {
+            var uniqueElems = new System.Collections.Generic.HashSet<ElementType>();
+            foreach (var e in equippedElements)
+                if (e != null) uniqueElems.Add(e.elementType);
+            if (uniqueElems.Count >= 2 && !uniqueElems.Contains(elem.elementType))
+                return;
+        }
+
         // Push: new element appears on right, old right goes to left, old left disappears
         leftOrb = rightOrb;
         rightOrb = elem;
@@ -338,8 +391,13 @@ public class SpellCaster : MonoBehaviour
         // Get target position
         Vector3 targetPos = GetCursorWorldPosition();
 
-        // Set cooldown
-        cooldownTimer = def.cooldown * cooldownBonusMult;
+        // Set cooldown (with relic modifiers)
+        float cdMult = cooldownBonusMult;
+        if (relicMgr != null && relicMgr.HasCursedVelocity)
+            cdMult *= 0.7f;
+        if (relicMgr != null)
+            cdMult *= relicMgr.GetCooldownMult();
+        cooldownTimer = def.cooldown * cdMult;
 
         // Fire the combo spell
         ComboSpellFactory.Cast(def, transform.position, targetPos, dmgMult, charged);

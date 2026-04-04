@@ -18,7 +18,7 @@ public class WardenBoss : MonoBehaviour
     bool phase2;
 
     // State machine
-    enum State { Chase, LeapWindup, Leaping, SlamCombo, ShockwaveAttack, PillarCharge, Recover, ArenaClose }
+    enum State { Chase, LeapWindup, Leaping, SlamCombo, ShockwaveAttack, PillarCharge, Recover }
     State state = State.Chase;
     float stateTimer;
     float actionCooldown;
@@ -44,7 +44,6 @@ public class WardenBoss : MonoBehaviour
 
     // Phase 2 arena closing
     List<GameObject> arenaWalls = new();
-    float arenaTimer;
 
     void Start()
     {
@@ -109,9 +108,6 @@ public class WardenBoss : MonoBehaviour
                 break;
             case State.Recover:
                 RecoverUpdate();
-                break;
-            case State.ArenaClose:
-                ArenaCloseUpdate(toPlayer, dist, speedMult);
                 break;
         }
 
@@ -475,12 +471,6 @@ public class WardenBoss : MonoBehaviour
             walls.Add(w);
             Destroy(w, 30f);
         }
-    }
-
-    void ArenaCloseUpdate(Vector3 toPlayer, float dist, float speedMult)
-    {
-        // Not used currently — arena walls are static after spawn
-        state = State.Chase;
     }
 
     // --- UTILITY ---

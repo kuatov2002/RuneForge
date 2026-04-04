@@ -26,6 +26,9 @@ public static class ComboSpellFactory
         radius = SpellMutationSystem.ModifyRadius(radius);
         float duration = SpellMutationSystem.ModifyDuration(def.duration);
 
+        // Soft cap: diminishing returns on total multiplier (covers charged + mutations)
+        dmg = SoftCapDamage(dmg, def.baseDamage);
+
         Vector3 dir = (targetPos - origin);
         dir.y = 0;
         if (dir.sqrMagnitude > 0.01f) dir.Normalize();
@@ -156,5 +159,18 @@ public static class ComboSpellFactory
             }
             RunUpgradeSystem.BounceToNearestEnemy(targetPos, dmg * 0.5f, 5f, exclude);
         }
+    }
+
+    /// <summary>
+    /// Soft cap on total damage multiplier. Computes effective mult (totalDmg / baseDmg),
+    /// applies sqrt compression above threshold 4.0, then reconstructs final damage.
+    /// </summary>
+    static float SoftCapDamage(float totalDmg, float baseDmg)
+    {
+        if (baseDmg <= 0) return totalDmg;
+        float mult = totalDmg / baseDmg;
+        if (mult <= 3.5f) return totalDmg;
+        float capped = 3.5f + Mathf.Sqrt(mult - 3.5f) * 0.7f;
+        return baseDmg * capped;
     }
 }

@@ -12,7 +12,7 @@ public static class LightningStrikeSpell
     {
         if (charged) { damage *= 1.3f; radius *= 1.2f; }
 
-        int maxChains = charged ? 4 : 3;
+        int maxChains = charged ? 3 : 2;
 
         // Find closest enemy to center within radius for main bolt
         Collider[] nearby = Physics.OverlapSphere(center, radius);

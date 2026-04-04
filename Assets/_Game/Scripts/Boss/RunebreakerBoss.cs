@@ -15,11 +15,12 @@ public class RunebreakerBoss : MonoBehaviour
     bool isDead;
     int phase = 1;
     SpellCaster playerCaster;
+    BossEnrage enrage;
 
-    enum State { Hunt, TeleportStrike, SwordCombo, RuneSteal, Shockwave, BoltBarrage, Berserker, Recover }
+    enum State { Hunt, TeleportStrike, SwordCombo, RuneSteal, Shockwave, BoltBarrage, Berserker, Recover, CinematicPause }
     State state = State.Hunt;
     float stateTimer;
-    float actionCooldown = 1.5f;
+    float actionCooldown = 0.9f;
 
     // Teleport strike
     int teleportStrikeCount;
@@ -44,6 +45,8 @@ public class RunebreakerBoss : MonoBehaviour
     // Berserker
     float berserkerTimer;
     float berserkerDashCooldown;
+    float desperationBoltTimer;
+    List<GameObject> runeZones = new();
 
     void Start()
     {
@@ -63,9 +66,10 @@ public class RunebreakerBoss : MonoBehaviour
 
         if (health != null)
         {
-            health.OnDeath += () => { isDead = true; Destroy(gameObject, 0.5f); };
+            health.OnDeath += () => { isDead = true; CleanupRuneZones(); Destroy(gameObject, 0.5f); };
             health.OnHPChanged += OnHPChanged;
         }
+        enrage = GetComponent<BossEnrage>();
     }
 
     void OnHPChanged(int cur, int max)
@@ -119,6 +123,9 @@ public class RunebreakerBoss : MonoBehaviour
             case State.Recover:
                 RecoverUpdate();
                 break;
+            case State.CinematicPause:
+                CinematicPauseUpdate();
+                break;
         }
     }
 
@@ -129,11 +136,13 @@ public class RunebreakerBoss : MonoBehaviour
         transform.rotation = Quaternion.LookRotation(dir);
 
         // Always closing distance
-        float speed = moveSpeed * (phase >= 2 ? 1.3f : 1f);
+        float enrageSpeed = enrage != null ? enrage.SpeedMultiplier : 1f;
+        float speed = moveSpeed * (phase >= 2 ? 1.3f : 1f) * enrageSpeed;
         if (dist > meleeRange)
             rb.MovePosition(transform.position + dir * speed * speedMult * Time.deltaTime);
 
-        actionCooldown -= Time.deltaTime;
+        float cdSpeed = enrage != null ? 1f / enrage.CooldownMultiplier : 1f;
+        actionCooldown -= Time.deltaTime * cdSpeed;
         if (actionCooldown > 0) return;
 
         float r = Random.value;
@@ -175,7 +184,7 @@ public class RunebreakerBoss : MonoBehaviour
     void StartTeleportStrike()
     {
         state = State.TeleportStrike;
-        teleportStrikeMax = phase >= 2 ? Random.Range(2, 4) : 1;
+        teleportStrikeMax = phase >= 2 ? Random.Range(2, 4) : 2;
         teleportStrikeCount = 0;
         teleportStrikeDelay = 0.3f; // Initial delay (telegraph)
 
@@ -227,7 +236,7 @@ public class RunebreakerBoss : MonoBehaviour
         {
             state = State.Recover;
             stateTimer = phase >= 2 ? 0.4f : 0.7f;
-            actionCooldown = phase >= 2 ? 0.6f : 1f;
+            actionCooldown = phase >= 2 ? 0.36f : 0.6f;
             foreach (var r in renderers)
                 if (r != null) r.material.color = GetPhaseColor();
         }
@@ -287,7 +296,7 @@ public class RunebreakerBoss : MonoBehaviour
 
                 state = State.Recover;
                 stateTimer = phase >= 3 ? 0.3f : (phase >= 2 ? 0.5f : 0.8f);
-                actionCooldown = phase >= 2 ? 0.5f : 0.8f;
+                actionCooldown = phase >= 2 ? 0.3f : 0.48f;
             }
             else
             {
@@ -351,9 +360,13 @@ public class RunebreakerBoss : MonoBehaviour
             if (TopDownCamera.Instance != null) TopDownCamera.Instance.AddTrauma(0.4f);
             SFXSystem.Play(SFXSystem.SFXType.Explosion, transform.position);
 
+            // Phase 2+: leave a rune zone at steal position
+            if (phase >= 2)
+                SpawnRuneZone(transform.position);
+
             state = State.Recover;
             stateTimer = 0.5f;
-            actionCooldown = 1f;
+            actionCooldown = 0.6f;
         }
     }
 
@@ -422,7 +435,7 @@ public class RunebreakerBoss : MonoBehaviour
 
             state = State.Recover;
             stateTimer = phase >= 3 ? 0.3f : 0.6f;
-            actionCooldown = 0.8f;
+            actionCooldown = 0.48f;
         }
     }
 
@@ -469,7 +482,7 @@ public class RunebreakerBoss : MonoBehaviour
         {
             state = State.Recover;
             stateTimer = 0.4f;
-            actionCooldown = phase >= 2 ? 0.5f : 0.8f;
+            actionCooldown = phase >= 2 ? 0.3f : 0.48f;
         }
     }
 
@@ -494,6 +507,21 @@ public class RunebreakerBoss : MonoBehaviour
             trail.transform.localScale = Vector3.one * 0.5f;
             trail.GetComponent<Renderer>().material = ShaderCache.NewEmissive(new Color(1f, 0.2f, 0f, 0.5f), 3f);
             Destroy(trail, 0.3f);
+        }
+
+        // Desperation bolts between dashes
+        desperationBoltTimer -= Time.deltaTime;
+        if (desperationBoltTimer <= 0)
+        {
+            desperationBoltTimer = 0.6f;
+            int boltCount = Random.Range(2, 4);
+            for (int i = 0; i < boltCount; i++)
+            {
+                Vector3 randomDir = Quaternion.Euler(0, Random.Range(0f, 360f), 0) * Vector3.forward;
+                EnemyProjectile.Create(
+                    transform.position + Vector3.up * 1f,
+                    randomDir, 10f, 3, new Color(1f, 0.2f, 0f), null);
+            }
         }
 
         // Rapid mini-dashes
@@ -521,7 +549,7 @@ public class RunebreakerBoss : MonoBehaviour
             // Exhaustion: big recovery window
             state = State.Recover;
             stateTimer = 1.5f;
-            actionCooldown = 0.5f;
+            actionCooldown = 0.3f;
             moveSpeed /= 2f; // Temporarily slower after berserker
 
             foreach (var r in renderers)
@@ -548,30 +576,77 @@ public class RunebreakerBoss : MonoBehaviour
 
     void EnterPhase3()
     {
-        if (GameFeel.Instance != null) GameFeel.Instance.Hitstop(0.1f);
-        if (TopDownCamera.Instance != null) TopDownCamera.Instance.AddTrauma(0.7f);
+        // Cinematic pause
+        if (GameFeel.Instance != null) GameFeel.Instance.Hitstop(0.15f);
+        if (TopDownCamera.Instance != null)
+        {
+            TopDownCamera.Instance.AddTrauma(0.8f);
+            TopDownCamera.Instance.ZoomTo(7f, 0.5f);
+        }
+
+        SFXSystem.Play(SFXSystem.SFXType.BossIntro, transform.position);
         SFXSystem.Play(SFXSystem.SFXType.Explosion, transform.position);
+        GameFeel.ScreenFlash(new Color(1f, 0.1f, 0f, 0.8f), 0.5f);
 
         ForceOverheatRandomSlot();
-        ForceOverheatRandomSlot(); // Overheat 2 slots
+        ForceOverheatRandomSlot();
         CreateDisableVFX();
+
+        // Explode all rune zones on the arena
+        foreach (var z in runeZones)
+        {
+            if (z == null) continue;
+            // Damage near each zone
+            Collider[] hits = Physics.OverlapSphere(z.transform.position, 3f);
+            foreach (var h in hits)
+            {
+                var pc = h.GetComponent<PlayerController>();
+                if (pc == null || pc.isInvulnerable) continue;
+                var hp = h.GetComponent<Health>();
+                if (hp != null && !hp.IsDead) hp.TakeDamage(3);
+            }
+            // Explosion VFX at zone
+            var blast = GameObject.CreatePrimitive(PrimitiveType.Sphere);
+            Destroy(blast.GetComponent<SphereCollider>());
+            blast.transform.position = z.transform.position + Vector3.up * 0.5f;
+            blast.transform.localScale = Vector3.one * 6f;
+            blast.GetComponent<Renderer>().material = ShaderCache.NewEmissive(new Color(1f, 0.2f, 0f, 0.6f), 5f);
+            Destroy(blast, 0.4f);
+            Destroy(z);
+        }
+        runeZones.Clear();
 
         baseColor = new Color(1f, 0.1f, 0.1f);
         UpdateVisual();
-
         moveSpeed *= 1.3f;
 
-        // Enter berserker rage
-        state = State.Berserker;
-        berserkerTimer = 5f;
-        berserkerDashCooldown = 0.3f;
+        // Enter cinematic pause state (1.5s) before berserker
+        state = State.CinematicPause;
+        stateTimer = 1.5f;
+    }
 
-        foreach (var r in renderers)
-            if (r != null && r.gameObject.name != "Eye")
-            {
-                r.material.color = new Color(1f, 0.15f, 0.05f);
-                r.material.SetColor("_EmissionColor", new Color(1f, 0.2f, 0f) * 4f);
-            }
+    // --- CINEMATIC PAUSE (Phase 3 entry) ---
+    void CinematicPauseUpdate()
+    {
+        stateTimer -= Time.deltaTime;
+        if (stateTimer <= 0)
+        {
+            // Enter berserker after cinematic
+            state = State.Berserker;
+            berserkerTimer = 5f;
+            berserkerDashCooldown = 0.3f;
+
+            foreach (var r in renderers)
+                if (r != null && r.gameObject.name != "Eye")
+                {
+                    r.material.color = new Color(1f, 0.15f, 0.05f);
+                    r.material.SetColor("_EmissionColor", new Color(1f, 0.2f, 0f) * 4f);
+                }
+
+            // Zoom back out
+            if (TopDownCamera.Instance != null)
+                TopDownCamera.Instance.ZoomTo(14f, 0.5f);
+        }
     }
 
     // --- RECOVER ---
@@ -586,20 +661,55 @@ public class RunebreakerBoss : MonoBehaviour
                     r.material.color = GetPhaseColor();
                     r.material.SetColor("_EmissionColor", Color.black);
                 }
+
+            // Phase 1: 50% chance to skip Hunt and attack immediately
+            if (phase == 1 && Random.value < 0.5f)
+                actionCooldown = 0f;
+
             state = State.Hunt;
         }
     }
 
     // --- UTILITY ---
+    void SpawnRuneZone(Vector3 pos)
+    {
+        pos.y = 0.05f;
+        var zone = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
+        Destroy(zone.GetComponent<CapsuleCollider>());
+        zone.name = "RuneZone";
+        zone.transform.position = pos;
+        float radius = 3f;
+        zone.transform.localScale = new Vector3(radius * 2, 0.04f, radius * 2);
+        zone.GetComponent<Renderer>().material =
+            ShaderCache.NewEmissive(new Color(0.8f, 0.1f, 0.1f, 0.5f), 2f);
+
+        var pz = zone.AddComponent<PoisonZone>();
+        pz.dps = 2f;
+        pz.radius = radius;
+
+        runeZones.Add(zone);
+        Destroy(zone, 12f);
+    }
+
+    void CleanupRuneZones()
+    {
+        foreach (var z in runeZones) if (z != null) Destroy(z);
+        runeZones.Clear();
+    }
+
+    void OnDestroy() { CleanupRuneZones(); }
+
     void DamagePlayerInRadius(float radius, int damage)
     {
+        float dmgMult = enrage != null ? enrage.DamageMultiplier : 1f;
+        int finalDmg = Mathf.CeilToInt(damage * dmgMult);
         Collider[] hits = Physics.OverlapSphere(transform.position, radius);
         foreach (var h in hits)
         {
             var pc = h.GetComponent<PlayerController>();
             if (pc == null || pc.isInvulnerable) continue;
             var hp = h.GetComponent<Health>();
-            if (hp != null && !hp.IsDead) hp.TakeDamage(damage);
+            if (hp != null && !hp.IsDead) hp.TakeDamage(finalDmg);
         }
     }
 

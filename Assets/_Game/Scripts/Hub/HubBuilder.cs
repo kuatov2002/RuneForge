@@ -3,6 +3,7 @@ using UnityEngine;
 /// <summary>
 /// Builds the hub environment procedurally — a cozy sanctum between runs.
 /// Layout: central hall with NPC stations around it.
+/// Decorations scale with meta-progression (total essence spent).
 /// </summary>
 public static class HubBuilder
 {
@@ -10,7 +11,7 @@ public static class HubBuilder
     {
         var hub = new GameObject("Hub");
 
-        // ── Floor (large circular-ish area) ──
+        // -- Floor (large circular-ish area) --
         int size = 20;
         var (wallCol, floorCol, floorAltCol, pillarCol) = (
             new Color(0.25f, 0.2f, 0.3f),
@@ -34,7 +35,6 @@ public static class HubBuilder
                 tile.transform.parent = hub.transform;
                 tile.transform.position = new Vector3(x + 0.5f, -0.25f, z + 0.5f);
                 tile.transform.localScale = new Vector3(0.98f, 0.5f, 0.98f);
-                bool alt = (x + z) % 2 == 0;
                 tile.GetComponent<Renderer>().material = ShaderCache.NewFloor(floorCol, floorAltCol);
                 tile.isStatic = true;
             }
@@ -53,7 +53,7 @@ public static class HubBuilder
         circle.transform.localScale = new Vector3(4f, 0.02f, 4f);
         circle.GetComponent<Renderer>().material = ShaderCache.NewMagic(new Color(0.4f, 0.2f, 0.8f), 2f);
 
-        // ── NPC Stations ──
+        // -- NPC Stations --
 
         // 1. Forge Master (upgrades) — north
         CreateNPCStation(hub.transform, new Vector3(half, 0, size - 3),
@@ -74,7 +74,7 @@ public static class HubBuilder
         CreateNPCStation(hub.transform, new Vector3(5, 0, size - 5),
             "Codex", new Color(0.6f, 0.3f, 0.9f), 1.0f);
 
-        // ── Decorations ──
+        // -- Decorations --
 
         // Corner pillars
         float pOff = 2f;
@@ -99,7 +99,103 @@ public static class HubBuilder
         cl.intensity = 3f;
         cl.range = 16f;
 
+        // -- Progression-based decorations --
+        AddProgressDecoration(hub.transform, half);
+        BuildStatsBoard(hub.transform);
+
         return hub;
+    }
+
+    /// <summary>
+    /// Places torches and rune pillars around the hub proportional to total essence spent.
+    /// More spending = more decorations, up to 20.
+    /// </summary>
+    static void AddProgressDecoration(Transform parent, float hubCenter)
+    {
+        int totalSpent = MetaProgression.TotalEssenceSpent;
+        int decorCount = Mathf.Min(totalSpent / 50, 20);
+
+        for (int i = 0; i < decorCount; i++)
+        {
+            float angle = i * (360f / Mathf.Max(1, decorCount)) * Mathf.Deg2Rad;
+            float radius = 6f + (i % 3) * 2f;
+            Vector3 pos = new Vector3(
+                hubCenter + Mathf.Cos(angle) * radius,
+                0,
+                hubCenter + Mathf.Sin(angle) * radius
+            );
+
+            if (i % 2 == 0)
+            {
+                // Torch pedestal
+                var torch = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
+                torch.name = "ProgressTorch";
+                torch.transform.parent = parent;
+                torch.transform.position = pos + Vector3.up * 0.75f;
+                torch.transform.localScale = new Vector3(0.15f, 0.75f, 0.15f);
+                torch.GetComponent<Renderer>().material = ShaderCache.NewLit(new Color(0.3f, 0.25f, 0.2f));
+                torch.isStatic = true;
+
+                // Flame sphere
+                var flame = GameObject.CreatePrimitive(PrimitiveType.Sphere);
+                Object.Destroy(flame.GetComponent<SphereCollider>());
+                flame.name = "TorchFlame";
+                flame.transform.parent = parent;
+                flame.transform.position = pos + Vector3.up * 1.6f;
+                flame.transform.localScale = Vector3.one * 0.2f;
+                flame.GetComponent<Renderer>().material = ShaderCache.NewEmissive(new Color(1f, 0.5f, 0.1f), 3f);
+            }
+            else
+            {
+                // Rune pillar with color based on progression tier
+                var pillar = GameObject.CreatePrimitive(PrimitiveType.Cube);
+                pillar.name = "ProgressPillar";
+                pillar.transform.parent = parent;
+                pillar.transform.position = pos + Vector3.up * 0.5f;
+                pillar.transform.localScale = new Vector3(0.4f, 1f, 0.4f);
+                pillar.isStatic = true;
+
+                Color pillarColor;
+                if (totalSpent > 500)
+                    pillarColor = new Color(0.4f, 0.2f, 0.6f);
+                else if (totalSpent > 200)
+                    pillarColor = new Color(0.2f, 0.3f, 0.5f);
+                else
+                    pillarColor = new Color(0.35f, 0.3f, 0.25f);
+
+                pillar.GetComponent<Renderer>().material = ShaderCache.NewEmissive(pillarColor, 1.5f);
+            }
+        }
+    }
+
+    /// <summary>
+    /// Creates a stats board displaying lifetime run statistics.
+    /// Placed near the hub center on the east side.
+    /// </summary>
+    static void BuildStatsBoard(Transform parent)
+    {
+        Vector3 boardPos = new Vector3(14f, 1.5f, 10f);
+
+        var board = GameObject.CreatePrimitive(PrimitiveType.Cube);
+        board.name = "StatsBoard";
+        board.transform.parent = parent;
+        board.transform.position = boardPos;
+        board.transform.localScale = new Vector3(2f, 1.5f, 0.1f);
+        board.GetComponent<Renderer>().material = ShaderCache.NewLit(new Color(0.2f, 0.15f, 0.1f));
+        board.isStatic = true;
+
+        var textObj = new GameObject("StatsBoardText");
+        textObj.transform.parent = parent;
+        textObj.transform.position = boardPos + Vector3.forward * -0.06f;
+        var tm = textObj.AddComponent<TextMesh>();
+        tm.text = $"Runs: {MetaProgression.RunsCompleted}\n" +
+                  $"Best Floor: {MetaProgression.BestFloor}\n" +
+                  $"Total Kills: {MetaProgression.TotalKills}";
+        tm.fontSize = 24;
+        tm.characterSize = 0.05f;
+        tm.color = new Color(0.8f, 0.7f, 0.5f);
+        tm.alignment = TextAlignment.Center;
+        tm.anchor = TextAnchor.MiddleCenter;
     }
 
     static void CreateHubWalls(Transform parent, int size, Color wallCol)

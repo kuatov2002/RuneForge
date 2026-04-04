@@ -225,13 +225,35 @@ public class RiftZone : MonoBehaviour
         var hp = other.GetComponent<Health>();
         if (hp == null || hp.IsDead) return;
 
-        // Slow enemies (reuse magma slow for 30% speed)
-        hp.ApplyMagmaSlow();
+        // Rift slow — 20% speed (stronger than magma)
+        hp.ApplyRiftSlow();
+        hp.IsMovementLocked = true;
 
         // DoT tick
         _tickTimer -= Time.deltaTime;
         if (_tickTimer > 0) return;
         _tickTimer = 0.5f;
         hp.TakeDamage(_dps, _spellElement);
+    }
+
+    void OnTriggerExit(Collider other)
+    {
+        if (other.GetComponent<PlayerController>() != null) return;
+        var hp = other.GetComponent<Health>();
+        if (hp != null)
+            hp.IsMovementLocked = false;
+    }
+
+    void OnDestroy()
+    {
+        // Clear movement lock on all enemies when zone is destroyed
+        Collider[] hits = Physics.OverlapSphere(transform.position, _radius);
+        foreach (var c in hits)
+        {
+            if (c.GetComponent<PlayerController>() != null) continue;
+            var hp = c.GetComponent<Health>();
+            if (hp != null)
+                hp.IsMovementLocked = false;
+        }
     }
 }

@@ -20,6 +20,40 @@ public static class ShopSystem
         public SpellMutationSystem.MutationDef mutation; // for Mutation type
     }
 
+    /// <summary>Tier-based relic pricing: cursed = cheap, common = mid, uncommon = expensive.</summary>
+    static int RelicPrice(RelicSO relic, int floor)
+    {
+        if (relic.isCursed)
+            return 50 + floor * 8;
+
+        // Common tier
+        switch (relic.relicType)
+        {
+            case RelicType.SpeedBoost: case RelicType.GaleRing:
+            case RelicType.Lucky: case RelicType.Regeneration:
+            case RelicType.Aftershock: case RelicType.QuickSwap:
+            case RelicType.DashRecharge: case RelicType.GoldRush:
+            case RelicType.LowTide: case RelicType.Underdog:
+            case RelicType.CrowdedRoom: case RelicType.ChargeHoarder:
+            case RelicType.Cartographer: case RelicType.EscapeArtist:
+            case RelicType.Scavenger:
+                return 40 + floor * 8;
+        }
+
+        // Rare tier
+        switch (relic.relicType)
+        {
+            case RelicType.LastStand: case RelicType.ReactorCore:
+            case RelicType.Minimalist: case RelicType.Monolith:
+            case RelicType.Gambler: case RelicType.Cascade:
+            case RelicType.PhantomCaster: case RelicType.ReactionCatalyst:
+                return 120 + floor * 15;
+        }
+
+        // Uncommon tier (default)
+        return 70 + floor * 12;
+    }
+
     /// <summary>Apply Haggler meta-upgrade discount to a price.</summary>
     static int ApplyDiscount(int basePrice)
     {
@@ -43,7 +77,7 @@ public static class ShopSystem
                 type = ShopItemType.Relic,
                 name = relic.relicName,
                 description = relic.description,
-                price = ApplyDiscount(60 + floor * 10),
+                price = ApplyDiscount(RelicPrice(relic, floor)),
                 color = relic.color,
                 relic = relic
             });
@@ -103,7 +137,7 @@ public static class ShopSystem
                     type = ShopItemType.CursedRelic,
                     name = cursed.relicName,
                     description = cursed.description,
-                    price = ApplyDiscount(50 + floor * 8),
+                    price = ApplyDiscount(RelicPrice(cursed, floor)),
                     color = cursed.color,
                     relic = cursed
                 });
@@ -116,7 +150,7 @@ public static class ShopSystem
                     type = ShopItemType.Relic,
                     name = relic2.relicName,
                     description = relic2.description,
-                    price = ApplyDiscount(75 + floor * 10),
+                    price = ApplyDiscount(RelicPrice(relic2, floor)),
                     color = relic2.color,
                     relic = relic2
                 });

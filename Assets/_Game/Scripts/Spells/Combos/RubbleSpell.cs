@@ -11,7 +11,7 @@ public static class RubbleSpell
     {
         if (charged) { radius *= 1.3f; damagePerWave *= 1.4f; }
 
-        int waves = charged ? 5 : 3;
+        int waves = charged ? 3 : 2;
         float interval = duration / waves;
 
         var player = Object.FindAnyObjectByType<PlayerController>();
@@ -60,6 +60,7 @@ public class RubbleStorm : MonoBehaviour
     Vector3 _center;
     float _damage;
     float _radius;
+    int _totalWaves;
     int _wavesRemaining;
     float _interval;
     float _timer;
@@ -71,6 +72,7 @@ public class RubbleStorm : MonoBehaviour
         _center = center;
         _damage = damage;
         _radius = radius;
+        _totalWaves = waves;
         _wavesRemaining = waves;
         _interval = interval;
         _timer = 0;
@@ -124,7 +126,9 @@ public class RubbleStorm : MonoBehaviour
             if (hp != null && !hp.IsDead)
             {
                 hp.TakeDamage(_damage, _spellElement);
-                hp.ApplyStun(0.5f);
+                int waveIndex = _totalWaves - _wavesRemaining - 1;
+                float stunDuration = 0.5f + waveIndex * 0.3f;
+                hp.ApplyStun(stunDuration);
             }
         }
 

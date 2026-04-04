@@ -14,11 +14,12 @@ public class MirrorKnightBoss : MonoBehaviour
     Renderer[] renderers;
     bool isDead;
     bool phase2;
+    BossEnrage enrage;
 
     enum State { Stalk, DashCombo, Parry, ShieldBash, MirrorClones, SweepSlash, Recover }
     State state = State.Stalk;
     float stateTimer;
-    float actionCooldown = 1.5f;
+    float actionCooldown = 0.9f;
 
     // Dash combo
     int dashComboCount;
@@ -37,11 +38,24 @@ public class MirrorKnightBoss : MonoBehaviour
     float sweepAngle;
     float sweepDir;
 
+    float stalkProjectileTimer = 0.8f;
+    float cloneRespawnTimer = 12f;
+
     // Shield reflects projectiles when not vulnerable
     bool isVulnerable;
     public bool IsShielded => !isVulnerable;
 
     public bool ShouldBlockDamage() => !isVulnerable;
+
+    /// <summary>Called when player projectile hits while shielded. Reflects it back.</summary>
+    public bool TryReflectProjectile(Vector3 hitPos)
+    {
+        if (isVulnerable) return false;
+        Vector3 reflectDir = (target.position - transform.position).normalized;
+        EnemyProjectile.Create(hitPos + Vector3.up * 0.5f, reflectDir, 10f, 2, new Color(0.8f, 0.3f, 0.3f), null);
+        SFXSystem.Play(SFXSystem.SFXType.ShieldBlock, hitPos, 0.5f);
+        return true;
+    }
 
     void Start()
     {
@@ -67,6 +81,7 @@ public class MirrorKnightBoss : MonoBehaviour
                 }
             };
         }
+        enrage = GetComponent<BossEnrage>();
     }
 
     void Update()
@@ -78,6 +93,25 @@ public class MirrorKnightBoss : MonoBehaviour
         Vector3 toPlayer = target.position - transform.position;
         toPlayer.y = 0;
         float dist = toPlayer.magnitude;
+
+        // Phase 2: auto-respawn clones every 12s
+        if (phase2)
+        {
+            clones.RemoveAll(c => c == null);
+            cloneRespawnTimer -= Time.deltaTime;
+            if (cloneRespawnTimer <= 0 && clones.Count == 0 && state != State.MirrorClones)
+            {
+                cloneRespawnTimer = 12f;
+                // Spawn clones inline without changing state
+                for (int i = 0; i < 2; i++)
+                {
+                    Vector3 toP = target.position - transform.position; toP.y = 0;
+                    Vector3 perp = Vector3.Cross(toP.normalized, Vector3.up) * (i == 0 ? 1 : -1);
+                    SpawnClone(target.position + perp * 4f);
+                }
+                SFXSystem.Play(SFXSystem.SFXType.DualCast, transform.position);
+            }
+        }
 
         switch (state)
         {
@@ -112,7 +146,8 @@ public class MirrorKnightBoss : MonoBehaviour
         transform.rotation = Quaternion.LookRotation(dir);
 
         // Circle the player at medium distance
-        float speed = phase2 ? moveSpeed * 1.3f : moveSpeed;
+        float enrageSpeed = enrage != null ? enrage.SpeedMultiplier : 1f;
+        float speed = (phase2 ? moveSpeed * 1.3f : moveSpeed) * enrageSpeed;
         if (dist > 5f)
         {
             rb.MovePosition(transform.position + dir * speed * speedMult * Time.deltaTime);
@@ -130,7 +165,25 @@ public class MirrorKnightBoss : MonoBehaviour
             rb.MovePosition(transform.position + strafe * speed * speedMult * Time.deltaTime);
         }
 
-        actionCooldown -= Time.deltaTime;
+        // Passive projectile harassment during stalk
+        stalkProjectileTimer -= Time.deltaTime;
+        if (stalkProjectileTimer <= 0)
+        {
+            stalkProjectileTimer = 0.8f;
+            int count = Random.Range(1, 3);
+            for (int i = 0; i < count; i++)
+            {
+                Vector3 projDir = toPlayer.normalized;
+                projDir = Quaternion.Euler(0, Random.Range(-10f, 10f), 0) * projDir;
+                EnemyProjectile.Create(
+                    transform.position + Vector3.up * 1f + transform.forward * 0.5f,
+                    projDir, 8f, 2, new Color(0.6f, 0.6f, 0.9f), null);
+            }
+            SFXSystem.Play(SFXSystem.SFXType.Cast, transform.position, 0.3f);
+        }
+
+        float cdSpeed = enrage != null ? 1f / enrage.CooldownMultiplier : 1f;
+        actionCooldown -= Time.deltaTime * cdSpeed;
         if (actionCooldown > 0) return;
 
         // Attack selection — always aggressive
@@ -202,6 +255,7 @@ public class MirrorKnightBoss : MonoBehaviour
         transform.rotation = Quaternion.LookRotation(dashDir);
 
         // Damage on contact during dash
+        float dmgMult = enrage != null ? enrage.DamageMultiplier : 1f;
         Collider[] hits = Physics.OverlapSphere(transform.position, 1.5f);
         foreach (var h in hits)
         {
@@ -210,7 +264,7 @@ public class MirrorKnightBoss : MonoBehaviour
             var hp = h.GetComponent<Health>();
             if (hp != null && !hp.IsDead)
             {
-                hp.TakeDamage(attackDamage);
+                hp.TakeDamage(Mathf.CeilToInt(attackDamage * dmgMult));
                 if (GameFeel.Instance != null) GameFeel.Instance.Hitstop(0.04f);
             }
         }
@@ -248,7 +302,7 @@ public class MirrorKnightBoss : MonoBehaviour
 
                 state = State.Recover;
                 stateTimer = phase2 ? 0.8f : 1.2f;
-                actionCooldown = phase2 ? 0.6f : 1f;
+                actionCooldown = phase2 ? 0.36f : 0.6f;
             }
             else
             {
@@ -263,7 +317,7 @@ public class MirrorKnightBoss : MonoBehaviour
     void StartParry()
     {
         state = State.Parry;
-        parryWindow = phase2 ? 1.2f : 1f;
+        parryWindow = 0.7f;
         parryTriggered = false;
         isVulnerable = false;
 
@@ -307,31 +361,56 @@ public class MirrorKnightBoss : MonoBehaviour
         if (state != State.Parry || parryTriggered) return;
         parryTriggered = true;
 
-        // Counter-attack: instant dash to player + AoE
-        Vector3 toP = target.position - transform.position; toP.y = 0;
-        transform.position = target.position - toP.normalized * 1.5f;
-
-        float radius = 3f;
-        Collider[] hits = Physics.OverlapSphere(transform.position, radius);
-        foreach (var h in hits)
-        {
-            var pc = h.GetComponent<PlayerController>();
-            if (pc == null || pc.isInvulnerable) continue;
-            var hp = h.GetComponent<Health>();
-            if (hp != null && !hp.IsDead) hp.TakeDamage(attackDamage + 2);
-        }
-
-        SpawnSlashVFX(transform.position, radius);
-        if (TopDownCamera.Instance != null) TopDownCamera.Instance.AddTrauma(0.5f);
-        if (GameFeel.Instance != null) GameFeel.Instance.Hitstop(0.06f);
-        SFXSystem.Play(SFXSystem.SFXType.Explosion, transform.position);
+        // Check if Perfect Parry (hit in last 0.1s of window)
+        bool perfectParry = parryWindow <= 0.1f;
 
         foreach (var r in renderers)
             if (r != null) r.material.SetColor("_EmissionColor", Color.black);
 
-        state = State.Recover;
-        stateTimer = 0.5f;
-        actionCooldown = 1f;
+        if (perfectParry)
+        {
+            // Perfect Parry: Knight stunned 2s, shield dropped — big reward
+            health.ApplyStun(2f);
+            isVulnerable = true;
+            foreach (var r in renderers)
+                if (r != null) r.material.color = new Color(1f, 0.8f, 0.2f);
+
+            if (TopDownCamera.Instance != null) TopDownCamera.Instance.AddTrauma(0.6f);
+            if (GameFeel.Instance != null) GameFeel.Instance.Hitstop(0.08f);
+            SFXSystem.Play(SFXSystem.SFXType.Explosion, transform.position);
+            GameFeel.ScreenFlash(new Color(1f, 0.9f, 0.3f), 0.3f);
+
+            state = State.Recover;
+            stateTimer = 2f;
+            actionCooldown = 0.6f;
+        }
+        else
+        {
+            // Normal parry hit: 5 damage counter + teleport behind player (punishment)
+            Vector3 behindPlayer = target.position - target.forward * 2f;
+            behindPlayer.y = 0;
+            transform.position = behindPlayer;
+
+            float dmgMult = enrage != null ? enrage.DamageMultiplier : 1f;
+            float radius = 3f;
+            Collider[] hits = Physics.OverlapSphere(transform.position, radius);
+            foreach (var h in hits)
+            {
+                var pc = h.GetComponent<PlayerController>();
+                if (pc == null || pc.isInvulnerable) continue;
+                var hp = h.GetComponent<Health>();
+                if (hp != null && !hp.IsDead) hp.TakeDamage(Mathf.CeilToInt(5 * dmgMult));
+            }
+
+            SpawnSlashVFX(transform.position, radius, new Color(1f, 0.3f, 0.3f));
+            if (TopDownCamera.Instance != null) TopDownCamera.Instance.AddTrauma(0.5f);
+            if (GameFeel.Instance != null) GameFeel.Instance.Hitstop(0.06f);
+            SFXSystem.Play(SFXSystem.SFXType.Explosion, transform.position);
+
+            state = State.Recover;
+            stateTimer = 0.5f;
+            actionCooldown = 0.6f;
+        }
     }
 
     // --- SHIELD BASH: short dash + stun ---
@@ -383,7 +462,7 @@ public class MirrorKnightBoss : MonoBehaviour
             else
             {
                 state = State.Stalk;
-                actionCooldown = 0.8f;
+                actionCooldown = 0.48f;
             }
         }
     }
@@ -434,7 +513,7 @@ public class MirrorKnightBoss : MonoBehaviour
 
             state = State.Recover;
             stateTimer = phase2 ? 0.6f : 1f;
-            actionCooldown = 0.8f;
+            actionCooldown = 0.48f;
         }
     }
 
@@ -463,7 +542,7 @@ public class MirrorKnightBoss : MonoBehaviour
             }
 
             state = State.Stalk;
-            actionCooldown = 3f;
+            actionCooldown = 1.8f;
         }
     }
 
@@ -485,7 +564,7 @@ public class MirrorKnightBoss : MonoBehaviour
         cloneRb.useGravity = false; cloneRb.isKinematic = true;
 
         var ai = clone.AddComponent<MirrorCloneAI>();
-        ai.Setup(target, attackDamage, chargeSpeed);
+        ai.Setup(target, attackDamage, chargeSpeed, this);
 
         clones.Add(clone);
         Destroy(clone, 6f);
@@ -552,13 +631,17 @@ public class MirrorCloneAI : MonoBehaviour
     bool dashing;
     Rigidbody rb;
     int dashesLeft = 2;
+    MirrorKnightBoss knight;
+    float copyDelay = 0.5f;
+    bool copyTriggered;
 
-    public void Setup(Transform tgt, int dmg, float spd)
+    public void Setup(Transform tgt, int dmg, float spd, MirrorKnightBoss boss = null)
     {
         target = tgt;
         damage = dmg;
         speed = spd;
         rb = GetComponent<Rigidbody>();
+        knight = boss;
     }
 
     void Update()
@@ -601,7 +684,6 @@ public class MirrorCloneAI : MonoBehaviour
                 dashesLeft--;
                 if (dashesLeft <= 0)
                 {
-                    // Despawn VFX
                     var vfx = GameObject.CreatePrimitive(PrimitiveType.Sphere);
                     Destroy(vfx.GetComponent<SphereCollider>());
                     vfx.transform.position = transform.position + Vector3.up;
