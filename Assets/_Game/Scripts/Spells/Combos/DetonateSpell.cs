@@ -98,7 +98,7 @@ public static class DetonateSpell
             }
         }
 
-        // Check SpellInteractionSystem for fire interactions with existing zones
+        // Fire interactions with airborne zones (steam, poison clouds)
         Collider[] zones = Physics.OverlapSphere(pos, radius);
         foreach (var z in zones)
         {

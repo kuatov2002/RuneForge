@@ -182,6 +182,10 @@ public class PlagueSparkProjectile : MonoBehaviour
         if (other.GetComponent<ZoneProjectile>() != null) return;
         if (other.GetComponent<SpellProjectile>() != null) return;
 
+        // Poison zone interactions (steam → toxic mist, cyclone → plague vortex)
+        if (SpellInteractionSystem.TryInteraction(ElementType.Poison, other, transform.position, _damage))
+        { _hit = true; Destroy(gameObject); return; }
+
         var hp = other.GetComponent<Health>();
         if (hp != null && !hp.IsDead)
         {

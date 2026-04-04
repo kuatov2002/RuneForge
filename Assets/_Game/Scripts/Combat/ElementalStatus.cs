@@ -10,7 +10,7 @@ using System.Collections.Generic;
 public class ElementalStatus : MonoBehaviour
 {
     // ── Events ──────────────────────────────────────────────
-    /// <summary>Fired when a reaction occurs. Same signature as SpellInteractionSystem.OnReaction.</summary>
+    /// <summary>Fired when a reaction occurs (status mixing on enemies).</summary>
     public static event Action<string, Vector3, Color> OnReaction;
 
     /// <summary>Fired when a status is added or removed on this enemy. (type, added)</summary>

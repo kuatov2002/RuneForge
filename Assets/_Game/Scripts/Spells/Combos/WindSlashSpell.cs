@@ -99,6 +99,10 @@ public class WindBladeProjectile : MonoBehaviour
         if (other.GetComponent<PlayerController>() != null) return;
         if (other.GetComponent<WindBladeProjectile>() != null) return;
 
+        // Air zone interactions (steam → steam blast, plague → pandemic, cyclone → updraft)
+        if (SpellInteractionSystem.TryInteraction(ElementType.Air, other, transform.position, _damage))
+        { Destroy(gameObject); return; }
+
         var hp = other.GetComponent<Health>();
         if (hp == null || hp.IsDead) return;
 

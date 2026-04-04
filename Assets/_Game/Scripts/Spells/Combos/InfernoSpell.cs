@@ -128,7 +128,7 @@ public class FireballProjectile : MonoBehaviour
         if (other.GetComponent<FireballProjectile>() != null) return;
         if (other.GetComponent<SpellProjectile>() != null) return;
 
-        // Check spell zone interactions (Fire + Steam, Fire + Permafrost, etc.)
+        // Fire interactions with airborne zones (steam, poison clouds)
         if (SpellInteractionSystem.TryFireInteraction(other, transform.position, _damage))
         { Explode(); return; }
 

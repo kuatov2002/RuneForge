@@ -66,11 +66,10 @@ public class SpellProjectile : MonoBehaviour
         if (other.GetComponent<SpellProjectile>() != null) return;
         if (hitTargets.Contains(other)) return;
 
-        // Check if we hit a steam cloud (Fire ignites steam)
-        var steam = other.GetComponent<SteamCloudZone>();
-        if (steam != null)
+        // Check zone interactions (element-dependent)
+        ElementType elemType = element != null ? element.elementType : ElementType.Fire;
+        if (SpellInteractionSystem.TryInteraction(elemType, other, transform.position, damage))
         {
-            steam.Ignite();
             Destroy(gameObject);
             return;
         }
