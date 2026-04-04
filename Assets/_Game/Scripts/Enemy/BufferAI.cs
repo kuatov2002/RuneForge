@@ -377,16 +377,6 @@ public class EnemyBuff : MonoBehaviour
     }
 }
 
-/// <summary>Faces camera at all times (for floating text labels).</summary>
-public class BillboardText : MonoBehaviour
-{
-    void LateUpdate()
-    {
-        if (Camera.main != null)
-            transform.rotation = Camera.main.transform.rotation;
-    }
-}
-
 /// <summary>
 /// Simple expanding ring VFX used by Buffer's War Cry.
 /// </summary>

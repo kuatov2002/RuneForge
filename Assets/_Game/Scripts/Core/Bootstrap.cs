@@ -2365,7 +2365,7 @@ public class Bootstrap : MonoBehaviour
         BuildBody(e.transform, c, 2.5f);
         e.transform.position = new Vector3(6, 0, 10);
         var rb = e.AddComponent<Rigidbody>(); rb.useGravity = false; rb.isKinematic = true;
-        var hp = e.AddComponent<Health>(); hp.maxHP = 80; hp.currentHP = 80;
+        var hp = e.AddComponent<Health>(); hp.maxHP = 320; hp.currentHP = 320;
         e.AddComponent<EnemyHealthBar>();
         e.AddComponent<ElementalStatus>();
         e.AddComponent<ElementalStatusVisuals>();
@@ -2394,7 +2394,7 @@ public class Bootstrap : MonoBehaviour
         }
         e.transform.position = new Vector3(6, 0, 10);
         var rb = e.AddComponent<Rigidbody>(); rb.useGravity = false; rb.isKinematic = true;
-        var hp = e.AddComponent<Health>(); hp.maxHP = 110; hp.currentHP = 110;
+        var hp = e.AddComponent<Health>(); hp.maxHP = 440; hp.currentHP = 440;
         e.AddComponent<EnemyHealthBar>();
         e.AddComponent<ElementalStatus>();
         e.AddComponent<ElementalStatusVisuals>();
@@ -2427,7 +2427,7 @@ public class Bootstrap : MonoBehaviour
         shieldVis.GetComponent<Renderer>().material = MakeEmissive(new Color(0.5f, 0.5f, 0.8f));
         e.transform.position = new Vector3(6, 0, 10);
         var rb = e.AddComponent<Rigidbody>(); rb.useGravity = false; rb.isKinematic = true;
-        var hp = e.AddComponent<Health>(); hp.maxHP = 140; hp.currentHP = 140;
+        var hp = e.AddComponent<Health>(); hp.maxHP = 560; hp.currentHP = 560;
         e.AddComponent<EnemyHealthBar>();
         e.AddComponent<ElementalStatus>();
         e.AddComponent<ElementalStatusVisuals>();
@@ -2458,7 +2458,7 @@ public class Bootstrap : MonoBehaviour
         tip.GetComponent<Renderer>().material = MakeEmissive(new Color(0.6f, 0f, 1f));
         e.transform.position = new Vector3(6, 0, 10);
         var rb = e.AddComponent<Rigidbody>(); rb.useGravity = false; rb.isKinematic = true;
-        var hp = e.AddComponent<Health>(); hp.maxHP = 180; hp.currentHP = 180;
+        var hp = e.AddComponent<Health>(); hp.maxHP = 720; hp.currentHP = 720;
         e.AddComponent<EnemyHealthBar>();
         e.AddComponent<ElementalStatus>();
         e.AddComponent<ElementalStatusVisuals>();
@@ -2486,7 +2486,7 @@ public class Bootstrap : MonoBehaviour
         }
         e.transform.position = new Vector3(6, 0, 10);
         var rb = e.AddComponent<Rigidbody>(); rb.useGravity = false; rb.isKinematic = true;
-        var hp = e.AddComponent<Health>(); hp.maxHP = 220; hp.currentHP = 220;
+        var hp = e.AddComponent<Health>(); hp.maxHP = 880; hp.currentHP = 880;
         e.AddComponent<EnemyHealthBar>();
         e.AddComponent<ElementalStatus>();
         e.AddComponent<ElementalStatusVisuals>();
