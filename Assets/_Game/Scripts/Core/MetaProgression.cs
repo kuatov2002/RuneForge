@@ -2,185 +2,154 @@ using UnityEngine;
 
 public static class MetaProgression
 {
-    // ─── KEYS ───────────────────────────────────────────────────
-    const string KEY_CURRENCY = "meta_currency";
-    const string KEY_RUNS_COMPLETED = "meta_runs_completed";
-    const string KEY_BEST_FLOOR = "meta_best_floor";
-    const string KEY_TOTAL_KILLS = "meta_total_kills";
-    const string KEY_TOTAL_ESSENCE_SPENT = "meta_total_essence_spent";
-
-    // Path A upgrade keys (original)
-    const string KEY_MAX_HP_BONUS = "meta_maxhp_bonus";
-    const string KEY_BASE_DAMAGE = "meta_base_damage";
-    const string KEY_DASH_CHARGES = "meta_dash_charges";
-    const string KEY_SPEED_BONUS = "meta_speed_bonus";
-    const string KEY_STARTING_GOLD = "meta_starting_gold";
-    const string KEY_POTION_SLOT = "meta_potion_slot";
-    const string KEY_CRIT_CHANCE = "meta_crit_chance";
-    const string KEY_REROLLS = "meta_rerolls";
-    const string KEY_STARTING_RELIC = "meta_starting_relic";
-    const string KEY_ELEMENT_UNLOCK = "meta_elem_unlock_";
-
-    // Path B upgrade keys
-    const string KEY_SECOND_WIND = "meta_second_wind";
-    const string KEY_SPELL_MASTERY = "meta_spell_mastery";
-    const string KEY_PHASE_STEP = "meta_phase_step";
-    const string KEY_BLINK_STRIKE = "meta_blink_strike";
-    const string KEY_HAGGLER = "meta_haggler";
-    const string KEY_ELEM_MASTERY = "meta_elem_mastery";
-    const string KEY_BLOOD_MAGE = "meta_blood_mage";
-    const string KEY_LUCKY_FIND = "meta_lucky_find";
-    const string KEY_CURSED_HEIRLOOM = "meta_cursed_heirloom";
-
-    // Path choice key prefix: stores "A" or "B"
-    const string KEY_UPGRADE_PATH = "meta_upgrade_path_";
+    static SaveData D => SaveSystem.Data;
 
     // ─── CURRENCY ───────────────────────────────────────────────
 
     public static int Currency
     {
-        get => PlayerPrefs.GetInt(KEY_CURRENCY, 0);
-        set { PlayerPrefs.SetInt(KEY_CURRENCY, value); PlayerPrefs.Save(); }
+        get => D.currency;
+        set { D.currency = value; SaveSystem.Save(); }
     }
 
     public static int RunsCompleted
     {
-        get => PlayerPrefs.GetInt(KEY_RUNS_COMPLETED, 0);
-        set { PlayerPrefs.SetInt(KEY_RUNS_COMPLETED, value); PlayerPrefs.Save(); }
+        get => D.runsCompleted;
+        set { D.runsCompleted = value; SaveSystem.Save(); }
     }
 
     public static int BestFloor
     {
-        get => PlayerPrefs.GetInt(KEY_BEST_FLOOR, 0);
+        get => D.bestFloor;
         set
         {
-            if (value > PlayerPrefs.GetInt(KEY_BEST_FLOOR, 0))
-            { PlayerPrefs.SetInt(KEY_BEST_FLOOR, value); PlayerPrefs.Save(); }
+            if (value > D.bestFloor)
+            { D.bestFloor = value; SaveSystem.Save(); }
         }
     }
 
     public static int TotalKills
     {
-        get => PlayerPrefs.GetInt(KEY_TOTAL_KILLS, 0);
-        set { PlayerPrefs.SetInt(KEY_TOTAL_KILLS, value); PlayerPrefs.Save(); }
+        get => D.totalKills;
+        set { D.totalKills = value; SaveSystem.Save(); }
     }
 
     public static int TotalEssenceSpent
     {
-        get => PlayerPrefs.GetInt(KEY_TOTAL_ESSENCE_SPENT, 0);
-        set { PlayerPrefs.SetInt(KEY_TOTAL_ESSENCE_SPENT, value); PlayerPrefs.Save(); }
+        get => D.totalEssenceSpent;
+        set { D.totalEssenceSpent = value; SaveSystem.Save(); }
     }
 
     // ─── PATH A UPGRADE LEVELS ────────────────────────────────
 
     public static int MaxHPBonus
     {
-        get => PlayerPrefs.GetInt(KEY_MAX_HP_BONUS, 0);
-        set { PlayerPrefs.SetInt(KEY_MAX_HP_BONUS, value); PlayerPrefs.Save(); }
+        get => D.maxHPBonus;
+        set { D.maxHPBonus = value; SaveSystem.Save(); }
     }
 
     public static int BaseDamageLevel
     {
-        get => PlayerPrefs.GetInt(KEY_BASE_DAMAGE, 0);
-        set { PlayerPrefs.SetInt(KEY_BASE_DAMAGE, value); PlayerPrefs.Save(); }
+        get => D.baseDamage;
+        set { D.baseDamage = value; SaveSystem.Save(); }
     }
 
     public static int DashChargesLevel
     {
-        get => PlayerPrefs.GetInt(KEY_DASH_CHARGES, 0);
-        set { PlayerPrefs.SetInt(KEY_DASH_CHARGES, value); PlayerPrefs.Save(); }
+        get => D.dashCharges;
+        set { D.dashCharges = value; SaveSystem.Save(); }
     }
 
     public static int SpeedBonusLevel
     {
-        get => PlayerPrefs.GetInt(KEY_SPEED_BONUS, 0);
-        set { PlayerPrefs.SetInt(KEY_SPEED_BONUS, value); PlayerPrefs.Save(); }
+        get => D.speedBonus;
+        set { D.speedBonus = value; SaveSystem.Save(); }
     }
 
     public static int StartingGoldLevel
     {
-        get => PlayerPrefs.GetInt(KEY_STARTING_GOLD, 0);
-        set { PlayerPrefs.SetInt(KEY_STARTING_GOLD, value); PlayerPrefs.Save(); }
+        get => D.startingGold;
+        set { D.startingGold = value; SaveSystem.Save(); }
     }
 
     public static int PotionSlotLevel
     {
-        get => PlayerPrefs.GetInt(KEY_POTION_SLOT, 0);
-        set { PlayerPrefs.SetInt(KEY_POTION_SLOT, value); PlayerPrefs.Save(); }
+        get => D.potionSlot;
+        set { D.potionSlot = value; SaveSystem.Save(); }
     }
 
     public static int CritChanceLevel
     {
-        get => PlayerPrefs.GetInt(KEY_CRIT_CHANCE, 0);
-        set { PlayerPrefs.SetInt(KEY_CRIT_CHANCE, value); PlayerPrefs.Save(); }
+        get => D.critChance;
+        set { D.critChance = value; SaveSystem.Save(); }
     }
 
     public static int Rerolls
     {
-        get => PlayerPrefs.GetInt(KEY_REROLLS, 0);
-        set { PlayerPrefs.SetInt(KEY_REROLLS, value); PlayerPrefs.Save(); }
+        get => D.rerolls;
+        set { D.rerolls = value; SaveSystem.Save(); }
     }
 
     public static int StartingRelicLevel
     {
-        get => PlayerPrefs.GetInt(KEY_STARTING_RELIC, 0);
-        set { PlayerPrefs.SetInt(KEY_STARTING_RELIC, value); PlayerPrefs.Save(); }
+        get => D.startingRelic;
+        set { D.startingRelic = value; SaveSystem.Save(); }
     }
 
     // ─── PATH B UPGRADE LEVELS ────────────────────────────────
 
     public static int SecondWindLevel
     {
-        get => PlayerPrefs.GetInt(KEY_SECOND_WIND, 0);
-        set { PlayerPrefs.SetInt(KEY_SECOND_WIND, value); PlayerPrefs.Save(); }
+        get => D.secondWind;
+        set { D.secondWind = value; SaveSystem.Save(); }
     }
 
     public static int SpellMasteryLevel
     {
-        get => PlayerPrefs.GetInt(KEY_SPELL_MASTERY, 0);
-        set { PlayerPrefs.SetInt(KEY_SPELL_MASTERY, value); PlayerPrefs.Save(); }
+        get => D.spellMastery;
+        set { D.spellMastery = value; SaveSystem.Save(); }
     }
 
     public static int PhaseStepLevel
     {
-        get => PlayerPrefs.GetInt(KEY_PHASE_STEP, 0);
-        set { PlayerPrefs.SetInt(KEY_PHASE_STEP, value); PlayerPrefs.Save(); }
+        get => D.phaseStep;
+        set { D.phaseStep = value; SaveSystem.Save(); }
     }
 
     public static int BlinkStrikeLevel
     {
-        get => PlayerPrefs.GetInt(KEY_BLINK_STRIKE, 0);
-        set { PlayerPrefs.SetInt(KEY_BLINK_STRIKE, value); PlayerPrefs.Save(); }
+        get => D.blinkStrike;
+        set { D.blinkStrike = value; SaveSystem.Save(); }
     }
 
     public static int HagglerLevel
     {
-        get => PlayerPrefs.GetInt(KEY_HAGGLER, 0);
-        set { PlayerPrefs.SetInt(KEY_HAGGLER, value); PlayerPrefs.Save(); }
+        get => D.haggler;
+        set { D.haggler = value; SaveSystem.Save(); }
     }
 
     public static int ElemMasteryLevel
     {
-        get => PlayerPrefs.GetInt(KEY_ELEM_MASTERY, 0);
-        set { PlayerPrefs.SetInt(KEY_ELEM_MASTERY, value); PlayerPrefs.Save(); }
+        get => D.elemMastery;
+        set { D.elemMastery = value; SaveSystem.Save(); }
     }
 
     public static int BloodMageLevel
     {
-        get => PlayerPrefs.GetInt(KEY_BLOOD_MAGE, 0);
-        set { PlayerPrefs.SetInt(KEY_BLOOD_MAGE, value); PlayerPrefs.Save(); }
+        get => D.bloodMage;
+        set { D.bloodMage = value; SaveSystem.Save(); }
     }
 
     public static int LuckyFindLevel
     {
-        get => PlayerPrefs.GetInt(KEY_LUCKY_FIND, 0);
-        set { PlayerPrefs.SetInt(KEY_LUCKY_FIND, value); PlayerPrefs.Save(); }
+        get => D.luckyFind;
+        set { D.luckyFind = value; SaveSystem.Save(); }
     }
 
     public static int CursedHeirloomLevel
     {
-        get => PlayerPrefs.GetInt(KEY_CURSED_HEIRLOOM, 0);
-        set { PlayerPrefs.SetInt(KEY_CURSED_HEIRLOOM, value); PlayerPrefs.Save(); }
+        get => D.cursedHeirloom;
+        set { D.cursedHeirloom = value; SaveSystem.Save(); }
     }
 
     // ─── COMPUTED VALUES (Path A) ─────────────────────────────
@@ -195,50 +164,27 @@ public static class MetaProgression
 
     // ─── COMPUTED VALUES (Path B) ─────────────────────────────
 
-    /// <summary>Number of floors where player survives a lethal hit (1 HP instead of death).</summary>
     public static int SecondWindCharges => SecondWindLevel;
-
-    /// <summary>Bonus damage multiplier for same-element combos (e.g. Fire+Fire).</summary>
     public static float SpellMasteryBonus => 1f + SpellMasteryLevel * 0.08f;
-
-    /// <summary>Extra invulnerability duration on dash (seconds).</summary>
     public static float PhaseStepDuration => PhaseStepLevel * 0.3f;
-
-    /// <summary>Damage dealt when dashing through enemies.</summary>
     public static int BlinkStrikeDamage => BlinkStrikeLevel > 0 ? 1 + BlinkStrikeLevel * 2 : 0;
-
-    /// <summary>Shop price discount multiplier (e.g. 0.68 = 32% off).</summary>
     public static float HagglerDiscount => 1f - HagglerLevel * 0.08f;
-
-    /// <summary>Bonus multiplier for elemental reactions.</summary>
     public static float ReactionDamageBonus => 1f + ElemMasteryLevel * 0.10f;
-
-    /// <summary>Chance to heal 1 HP on enemy kill.</summary>
     public static float BloodMageChance => BloodMageLevel * 0.03f;
-
-    /// <summary>Chance for a bonus relic drop in rooms.</summary>
     public static float LuckyFindChance => LuckyFindLevel * 0.05f;
-
-    /// <summary>Start run with a cursed relic + bonus gold.</summary>
     public static bool HasCursedHeirloom => CursedHeirloomLevel > 0;
     public static int CursedHeirloomGold => HasCursedHeirloom ? 50 : 0;
 
     // ─── PATH CHOICE SYSTEM ──────────────────────────────────
 
-    /// <summary>Get active path for upgrade slot: "A" or "B". Defaults to "A".</summary>
-    public static string GetChosenPath(string upgradeId)
-    {
-        return PlayerPrefs.GetString(KEY_UPGRADE_PATH + upgradeId, "A");
-    }
+    public static string GetChosenPath(string upgradeId) => D.GetPath(upgradeId);
 
-    /// <summary>Set the active path for an upgrade slot.</summary>
     public static void ChoosePath(string upgradeId, string path)
     {
-        PlayerPrefs.SetString(KEY_UPGRADE_PATH + upgradeId, path);
-        PlayerPrefs.Save();
+        D.SetPath(upgradeId, path);
+        SaveSystem.Save();
     }
 
-    /// <summary>Toggle active path A↔B for free. Each path keeps its own independent levels.</summary>
     public static void SwitchPath(UpgradeSlot slot)
     {
         string current = GetChosenPath(slot.pathA.id);
@@ -250,13 +196,16 @@ public static class MetaProgression
     {
         if (elemName == "Fire" || elemName == "Water" || elemName == "Earth" || elemName == "Air")
             return true;
-        return PlayerPrefs.GetInt(KEY_ELEMENT_UNLOCK + elemName, 0) > 0;
+        return D.unlockedElements.Contains(elemName);
     }
 
     public static void UnlockElement(string elemName)
     {
-        PlayerPrefs.SetInt(KEY_ELEMENT_UNLOCK + elemName, 1);
-        PlayerPrefs.Save();
+        if (!D.unlockedElements.Contains(elemName))
+        {
+            D.unlockedElements.Add(elemName);
+            SaveSystem.Save();
+        }
     }
 
     // ─── UPGRADE DEFINITIONS ────────────────────────────────────
@@ -273,7 +222,6 @@ public static class MetaProgression
         public System.Func<int, int> getCost;
     }
 
-    /// <summary>Paired upgrade slot: Path A and Path B are mutually exclusive.</summary>
     public struct UpgradeSlot
     {
         public UpgradeDef pathA;
@@ -282,7 +230,6 @@ public static class MetaProgression
 
     public static UpgradeSlot[] AllUpgradeSlots => new UpgradeSlot[]
     {
-        // Slot 1: Vitality vs Second Wind
         new() {
             pathA = new() { id = "maxhp", name = "Resilience", description = "+1 Max HP",
                 maxLevel = 5, color = new Color(0.9f, 0.2f, 0.2f),
@@ -293,7 +240,6 @@ public static class MetaProgression
                 getLevel = () => SecondWindLevel, setLevel = v => SecondWindLevel = v,
                 getCost = lvl => 100 + lvl * 50 },
         },
-        // Slot 2: Arcane Power vs Spell Mastery
         new() {
             pathA = new() { id = "damage", name = "Arcane Power", description = "+5% Spell Damage",
                 maxLevel = 8, color = new Color(0.9f, 0.5f, 0.1f),
@@ -304,7 +250,6 @@ public static class MetaProgression
                 getLevel = () => SpellMasteryLevel, setLevel = v => SpellMasteryLevel = v,
                 getCost = lvl => 70 + lvl * 35 },
         },
-        // Slot 3: Swift Feet vs Phase Step
         new() {
             pathA = new() { id = "speed", name = "Swift Feet", description = "+8% Move Speed",
                 maxLevel = 5, color = new Color(0.3f, 0.8f, 1f),
@@ -315,7 +260,6 @@ public static class MetaProgression
                 getLevel = () => PhaseStepLevel, setLevel = v => PhaseStepLevel = v,
                 getCost = lvl => 80 + lvl * 40 },
         },
-        // Slot 4: Shadow Step vs Blink Strike
         new() {
             pathA = new() { id = "dash", name = "Shadow Step", description = "+1 Dash Charge",
                 maxLevel = 2, color = new Color(0.5f, 0.3f, 0.8f),
@@ -326,7 +270,6 @@ public static class MetaProgression
                 getLevel = () => BlinkStrikeLevel, setLevel = v => BlinkStrikeLevel = v,
                 getCost = lvl => 120 + lvl * 80 },
         },
-        // Slot 5: Merchant's Favor vs Haggler
         new() {
             pathA = new() { id = "gold", name = "Merchant's Favor", description = "+25 Starting Gold",
                 maxLevel = 4, color = new Color(1f, 0.85f, 0.2f),
@@ -337,7 +280,6 @@ public static class MetaProgression
                 getLevel = () => HagglerLevel, setLevel = v => HagglerLevel = v,
                 getCost = lvl => 50 + lvl * 25 },
         },
-        // Slot 6: Precision vs Elemental Mastery
         new() {
             pathA = new() { id = "crit", name = "Precision", description = "+3% Critical Hit Chance",
                 maxLevel = 5, color = new Color(1f, 0.3f, 0.5f),
@@ -348,7 +290,6 @@ public static class MetaProgression
                 getLevel = () => ElemMasteryLevel, setLevel = v => ElemMasteryLevel = v,
                 getCost = lvl => 60 + lvl * 30 },
         },
-        // Slot 7: Alchemist's Gift vs Blood Mage
         new() {
             pathA = new() { id = "potion", name = "Alchemist's Gift", description = "+1 Healing Potion per Floor",
                 maxLevel = 3, color = new Color(0.3f, 0.9f, 0.4f),
@@ -359,7 +300,6 @@ public static class MetaProgression
                 getLevel = () => BloodMageLevel, setLevel = v => BloodMageLevel = v,
                 getCost = lvl => 80 + lvl * 50 },
         },
-        // Slot 8: Fate's Hand vs Lucky Find
         new() {
             pathA = new() { id = "reroll", name = "Fate's Hand", description = "+1 Rune Reroll",
                 maxLevel = 5, color = new Color(0.6f, 0.4f, 0.9f),
@@ -370,7 +310,6 @@ public static class MetaProgression
                 getLevel = () => LuckyFindLevel, setLevel = v => LuckyFindLevel = v,
                 getCost = lvl => 60 + lvl * 25 },
         },
-        // Slot 9: Heirloom vs Cursed Heirloom
         new() {
             pathA = new() { id = "relic", name = "Heirloom", description = "Start with a Random Relic",
                 maxLevel = 1, color = new Color(0.8f, 0.6f, 0.2f),
@@ -383,7 +322,6 @@ public static class MetaProgression
         },
     };
 
-    /// <summary>Flat list of all Path A upgrades for backward compatibility.</summary>
     public static UpgradeDef[] AllUpgrades
     {
         get
@@ -465,9 +403,6 @@ public static class MetaProgression
 
     // ─── STARTING LOADOUTS (Aspects) ─────────────────────────
 
-    const string KEY_LOADOUT_UNLOCK = "meta_loadout_";
-    const string KEY_SELECTED_LOADOUT = "meta_selected_loadout";
-
     public struct LoadoutDef
     {
         public string id;
@@ -504,7 +439,7 @@ public static class MetaProgression
     public static bool IsLoadoutUnlocked(string loadoutId)
     {
         if (loadoutId == "default") return true;
-        return PlayerPrefs.GetInt(KEY_LOADOUT_UNLOCK + loadoutId, 0) > 0;
+        return D.unlockedLoadouts.Contains(loadoutId);
     }
 
     public static bool TryUnlockLoadout(string loadoutId)
@@ -516,15 +451,15 @@ public static class MetaProgression
         if (Currency < def.Value.unlockCost) return false;
         Currency -= def.Value.unlockCost;
         TotalEssenceSpent += def.Value.unlockCost;
-        PlayerPrefs.SetInt(KEY_LOADOUT_UNLOCK + loadoutId, 1);
-        PlayerPrefs.Save();
+        D.unlockedLoadouts.Add(loadoutId);
+        SaveSystem.Save();
         return true;
     }
 
     public static string SelectedLoadout
     {
-        get => PlayerPrefs.GetString(KEY_SELECTED_LOADOUT, "default");
-        set { PlayerPrefs.SetString(KEY_SELECTED_LOADOUT, value); PlayerPrefs.Save(); }
+        get => D.selectedLoadout;
+        set { D.selectedLoadout = value; SaveSystem.Save(); }
     }
 
     public static LoadoutDef GetSelectedLoadoutDef()
@@ -535,8 +470,6 @@ public static class MetaProgression
     }
 
     // ─── COMBO DISCOVERY ───────────────────────────────────────
-
-    const string KEY_COMBO_DISCOVERED = "meta_combo_";
 
     public static readonly string[] AllComboIds = new[]
     {
@@ -558,15 +491,15 @@ public static class MetaProgression
 
     public static bool IsComboDiscovered(string comboId)
     {
-        return PlayerPrefs.GetInt(KEY_COMBO_DISCOVERED + comboId, 0) > 0;
+        return D.discoveredCombos.Contains(comboId);
     }
 
     public static void DiscoverCombo(string comboId)
     {
-        if (!IsComboDiscovered(comboId))
+        if (!D.discoveredCombos.Contains(comboId))
         {
-            PlayerPrefs.SetInt(KEY_COMBO_DISCOVERED + comboId, 1);
-            PlayerPrefs.Save();
+            D.discoveredCombos.Add(comboId);
+            SaveSystem.Save();
         }
     }
 
@@ -583,45 +516,8 @@ public static class MetaProgression
 
     // ─── RESET (debug) ─────────────────────────────────────────
 
-    static readonly string[] AllKeys = {
-        KEY_CURRENCY, KEY_RUNS_COMPLETED, KEY_BEST_FLOOR,
-        KEY_TOTAL_KILLS, KEY_TOTAL_ESSENCE_SPENT,
-        KEY_MAX_HP_BONUS, KEY_BASE_DAMAGE, KEY_DASH_CHARGES,
-        KEY_SPEED_BONUS, KEY_STARTING_GOLD, KEY_POTION_SLOT,
-        KEY_CRIT_CHANCE, KEY_REROLLS, KEY_STARTING_RELIC,
-        KEY_SELECTED_LOADOUT,
-        // Path B keys
-        KEY_SECOND_WIND, KEY_SPELL_MASTERY, KEY_PHASE_STEP,
-        KEY_BLINK_STRIKE, KEY_HAGGLER, KEY_ELEM_MASTERY,
-        KEY_BLOOD_MAGE, KEY_LUCKY_FIND, KEY_CURSED_HEIRLOOM,
-    };
-
-    // Upgrade IDs for path choice cleanup
-    static readonly string[] UpgradeIds = {
-        "maxhp", "damage", "speed", "dash", "gold", "crit", "potion", "reroll", "relic"
-    };
-
     public static void ResetAll()
     {
-        foreach (var key in AllKeys)
-            PlayerPrefs.DeleteKey(key);
-
-        // Delete path choices
-        foreach (var id in UpgradeIds)
-            PlayerPrefs.DeleteKey(KEY_UPGRADE_PATH + id);
-
-        // Delete element unlocks
-        foreach (var name in new[] { "Lightning", "Poison", "Void" })
-            PlayerPrefs.DeleteKey(KEY_ELEMENT_UNLOCK + name);
-
-        // Delete loadout unlocks
-        foreach (var loadout in AllLoadouts)
-            PlayerPrefs.DeleteKey(KEY_LOADOUT_UNLOCK + loadout.id);
-
-        // Delete combo discoveries
-        foreach (var id in AllComboIds)
-            PlayerPrefs.DeleteKey(KEY_COMBO_DISCOVERED + id);
-
-        PlayerPrefs.Save();
+        SaveSystem.ResetAll();
     }
 }

@@ -3,23 +3,21 @@ using UnityEngine;
 /// <summary>
 /// Heat/Ascension system for post-victory replayability.
 /// Each heat level adds modifiers that increase difficulty but also rewards.
-/// Stored in PlayerPrefs.
 /// </summary>
 public static class AscensionSystem
 {
-    const string KEY_HEAT = "ascension_heat";
-    const string KEY_MAX_HEAT = "ascension_max_heat";
+    static SaveData D => SaveSystem.Data;
 
     public static int CurrentHeat
     {
-        get => PlayerPrefs.GetInt(KEY_HEAT, 0);
-        set { PlayerPrefs.SetInt(KEY_HEAT, Mathf.Max(0, value)); PlayerPrefs.Save(); }
+        get => D.ascensionHeat;
+        set { D.ascensionHeat = Mathf.Max(0, value); SaveSystem.Save(); }
     }
 
     public static int MaxHeatUnlocked
     {
-        get => PlayerPrefs.GetInt(KEY_MAX_HEAT, 0);
-        set { PlayerPrefs.SetInt(KEY_MAX_HEAT, value); PlayerPrefs.Save(); }
+        get => D.ascensionMaxHeat;
+        set { D.ascensionMaxHeat = value; SaveSystem.Save(); }
     }
 
     /// <summary>Call after a successful run to unlock next heat level.</summary>

@@ -3,11 +3,9 @@ using System.Collections.Generic;
 
 /// <summary>
 /// Tracks discovered combos, relics, and reactions across runs.
-/// Persists via PlayerPrefs.
 /// </summary>
 public static class Codex
 {
-    const string KEY_PREFIX = "codex_";
     static HashSet<string> discoveredCombos = new();
     static HashSet<string> discoveredReactions = new();
     static HashSet<string> discoveredRelics = new();
@@ -18,25 +16,19 @@ public static class Codex
         if (loaded) return;
         loaded = true;
 
-        string comboData = PlayerPrefs.GetString(KEY_PREFIX + "combos", "");
-        if (!string.IsNullOrEmpty(comboData))
-            foreach (var s in comboData.Split('|')) if (s.Length > 0) discoveredCombos.Add(s);
-
-        string reactionData = PlayerPrefs.GetString(KEY_PREFIX + "reactions", "");
-        if (!string.IsNullOrEmpty(reactionData))
-            foreach (var s in reactionData.Split('|')) if (s.Length > 0) discoveredReactions.Add(s);
-
-        string relicData = PlayerPrefs.GetString(KEY_PREFIX + "relics", "");
-        if (!string.IsNullOrEmpty(relicData))
-            foreach (var s in relicData.Split('|')) if (s.Length > 0) discoveredRelics.Add(s);
+        var d = SaveSystem.Data;
+        foreach (var s in d.codexCombos) if (s.Length > 0) discoveredCombos.Add(s);
+        foreach (var s in d.codexReactions) if (s.Length > 0) discoveredReactions.Add(s);
+        foreach (var s in d.codexRelics) if (s.Length > 0) discoveredRelics.Add(s);
     }
 
     static void Save()
     {
-        PlayerPrefs.SetString(KEY_PREFIX + "combos", string.Join("|", discoveredCombos));
-        PlayerPrefs.SetString(KEY_PREFIX + "reactions", string.Join("|", discoveredReactions));
-        PlayerPrefs.SetString(KEY_PREFIX + "relics", string.Join("|", discoveredRelics));
-        PlayerPrefs.Save();
+        var d = SaveSystem.Data;
+        d.codexCombos = new List<string>(discoveredCombos);
+        d.codexReactions = new List<string>(discoveredReactions);
+        d.codexRelics = new List<string>(discoveredRelics);
+        SaveSystem.Save();
     }
 
     public static void DiscoverCombo(string comboName)

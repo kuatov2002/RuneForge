@@ -209,10 +209,10 @@ public class Bootstrap : MonoBehaviour
         ElementalStatus.OnReaction += OnSpellReaction;
 
         // Tutorial hints (first run only)
-        if (PlayerPrefs.GetInt("TutorialShown", 0) == 0)
+        if (!SaveSystem.Data.tutorialShown)
         {
-            PlayerPrefs.SetInt("TutorialShown", 1);
-            PlayerPrefs.Save();
+            SaveSystem.Data.tutorialShown = true;
+            SaveSystem.Save();
             ShowTutorialHints();
         }
     }

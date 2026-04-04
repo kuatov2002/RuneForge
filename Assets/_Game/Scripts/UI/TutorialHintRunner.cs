@@ -5,7 +5,7 @@ using System.Collections.Generic;
 /// <summary>
 /// Event-driven tutorial system. Shows contextual hints when the player
 /// performs specific actions for the first time.
-/// Persists shown hints across runs via PlayerPrefs.
+/// Persists shown hints across runs via SaveSystem.
 /// </summary>
 public class TutorialHintRunner : MonoBehaviour
 {
@@ -13,8 +13,6 @@ public class TutorialHintRunner : MonoBehaviour
     SpellCaster caster;
     PlayerController ctrl;
     HashSet<string> shownHints = new();
-
-    const string PREFS_PREFIX = "tutorial_";
 
     public void Run(GameHUD targetHud)
     {
@@ -109,13 +107,12 @@ public class TutorialHintRunner : MonoBehaviour
 
     void ShowOnce(string key, string text)
     {
-        // Check both runtime and persistent storage
         if (shownHints.Contains(key)) return;
-        if (PlayerPrefs.GetInt(PREFS_PREFIX + key, 0) > 0) return;
+        if (SaveSystem.Data.shownTutorialHints.Contains(key)) return;
 
         shownHints.Add(key);
-        PlayerPrefs.SetInt(PREFS_PREFIX + key, 1);
-        PlayerPrefs.Save();
+        SaveSystem.Data.shownTutorialHints.Add(key);
+        SaveSystem.Save();
 
         if (hud != null) hud.ShowHint(text, 6f);
     }
