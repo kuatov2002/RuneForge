@@ -176,6 +176,9 @@ public class WildfireBoltBehavior : MonoBehaviour
         if (SpellInteractionSystem.TryFireInteraction(other, transform.position, _damage))
         { _hit = true; SpawnHitBurst(transform.position); Destroy(gameObject); return; }
 
+        // Skip non-interactive trigger colliders (ground zones)
+        if (other.isTrigger && other.GetComponent<Health>() == null) return;
+
         var hp = other.GetComponent<Health>();
         if (hp != null && !hp.IsDead)
         {

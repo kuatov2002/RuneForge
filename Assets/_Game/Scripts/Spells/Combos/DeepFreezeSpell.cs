@@ -138,6 +138,9 @@ public class IceSpikeProjectile : MonoBehaviour
         if (SpellInteractionSystem.TryInteraction(ElementType.Water, other, transform.position, _damage))
         { Shatter(); return; }
 
+        // Skip non-interactive trigger colliders (ground zones)
+        if (other.isTrigger && other.GetComponent<Health>() == null) return;
+
         var hp = other.GetComponent<Health>();
         if (hp != null && !hp.IsDead)
         {

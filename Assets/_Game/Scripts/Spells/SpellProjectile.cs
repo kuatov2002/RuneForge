@@ -74,6 +74,9 @@ public class SpellProjectile : MonoBehaviour
             return;
         }
 
+        // Skip non-interactive trigger colliders (ground zones like magma, permafrost)
+        if (other.isTrigger && other.GetComponent<Health>() == null) return;
+
         var health = other.GetComponent<Health>();
         if (health != null && !health.IsDead)
         {

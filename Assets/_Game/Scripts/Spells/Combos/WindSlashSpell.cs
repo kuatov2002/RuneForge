@@ -103,6 +103,9 @@ public class WindBladeProjectile : MonoBehaviour
         if (SpellInteractionSystem.TryInteraction(ElementType.Air, other, transform.position, _damage))
         { Destroy(gameObject); return; }
 
+        // Skip non-interactive trigger colliders (ground zones)
+        if (other.isTrigger && other.GetComponent<Health>() == null) return;
+
         var hp = other.GetComponent<Health>();
         if (hp == null || hp.IsDead) return;
 
