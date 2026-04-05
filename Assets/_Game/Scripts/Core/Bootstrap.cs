@@ -1953,22 +1953,55 @@ public class Bootstrap : MonoBehaviour
 
     Vector3 FlankSpawnPos(int side)
     {
-        // Room is roughly 12x12; usable area 1.5-10.5
+        int w = RoomBuilder.LastWidth;
+        int h = RoomBuilder.LastHeight;
+        RoomShape shape = RoomBuilder.LastBuiltShape;
+        float halfW = w * 0.5f;
+        float halfH = h * 0.5f;
+
+        // Usable area: 1.5 inset from walls
+        float minBound = 1.5f;
+        float maxBoundX = w - 1.5f;
+        float maxBoundZ = h - 1.5f;
+        float midX = w * 0.5f;
+        float midZ = h * 0.5f;
+
         // Split into 4 quadrants to force flanking
-        float midX = 6f, midZ = 6f;
-        float minX, maxX, minZ, maxZ;
+        float qMinX, qMaxX, qMinZ, qMaxZ;
         switch (side % 4)
         {
-            case 0: minX = 1.5f; maxX = midX - 1f; minZ = 1.5f; maxZ = midZ - 1f; break; // SW
-            case 1: minX = midX + 1f; maxX = 10.5f; minZ = midZ + 1f; maxZ = 10.5f; break; // NE
-            case 2: minX = midX + 1f; maxX = 10.5f; minZ = 1.5f; maxZ = midZ - 1f; break; // SE
-            default: minX = 1.5f; maxX = midX - 1f; minZ = midZ + 1f; maxZ = 10.5f; break; // NW
+            case 0: qMinX = minBound; qMaxX = midX - 1f; qMinZ = minBound; qMaxZ = midZ - 1f; break;
+            case 1: qMinX = midX + 1f; qMaxX = maxBoundX; qMinZ = midZ + 1f; qMaxZ = maxBoundZ; break;
+            case 2: qMinX = midX + 1f; qMaxX = maxBoundX; qMinZ = minBound; qMaxZ = midZ - 1f; break;
+            default: qMinX = minBound; qMaxX = midX - 1f; qMinZ = midZ + 1f; qMaxZ = maxBoundZ; break;
         }
-        Vector3 pos; int safety = 30;
+
+        Vector3 pos;
+        int safety = 50;
+        bool valid;
         do {
-            pos = new Vector3(Random.Range(minX, maxX), 0, Random.Range(minZ, maxZ));
+            pos = new Vector3(Random.Range(qMinX, qMaxX), 0, Random.Range(qMinZ, qMaxZ));
+            int tileX = Mathf.FloorToInt(pos.x);
+            int tileZ = Mathf.FloorToInt(pos.z);
+            valid = RoomBuilder.ShouldPlaceTile(shape, tileX, tileZ, w, h, halfW, halfH)
+                    && Vector3.Distance(pos, player.transform.position) >= 4f;
             safety--;
-        } while (Vector3.Distance(pos, player.transform.position) < 4f && safety > 0);
+        } while (!valid && safety > 0);
+
+        // Fallback: if quadrant has no valid tiles, try any valid tile in the room
+        if (!valid)
+        {
+            safety = 50;
+            do {
+                pos = new Vector3(Random.Range(minBound, maxBoundX), 0, Random.Range(minBound, maxBoundZ));
+                int tileX = Mathf.FloorToInt(pos.x);
+                int tileZ = Mathf.FloorToInt(pos.z);
+                valid = RoomBuilder.ShouldPlaceTile(shape, tileX, tileZ, w, h, halfW, halfH)
+                        && Vector3.Distance(pos, player.transform.position) >= 3f;
+                safety--;
+            } while (!valid && safety > 0);
+        }
+
         return pos;
     }
 

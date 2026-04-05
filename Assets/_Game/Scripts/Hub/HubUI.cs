@@ -28,10 +28,14 @@ public class HubUI : MonoBehaviour
         allElements = elements;
 
         uiDoc = gameObject.AddComponent<UIDocument>();
-        var ps = ScriptableObject.CreateInstance<PanelSettings>();
-        ps.scaleMode = PanelScaleMode.ScaleWithScreenSize;
-        ps.referenceResolution = new Vector2Int(1920, 1080);
-        ps.themeStyleSheet = ThemeStyleSheet.CreateInstance<ThemeStyleSheet>();
+        var ps = Resources.Load<PanelSettings>("UI/DefaultPanelSettings");
+        if (ps == null)
+        {
+            ps = ScriptableObject.CreateInstance<PanelSettings>();
+            ps.scaleMode = PanelScaleMode.ScaleWithScreenSize;
+            ps.referenceResolution = new Vector2Int(1920, 1080);
+            ps.themeStyleSheet = ScriptableObject.CreateInstance<ThemeStyleSheet>();
+        }
         uiDoc.panelSettings = ps;
 
         var font = Font.CreateDynamicFontFromOSFont("Arial", 14);

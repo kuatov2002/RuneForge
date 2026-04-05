@@ -12,6 +12,8 @@ public static class RoomBuilder
     static Material pillarMat;
 
     public static RoomShape LastBuiltShape { get; private set; }
+    public static int LastWidth { get; private set; }
+    public static int LastHeight { get; private set; }
 
     public static GameObject Build(int width = 12, int height = 12,
         bool doorN = false, bool doorS = false, bool doorE = false, bool doorW = false,
@@ -33,6 +35,9 @@ public static class RoomBuilder
             width = 6;
             height = Mathf.RoundToInt(height * 1.3f);
         }
+
+        LastWidth = width;
+        LastHeight = height;
 
         float halfW = width * 0.5f;
         float halfH = height * 0.5f;
@@ -255,7 +260,7 @@ public static class RoomBuilder
     /// <summary>
     /// Determines whether a floor tile should be placed at (x, z) based on room shape.
     /// </summary>
-    static bool ShouldPlaceTile(RoomShape shape, int x, int z, int w, int h,
+    public static bool ShouldPlaceTile(RoomShape shape, int x, int z, int w, int h,
         float halfW, float halfH)
     {
         switch (shape)

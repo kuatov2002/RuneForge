@@ -346,11 +346,11 @@ public class DeathRingEffect : MonoBehaviour
         }
         float scale = Mathf.Lerp(0.5f, _targetScale, t);
         transform.localScale = new Vector3(scale, 0.02f, scale);
-        if (_renderer != null)
+        if (_renderer != null && _renderer.material != null)
         {
-            Color c = _renderer.material.GetColor("_EmissionColor");
+            Color c = _renderer.material.GetColor("_Color");
             c.a = 1f - t;
-            _renderer.material.SetColor("_EmissionColor", c * (1f - t));
+            _renderer.material.SetColor("_Color", c * (1f - t));
         }
     }
 }
