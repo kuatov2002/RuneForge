@@ -281,17 +281,201 @@ public class SFXSystem : MonoBehaviour
         AudioSource.PlayClipAtPoint(_clips[idx], position, volume);
     }
 
-    // ─── Ambient Music ───
+    // ─── Music System ───
+
+    public enum MusicTrack { None, Title, Hub, Combat, Boss }
 
     AudioSource _musicSource;
-    bool _musicPlaying;
+    AudioSource _musicSourceB; // for crossfade
+    MusicTrack _currentTrack = MusicTrack.None;
+    bool _crossfading;
+    float _crossfadeTimer;
+    const float CrossfadeDuration = 1.5f;
+    static AudioClip[] _musicClips;
 
-    /// <summary>Start looping ambient music (procedurally generated drone).</summary>
-    public void StartMusic()
+    void GenerateMusicClips()
     {
-        if (_musicPlaying) return;
-        _musicPlaying = true;
+        if (_musicClips != null) return;
+        _musicClips = new AudioClip[System.Enum.GetValues(typeof(MusicTrack)).Length];
 
+        const int sr = 44100;
+        const float TAU = Mathf.PI * 2f;
+
+        // ─── TITLE: Mysterious, grand, slow build ───
+        _musicClips[(int)MusicTrack.Title] = MakeMusicClip("TitleMusic", 12f, sr, (t, d) =>
+        {
+            float phase = t / d;
+            // Deep resonant drone in D minor
+            float drone = Mathf.Sin(t * 73.4f * TAU) * 0.25f;  // D2
+            drone += Mathf.Sin(t * 110f * TAU) * 0.15f;         // A2
+            drone += Mathf.Sin(t * 146.8f * TAU) * 0.08f;       // D3
+
+            // Slow swell envelope
+            float swell = 0.5f + 0.5f * Mathf.Sin(phase * TAU * 0.5f);
+            drone *= swell;
+
+            // Ethereal high pad — fifths shimmering
+            float pad = Mathf.Sin(t * 587f * TAU) * 0.02f;  // D5
+            pad += Mathf.Sin(t * 880f * TAU) * 0.015f;       // A5
+            float padEnv = 0.3f + 0.7f * Mathf.Sin(phase * TAU);
+            pad *= padEnv;
+
+            // Mystical bell tones — every 3 seconds, a note rings
+            float bellPhase = (t % 3f) / 3f;
+            float bellFreq = (int)(t / 3f) % 4 == 0 ? 587f : (int)(t / 3f) % 4 == 1 ? 698f :
+                             (int)(t / 3f) % 4 == 2 ? 880f : 784f;
+            float bell = Mathf.Sin(t * bellFreq * TAU) * Mathf.Exp(-bellPhase * 4f) * 0.06f;
+
+            // Subtle noise texture
+            float noise = Noise(t, 300f) * 0.02f * swell;
+
+            return Mathf.Clamp(drone + pad + bell + noise, -1f, 1f);
+        });
+
+        // ─── HUB: Calm, warm, contemplative ───
+        _musicClips[(int)MusicTrack.Hub] = MakeMusicClip("HubMusic", 16f, sr, (t, d) =>
+        {
+            float phase = t / d;
+
+            // Warm pad in C major — root + third + fifth
+            float pad = Mathf.Sin(t * 65.4f * TAU) * 0.2f;   // C2
+            pad += Mathf.Sin(t * 82.4f * TAU) * 0.12f;        // E2
+            pad += Mathf.Sin(t * 98f * TAU) * 0.1f;           // G2
+            pad += Mathf.Sin(t * 130.8f * TAU) * 0.06f;       // C3
+
+            // Breathing LFO
+            float lfo = 0.6f + 0.4f * Mathf.Sin(t * 0.2f * TAU);
+            pad *= lfo;
+
+            // Gentle melodic notes — pentatonic sequence
+            float[] melody = { 523f, 587f, 659f, 784f, 880f, 784f, 659f, 587f };
+            float noteLen = d / melody.Length;
+            int noteIdx = (int)(t / noteLen) % melody.Length;
+            float noteT = (t % noteLen) / noteLen;
+            float noteEnv = Mathf.Sin(noteT * Mathf.PI) * 0.6f; // Bell shape
+            float mel = Mathf.Sin(t * melody[noteIdx] * TAU) * noteEnv * 0.04f;
+
+            // Soft high harmonics
+            float shimmer = Mathf.Sin(t * 1047f * TAU) * 0.01f; // C6
+            shimmer *= 0.5f + 0.5f * Mathf.Sin(t * 0.15f * TAU);
+
+            // Warmth: soft filtered noise
+            float warmth = Noise(t, 200f) * 0.015f * lfo;
+
+            return Mathf.Clamp(pad + mel + shimmer + warmth, -1f, 1f);
+        });
+
+        // ─── COMBAT: Driving, rhythmic, tense ───
+        _musicClips[(int)MusicTrack.Combat] = MakeMusicClip("CombatMusic", 8f, sr, (t, d) =>
+        {
+            float phase = t / d;
+
+            // Kick drum pattern — 4 beats per loop (120 BPM in 8s = 16 beats)
+            float beatLen = d / 16f;
+            float beatPhase = (t % beatLen) / beatLen;
+            float kick = Mathf.Sin(beatPhase * 200f * TAU * (1f - beatPhase)) * Mathf.Exp(-beatPhase * 20f) * 0.3f;
+
+            // Hi-hat on offbeats
+            float halfBeat = d / 32f;
+            float hihatPhase = (t % halfBeat) / halfBeat;
+            float hihat = Noise(t, 12000f) * Mathf.Exp(-hihatPhase * 40f) * 0.08f;
+
+            // Aggressive bass in E minor — pulsing
+            float bassFreq = 82.4f; // E2
+            float bassPulse = 0.5f + 0.5f * Mathf.Sin(beatPhase * Mathf.PI);
+            float bass = Mathf.Sin(t * bassFreq * TAU) * 0.2f * bassPulse;
+            bass += Mathf.Sin(t * bassFreq * 2f * TAU) * 0.08f * bassPulse; // Octave harmonic
+
+            // Tension chord stabs — Am on beats 1, 5, 9, 13
+            int beatNum = (int)(t / beatLen) % 16;
+            float stab = 0f;
+            if (beatNum % 4 == 0)
+            {
+                float stabEnv = Mathf.Exp(-beatPhase * 8f);
+                stab = (Mathf.Sin(t * 220f * TAU) + Mathf.Sin(t * 330f * TAU) * 0.6f +
+                        Mathf.Sin(t * 440f * TAU) * 0.3f) * stabEnv * 0.08f;
+            }
+
+            // Rising tension sweep across the loop
+            float sweepFreq = 150f + phase * 400f;
+            float sweep = Mathf.Sin(t * sweepFreq * TAU) * 0.03f * phase;
+
+            // Rhythmic noise accent
+            float accent = 0f;
+            if (beatNum % 4 == 2)
+                accent = Noise(t, 3000f) * Mathf.Exp(-beatPhase * 15f) * 0.1f;
+
+            return Mathf.Clamp(kick + hihat + bass + stab + sweep + accent, -1f, 1f);
+        });
+
+        // ─── BOSS: Epic, intense, dramatic ───
+        _musicClips[(int)MusicTrack.Boss] = MakeMusicClip("BossMusic", 10f, sr, (t, d) =>
+        {
+            float phase = t / d;
+
+            // Heavy double-time kick (150 BPM feel)
+            float beatLen = d / 20f;
+            float beatPhase = (t % beatLen) / beatLen;
+            float kick = Mathf.Sin(beatPhase * 250f * TAU * (1f - beatPhase * 0.8f)) * Mathf.Exp(-beatPhase * 15f) * 0.35f;
+
+            // Snare on beats 5, 10, 15, 20
+            int beatNum = (int)(t / beatLen) % 20;
+            float snare = 0f;
+            if (beatNum % 5 == 4)
+                snare = Noise(t, 5000f) * Mathf.Exp(-beatPhase * 12f) * 0.2f;
+
+            // Deep power bass — D minor, octave pulse
+            float bassRoot = 73.4f; // D2
+            float bassOct = Mathf.Sin(t * bassRoot * TAU) * 0.22f;
+            bassOct += Mathf.Sin(t * bassRoot * 2f * TAU) * 0.1f;
+            float bassPulse = 0.6f + 0.4f * Mathf.Sin(beatPhase * Mathf.PI);
+            bassOct *= bassPulse;
+
+            // Dissonant power chord stabs — Dm, Bb, C progression
+            float[] chordRoots = { 293.7f, 233.1f, 261.6f }; // D4, Bb3, C4
+            int chordIdx = (int)(phase * 3f) % 3;
+            float chordRoot = chordRoots[chordIdx];
+            float stabEnv = 0f;
+            if (beatNum % 5 < 2)
+                stabEnv = Mathf.Exp(-beatPhase * 6f) * 0.8f;
+            float chord = (Mathf.Sin(t * chordRoot * TAU) +
+                          Mathf.Sin(t * chordRoot * 1.2f * TAU) * 0.7f + // minor third
+                          Mathf.Sin(t * chordRoot * 1.5f * TAU) * 0.5f)  // fifth
+                          * stabEnv * 0.08f;
+
+            // Eerie high wail — slides between notes
+            float wailFreq = 880f + Mathf.Sin(phase * TAU * 2f) * 200f;
+            float wail = Mathf.Sin(t * wailFreq * TAU) * 0.025f;
+            wail *= 0.5f + 0.5f * Mathf.Sin(t * 3f * TAU); // Tremolo
+
+            // Tension riser — noise sweep building across the loop
+            float riser = Noise(t, 1000f + phase * 5000f) * phase * 0.06f;
+
+            // Impact hit at loop start
+            float impact = 0f;
+            if (t < 0.15f)
+                impact = Mathf.Sin(t * 60f * TAU) * Mathf.Exp(-t * 12f) * 0.3f;
+
+            return Mathf.Clamp(kick + snare + bassOct + chord + wail + riser + impact, -1f, 1f);
+        });
+    }
+
+    static AudioClip MakeMusicClip(string name, float duration, int sampleRate, WaveFunc wave)
+    {
+        int samples = Mathf.CeilToInt(duration * sampleRate);
+        float[] data = new float[samples];
+        for (int i = 0; i < samples; i++)
+        {
+            float t = (float)i / sampleRate;
+            data[i] = Mathf.Clamp(wave(t, duration), -1f, 1f);
+        }
+        var clip = AudioClip.Create(name, samples, 1, sampleRate, false);
+        clip.SetData(data, 0);
+        return clip;
+    }
+
+    void EnsureMusicSources()
+    {
         if (_musicSource == null)
         {
             _musicSource = gameObject.AddComponent<AudioSource>();
@@ -299,43 +483,84 @@ public class SFXSystem : MonoBehaviour
             _musicSource.loop = true;
             _musicSource.volume = 0.08f;
         }
-
-        // Generate ambient drone: low pads + subtle melody
-        float duration = 8f; // 8 second loop
-        int sampleRate = 44100;
-        int samples = Mathf.CeilToInt(duration * sampleRate);
-        float[] data = new float[samples];
-
-        for (int i = 0; i < samples; i++)
+        if (_musicSourceB == null)
         {
-            float t = (float)i / sampleRate;
-            float phase = t / duration; // 0-1 across the loop
+            _musicSourceB = gameObject.AddComponent<AudioSource>();
+            _musicSourceB.spatialBlend = 0f;
+            _musicSourceB.loop = true;
+            _musicSourceB.volume = 0f;
+        }
+    }
 
-            // Low drone pad (smooth loop)
-            float drone = Mathf.Sin(t * 55f * Mathf.PI * 2f) * 0.3f; // A1
-            drone += Mathf.Sin(t * 82.5f * Mathf.PI * 2f) * 0.15f; // E2
-            drone += Mathf.Sin(t * 110f * Mathf.PI * 2f) * 0.1f; // A2
+    /// <summary>Start looping ambient music (legacy — defaults to Combat track).</summary>
+    public void StartMusic()
+    {
+        SetMusicTrack(MusicTrack.Combat);
+    }
 
-            // Slow LFO modulation
-            float lfo = 0.7f + 0.3f * Mathf.Sin(t * 0.3f * Mathf.PI * 2f);
-            drone *= lfo;
+    /// <summary>Switch to a specific music track with crossfade.</summary>
+    public void SetMusicTrack(MusicTrack track)
+    {
+        if (track == _currentTrack) return;
+        GenerateMusicClips();
+        EnsureMusicSources();
 
-            // Subtle high shimmer
-            float shimmer = Mathf.Sin(t * 440f * Mathf.PI * 2f) * 0.02f;
-            shimmer *= (0.5f + 0.5f * Mathf.Sin(t * 0.5f * Mathf.PI * 2f));
-
-            data[i] = Mathf.Clamp(drone + shimmer, -1f, 1f);
+        if (track == MusicTrack.None)
+        {
+            StopMusic();
+            return;
         }
 
-        var clip = AudioClip.Create("AmbientMusic", samples, 1, sampleRate, false);
-        clip.SetData(data, 0);
-        _musicSource.clip = clip;
-        _musicSource.Play();
+        int idx = (int)track;
+        if (idx < 0 || idx >= _musicClips.Length || _musicClips[idx] == null) return;
+
+        if (_currentTrack == MusicTrack.None)
+        {
+            // No music playing — just start directly
+            _musicSource.clip = _musicClips[idx];
+            _musicSource.volume = 0.08f;
+            _musicSource.Play();
+            _currentTrack = track;
+            return;
+        }
+
+        // Crossfade: swap sources — B gets the new track, A fades out
+        _musicSourceB.clip = _musicClips[idx];
+        _musicSourceB.volume = 0f;
+        _musicSourceB.Play();
+        _crossfading = true;
+        _crossfadeTimer = 0f;
+        _currentTrack = track;
+    }
+
+    void UpdateMusicCrossfade()
+    {
+        if (!_crossfading) return;
+        _crossfadeTimer += Time.unscaledDeltaTime;
+        float t = Mathf.Clamp01(_crossfadeTimer / CrossfadeDuration);
+
+        _musicSource.volume = 0.08f * (1f - t);
+        _musicSourceB.volume = 0.08f * t;
+
+        if (t >= 1f)
+        {
+            _crossfading = false;
+            _musicSource.Stop();
+            // Swap sources so _musicSource is always the active one
+            (_musicSource, _musicSourceB) = (_musicSourceB, _musicSource);
+        }
     }
 
     public void StopMusic()
     {
-        _musicPlaying = false;
-        if (_musicSource != null) _musicSource.Stop();
+        _currentTrack = MusicTrack.None;
+        _crossfading = false;
+        if (_musicSource != null) { _musicSource.Stop(); _musicSource.volume = 0f; }
+        if (_musicSourceB != null) { _musicSourceB.Stop(); _musicSourceB.volume = 0f; }
+    }
+
+    void LateUpdate()
+    {
+        UpdateMusicCrossfade();
     }
 }

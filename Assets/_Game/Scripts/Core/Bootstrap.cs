@@ -94,6 +94,12 @@ public class Bootstrap : MonoBehaviour
     HubUI hubUI;
     GoldSystem goldSystem;
 
+    // Title screen
+    TitleScreen titleScreen;
+
+    // Screen transition
+    ScreenTransition screenTransition;
+
     static Material litMat;
 
     [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
@@ -110,8 +116,84 @@ public class Bootstrap : MonoBehaviour
         CreateGameFeel();
         CreateGoldSystem();
         CreateSFXSystem();
+        CreateScreenTransition();
         DoorTrigger.OnDoorEntered += OnDoorEntered;
-        EnterHub();
+        ShowTitleScreen();
+    }
+
+    void CreateScreenTransition()
+    {
+        var go = new GameObject("ScreenTransition");
+        screenTransition = go.AddComponent<ScreenTransition>();
+        DontDestroyOnLoad(go);
+    }
+
+    void AttachTransitionToCamera()
+    {
+        if (screenTransition == null) return;
+        screenTransition.Init(); // Creates quad parented to Camera.main
+    }
+
+    void ShowTitleScreen()
+    {
+        // Top-down camera matching the game's actual perspective
+        foreach (var c in FindObjectsByType<Camera>(FindObjectsSortMode.None))
+            Destroy(c.gameObject);
+        var camGO = new GameObject("TitleCamera");
+        camGO.tag = "MainCamera";
+        var camera = camGO.AddComponent<Camera>();
+        camera.orthographic = false;
+        camera.fieldOfView = 45f;
+        camera.backgroundColor = new Color(0.02f, 0.02f, 0.04f);
+        camera.clearFlags = CameraClearFlags.SolidColor;
+        camera.nearClipPlane = 0.1f;
+        camera.farClipPlane = 60f;
+        // Cinematic angle — perspective gives depth, slow orbit in TitleScreen.Update
+        camGO.transform.position = new Vector3(0, 8f, -4f);
+        camGO.transform.rotation = Quaternion.Euler(40f, 0, 0);
+        camGO.AddComponent<AudioListener>();
+
+        // Post-processing: bloom + vignette (slightly stronger than gameplay for drama)
+        var cameraData = camGO.AddComponent<UnityEngine.Rendering.Universal.UniversalAdditionalCameraData>();
+        cameraData.renderPostProcessing = true;
+        var volumeGO = new GameObject("TitleVolume");
+        volumeGO.transform.parent = camGO.transform;
+        var volume = volumeGO.AddComponent<Volume>();
+        volume.isGlobal = true;
+        var bloom = volume.profile.Add<UnityEngine.Rendering.Universal.Bloom>();
+        bloom.intensity.overrideState = true;
+        bloom.intensity.value = 0.6f;
+        bloom.threshold.overrideState = true;
+        bloom.threshold.value = 0.7f;
+        bloom.scatter.overrideState = true;
+        bloom.scatter.value = 0.6f;
+        var vignette = volume.profile.Add<UnityEngine.Rendering.Universal.Vignette>();
+        vignette.intensity.overrideState = true;
+        vignette.intensity.value = 0.3f;
+
+        AttachTransitionToCamera();
+        screenTransition.SetBlack();
+        screenTransition.FadeTo(0f, 1.5f, null);
+
+        // Title music
+        if (SFXSystem.Instance != null) SFXSystem.Instance.SetMusicTrack(SFXSystem.MusicTrack.Title);
+
+        var titleGO = new GameObject("TitleScreen");
+        titleScreen = titleGO.AddComponent<TitleScreen>();
+        titleScreen.Init(() =>
+        {
+            // Prevent double-click
+            if (titleScreen == null) return;
+            var ts = titleScreen;
+            titleScreen = null;
+
+            screenTransition.FadeTo(1f, 0.6f, () =>
+            {
+                Destroy(ts.gameObject);
+                Destroy(camGO);
+                EnterHub();
+            });
+        });
     }
 
     void EnterHub()
@@ -123,6 +205,17 @@ public class Bootstrap : MonoBehaviour
         CreatePlayer();
         player.transform.position = new Vector3(10, 0, 10); // Hub center
         CreateCamera();
+        AttachTransitionToCamera();
+
+        // Fade in from black
+        if (screenTransition != null)
+        {
+            screenTransition.SetBlack();
+            screenTransition.FadeTo(0f, 0.5f, null);
+        }
+
+        // Hub music
+        if (SFXSystem.Instance != null) SFXSystem.Instance.SetMusicTrack(SFXSystem.MusicTrack.Hub);
 
         // Hub UI
         var hubUIGO = new GameObject("HubUI");
@@ -131,6 +224,17 @@ public class Bootstrap : MonoBehaviour
     }
 
     void StartRunFromHub()
+    {
+        // Fade out, then start the run
+        if (screenTransition != null)
+        {
+            screenTransition.FadeTo(1f, 0.4f, () => StartRunAfterFade());
+            return;
+        }
+        StartRunAfterFade();
+    }
+
+    void StartRunAfterFade()
     {
         inHub = false;
 
@@ -157,6 +261,12 @@ public class Bootstrap : MonoBehaviour
         CreatePlayer();
         ApplyMetaProgressionToPlayer();
         CreateCamera();
+        AttachTransitionToCamera();
+        if (screenTransition != null)
+        {
+            screenTransition.SetBlack();
+            screenTransition.FadeTo(0f, 0.5f, null);
+        }
         CreateHUD();
         hud.RefreshRelics(relicMgr.OwnedRelics);
 
@@ -195,8 +305,8 @@ public class Bootstrap : MonoBehaviour
 
         SpawnWave();
 
-        // Start ambient music
-        if (SFXSystem.Instance != null) SFXSystem.Instance.StartMusic();
+        // Combat music
+        if (SFXSystem.Instance != null) SFXSystem.Instance.SetMusicTrack(SFXSystem.MusicTrack.Combat);
 
         // Codex: load discovery tracking
         Codex.Load();
@@ -652,6 +762,21 @@ public class Bootstrap : MonoBehaviour
     };
 
     void TransitionToRoom(NodeType nodeType)
+    {
+        // Quick fade transition between rooms
+        if (screenTransition != null)
+        {
+            screenTransition.FadeTo(1f, 0.25f, () =>
+            {
+                DoRoomTransition(nodeType);
+                screenTransition.FadeTo(0f, 0.25f, null);
+            });
+            return;
+        }
+        DoRoomTransition(nodeType);
+    }
+
+    void DoRoomTransition(NodeType nodeType)
     {
         // Clean up
         if (rewardPickup != null) { Destroy(rewardPickup); rewardPickup = null; }
@@ -1239,6 +1364,9 @@ public class Bootstrap : MonoBehaviour
 
         hud.ShowBossIntro(bossName, lore);
         SFXSystem.Play(SFXSystem.SFXType.BossIntro, player.transform.position);
+
+        // Switch to boss music
+        if (SFXSystem.Instance != null) SFXSystem.Instance.SetMusicTrack(SFXSystem.MusicTrack.Boss);
 
         if (cam != null) cam.ZoomTo(8f, 0.5f);
     }
@@ -2757,6 +2885,8 @@ public class Bootstrap : MonoBehaviour
             {
                 // After boss: also offer synergy + element unlock
                 bossActive = false;
+                // Return to combat music after boss
+                if (SFXSystem.Instance != null) SFXSystem.Instance.SetMusicTrack(SFXSystem.MusicTrack.Combat);
                 ShowPostBossRewards();
                 return;
             }
@@ -2896,6 +3026,21 @@ public class Bootstrap : MonoBehaviour
     void ReturnToHub()
     {
         isPlayerDead = false;
+
+        // Fade out then return to hub
+        if (screenTransition != null)
+        {
+            screenTransition.FadeTo(1f, 0.5f, () =>
+            {
+                if (SFXSystem.Instance != null) SFXSystem.Instance.StopMusic();
+                SpellInteractionSystem.OnReaction -= OnSpellReaction;
+                ElementalStatus.OnReaction -= OnSpellReaction;
+                CleanupRun();
+                EnterHub();
+            });
+            return;
+        }
+
         if (SFXSystem.Instance != null) SFXSystem.Instance.StopMusic();
         SpellInteractionSystem.OnReaction -= OnSpellReaction;
         ElementalStatus.OnReaction -= OnSpellReaction;
